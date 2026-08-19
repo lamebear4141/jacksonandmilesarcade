@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>The Arcade</title>
+<style>
+  :root{
+    --sky-top:#1a1a3e;
+    --sky-bottom:#3d2b6e;
+    --panel:#241640;
+    --ink:#f4f0ff;
+    --accent:#ffd23f;
+  }
+  * { box-sizing: border-box; }
+  html,body{
+    margin:0; min-height:100%;
+    background: linear-gradient(180deg,var(--sky-top),var(--sky-bottom));
+    font-family: 'Trebuchet MS', 'Arial Rounded MT Bold', sans-serif;
+    color: var(--ink);
+  }
+  .wrap{ max-width: 720px; margin: 0 auto; padding: 40px 20px; text-align:center; }
+  h1{
+    font-size: 40px; margin: 0 0 6px;
+    text-shadow: 0 3px 0 rgba(0,0,0,0.35);
+  }
+  p.sub{ color:#c9bfe8; margin:0 0 32px; font-size:15px; }
+  .grid{
+    display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:18px;
+  }
+  a.tile{
+    display:flex; flex-direction:column; align-items:center; gap:10px;
+    background: var(--panel); border-radius: 20px; padding: 26px 16px;
+    text-decoration:none; color: var(--ink);
+    box-shadow: 0 5px 0 #140a28;
+    transition: transform 0.12s ease;
+  }
+  a.tile:active{ transform: translateY(3px); box-shadow: 0 2px 0 #140a28; }
+  a.tile .emoji{ font-size: 44px; }
+  a.tile .name{ font-weight: 800; font-size: 16px; }
+  .empty{
+    background: var(--panel); border-radius: 20px; padding: 30px; color:#c9bfe8;
+    border: 2px dashed #4a3080; grid-column: 1 / -1;
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🕹️ The Arcade</h1>
+    <p class="sub">Pick a game to play!</p>
+    <div class="grid">
+      <a class="tile" href="multiverse-collector/index.html">
+        <span class="emoji">🟩</span>
+        <span class="name">Multiverse Collector</span>
+      </a>
+      <div class="empty">More games coming soon…</div>
+    </div>
+  </div>
+</body>
+</html>
