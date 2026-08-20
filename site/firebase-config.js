@@ -98,10 +98,48 @@ export function clearCurrentKid() {
 }
 
 /* =======================================================================
-   Per-kid game progress, stored right on their child doc:
-   families/{parentUID}/children/{childId}.progress[gameId]
+   Guest players — no sign-in, no cloud. A family that doesn't want an
+   account yet (or is on a device that isn't theirs) can still play: guest
+   profiles and their progress live only in this browser's localStorage.
+   Stats don't follow them to another device, and re-installing/clearing
+   the browser loses them — that's the trade for skipping sign-up. A kid's
+   id here is prefixed "guest-" so the functions below can tell at a
+   glance whether to talk to Firestore or to localStorage.
+   ======================================================================= */
+function readLocal(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
+  catch { return fallback; }
+}
+
+export function isGuestKid(id) {
+  return typeof id === 'string' && id.startsWith('guest-');
+}
+
+const GUEST_LIST_KEY = 'arcade.guestChildren';
+export function listLocalGuests() {
+  return readLocal(GUEST_LIST_KEY, []);
+}
+export function addLocalGuest(nickname) {
+  const guests = listLocalGuests();
+  const guest = { id: 'guest-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), nickname };
+  guests.push(guest);
+  localStorage.setItem(GUEST_LIST_KEY, JSON.stringify(guests));
+  return guest;
+}
+
+/* =======================================================================
+   Per-kid game progress. For a real (signed-in) kid this lives on their
+   child doc: families/{parentUID}/children/{childId}.progress[gameId].
+   For a guest kid it lives under a localStorage key keyed by their id.
    ======================================================================= */
 export async function saveChildProgress(childId, gameId, data) {
+  if (isGuestKid(childId)) {
+    const key = 'arcade.guestProgress.' + childId;
+    const all = readLocal(key, {});
+    all[gameId] = { ...data, updatedAt: Date.now() };
+    localStorage.setItem(key, JSON.stringify(all));
+    return;
+  }
   const uid = auth.currentUser?.uid;
   if (!uid) throw new Error('Not signed in');
   await setDoc(doc(db, 'families', uid, 'children', childId), {
@@ -110,6 +148,10 @@ export async function saveChildProgress(childId, gameId, data) {
 }
 
 export async function loadChildProgress(childId, gameId) {
+  if (isGuestKid(childId)) {
+    const all = readLocal('arcade.guestProgress.' + childId, {});
+    return all[gameId] || null;
+  }
   const uid = auth.currentUser?.uid;
   if (!uid) return null;
   const snap = await getDoc(doc(db, 'families', uid, 'children', childId));
@@ -120,9 +162,18 @@ export async function loadChildProgress(childId, gameId) {
 /* =======================================================================
    Public leaderboard — top-level "high_scores" collection. Only ever
    stores/returns a nickname + score: never a real name, email, or which
-   family a nickname belongs to.
+   family a nickname belongs to. Guest play never reaches this collection
+   (Firestore rules require a signed-in user to write it) — it keeps its
+   own small local scoreboard instead, via getLocalTopScores.
    ======================================================================= */
-export async function saveHighScore(game, nickname, score) {
+export async function saveHighScore(game, nickname, score, childId) {
+  if (isGuestKid(childId)) {
+    const key = 'arcade.guestScores.' + game;
+    const list = readLocal(key, []);
+    list.push({ nickname, score, t: Date.now() });
+    localStorage.setItem(key, JSON.stringify(list.slice(-100)));
+    return;
+  }
   await addDoc(collection(db, 'high_scores'), { game, nickname, score, createdAt: serverTimestamp() });
 }
 
@@ -135,6 +186,14 @@ export async function getTopScores(game, max = 10) {
     .map((d) => ({ nickname: d.data().nickname, score: d.data().score }))
     .sort((a, b) => b.score - a.score)
     .slice(0, max);
+}
+
+export async function getLocalTopScores(game, max = 10) {
+  return readLocal('arcade.guestScores.' + game, [])
+    .slice()
+    .sort((a, b) => b.score - a.score)
+    .slice(0, max)
+    .map(({ nickname, score }) => ({ nickname, score }));
 }
 
 /* =======================================================================

@@ -69,12 +69,12 @@
     border: 2px dashed #4a3080; grid-column: 1 / -1;
   }
 
-  /* ---- parent auth bar (small print, always tucked above everything else) ---- */
-  #authBar{
+  /* ---- parent / guest bars (small print, always tucked above everything else) ---- */
+  #authBar, #guestBar{
     display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:12px;
     font-size:12px; color:#9a8fc2; margin-bottom:22px;
   }
-  #authBar span{ color:#c9bfe8; }
+  #authBar span, #guestBar span{ color:#c9bfe8; }
   .linklike{
     background:none; border:none; padding:0; font:inherit; font-size:12px; font-weight:700;
     color:#9a8fc2; text-decoration:none; cursor:pointer;
@@ -107,9 +107,11 @@
   .bigBtn:active{ box-shadow:0 1px 0 #a97600; transform:translateY(3px); }
   .error{ color:#ff8a8a; font-size:12px; margin:10px 0 0; text-align:center; }
 
+  #guestModeBtn{ display:block; margin:18px auto 0; }
+
   /* ---- kid picker ---- */
-  #kidGate{ max-width:560px; margin:0 auto; }
-  #kidGate h2{ margin:0 0 4px; font-size:22px; }
+  #kidGate, #guestGate{ max-width:560px; margin:0 auto; }
+  #kidGate h2, #guestGate h2{ margin:0 0 4px; font-size:22px; }
   .kidIcons{ display:flex; flex-wrap:wrap; gap:14px; justify-content:center; margin:18px 0 4px; }
   .kid-btn{
     display:flex; flex-direction:column; align-items:center; gap:6px; background:var(--panel);
@@ -162,6 +164,12 @@
       <button class="linklike" id="logoutBtn">Log out</button>
     </div>
 
+    <div id="guestBar" class="hidden">
+      <span id="guestLabel"></span>
+      <button class="linklike hidden" id="switchProfileBtnGuest">Switch player</button>
+      <button class="linklike" id="signInInsteadBtn">Sign in to save stats</button>
+    </div>
+
     <div id="loginScreen">
       <div class="authCard">
         <h2>👪 Family Login</h2>
@@ -174,6 +182,22 @@
         <input id="authPassword" type="password" placeholder="Password" autocomplete="current-password">
         <button class="bigBtn" id="authSubmit" type="button">Sign In</button>
         <p class="error hidden" id="authError"></p>
+      </div>
+      <button class="linklike" id="guestModeBtn" type="button">🎮 Just play for fun — no sign-in</button>
+    </div>
+
+    <div id="guestGate" class="hidden">
+      <h2>Playing without signing in</h2>
+      <p class="sub">Scores stay on this device only.
+        <button class="linklike" id="goToLoginBtn" type="button">Sign in instead</button>
+        to save stats and build streaks.</p>
+      <div class="kidIcons" id="guestIcons">
+        <button class="addKidTile" id="addGuestTile" type="button"><span class="plus">➕</span>Add a player</button>
+      </div>
+      <div class="authCard hidden" id="addGuestForm">
+        <input id="newGuestName" placeholder="Nickname" maxlength="20">
+        <button class="bigBtn" id="addGuestBtn" type="button">Let's play!</button>
+        <p class="error hidden" id="addGuestError"></p>
       </div>
     </div>
 
@@ -245,6 +269,7 @@
 import {
   onParentChange, signUpParent, signInParent, signOutParent,
   addChild, listChildren, getCurrentKid, setCurrentKid, clearCurrentKid,
+  isGuestKid, listLocalGuests, addLocalGuest,
 } from './firebase-config.js';
 
 const $ = (id) => document.getElementById(id);
@@ -252,10 +277,9 @@ let childrenCache = [];
 
 /* ---------------------------------------------------------------- screens */
 function showScreen(name) {
-  ['loginScreen', 'kidGate', 'arcadeGrid'].forEach((id) => {
+  ['loginScreen', 'guestGate', 'kidGate', 'arcadeGrid'].forEach((id) => {
     $(id).classList.toggle('hidden', id !== name);
   });
-  $('switchProfileBtn').classList.toggle('hidden', name !== 'arcadeGrid');
 }
 
 function enterArcade(kid) {
@@ -263,12 +287,27 @@ function enterArcade(kid) {
   showScreen('arcadeGrid');
 }
 
+function enterArcadeAsReal(kid) {
+  $('switchProfileBtn').classList.remove('hidden');
+  $('switchProfileBtnGuest').classList.add('hidden');
+  enterArcade(kid);
+}
+
+function enterArcadeAsGuest(kid) {
+  $('authBar').classList.add('hidden');
+  $('guestBar').classList.remove('hidden');
+  $('guestLabel').textContent = `Playing as ${kid.nickname} · this device only`;
+  $('switchProfileBtnGuest').classList.remove('hidden');
+  $('switchProfileBtn').classList.add('hidden');
+  enterArcade(kid);
+}
+
 async function refreshKidGate() {
   childrenCache = await listChildren().catch(() => []);
   renderKidIcons();
   const current = getCurrentKid();
   if (current && childrenCache.some((c) => c.id === current.id)) {
-    enterArcade(current);
+    enterArcadeAsReal(current);
   } else {
     clearCurrentKid();
     showScreen('kidGate');
@@ -279,10 +318,17 @@ onParentChange(async (user) => {
   if (user) {
     $('parentEmail').textContent = user.email;
     $('authBar').classList.remove('hidden');
+    $('guestBar').classList.add('hidden');
     await refreshKidGate();
+    return;
+  }
+  $('authBar').classList.add('hidden');
+  const guestKid = getCurrentKid();
+  if (guestKid && isGuestKid(guestKid.id)) {
+    enterArcadeAsGuest(guestKid);
   } else {
-    $('authBar').classList.add('hidden');
     clearCurrentKid();
+    $('guestBar').classList.add('hidden');
     showScreen('loginScreen');
   }
 });
@@ -334,11 +380,9 @@ function avatarFor(name) {
   return AVATARS[h % AVATARS.length];
 }
 
-function renderKidIcons() {
-  const wrap = $('kidIcons');
-  const addTile = $('addKidTile');
+function renderProfileIcons(wrap, addTile, list, onPick) {
   wrap.querySelectorAll('.kid-btn').forEach((el) => el.remove());
-  childrenCache.forEach((kid) => {
+  list.forEach((kid) => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'kid-btn';
@@ -349,8 +393,17 @@ function renderKidIcons() {
     name.className = 'name';
     name.textContent = kid.nickname;
     btn.append(emoji, name);
-    btn.addEventListener('click', () => openPinPad(kid));
+    btn.addEventListener('click', () => onPick(kid));
     wrap.insertBefore(btn, addTile);
+  });
+}
+function renderKidIcons() {
+  renderProfileIcons($('kidIcons'), $('addKidTile'), childrenCache, openPinPad);
+}
+function renderGuestIcons() {
+  renderProfileIcons($('guestIcons'), $('addGuestTile'), listLocalGuests(), (guest) => {
+    setCurrentKid(guest);
+    enterArcadeAsGuest(guest);
   });
 }
 
@@ -374,6 +427,26 @@ $('addKidBtn').addEventListener('click', async () => {
     err.textContent = 'Could not save that — try again.';
     err.classList.remove('hidden');
   }
+});
+
+/* ---------------------------------------------------------------- guest mode */
+$('guestModeBtn').addEventListener('click', () => {
+  renderGuestIcons();
+  showScreen('guestGate');
+});
+$('goToLoginBtn').addEventListener('click', () => showScreen('loginScreen'));
+$('addGuestTile').addEventListener('click', () => $('addGuestForm').classList.toggle('hidden'));
+
+$('addGuestBtn').addEventListener('click', () => {
+  const name = $('newGuestName').value.trim();
+  const err = $('addGuestError');
+  err.classList.add('hidden');
+  if (!name) { err.textContent = 'Pick a nickname first.'; err.classList.remove('hidden'); return; }
+  const guest = addLocalGuest(name);
+  $('newGuestName').value = '';
+  $('addGuestForm').classList.add('hidden');
+  setCurrentKid(guest);
+  enterArcadeAsGuest(guest);
 });
 
 /* ---------------------------------------------------------------- PIN pad */
@@ -401,7 +474,7 @@ function checkPin() {
     const kid = { id: pinTarget.id, nickname: pinTarget.nickname };
     setCurrentKid(kid);
     closePinPad();
-    enterArcade(kid);
+    enterArcadeAsReal(kid);
   } else {
     $('pinError').classList.remove('hidden');
     pinValue = '';
@@ -419,11 +492,22 @@ document.querySelectorAll('.pin-keys button[data-k]').forEach((btn) => {
 $('pinBack').addEventListener('click', () => { pinValue = pinValue.slice(0, -1); updatePinDots(); });
 $('pinCancel').addEventListener('click', closePinPad);
 
-/* ---------------------------------------------------------------- parent controls */
+/* ---------------------------------------------------------------- parent / guest controls */
 $('logoutBtn').addEventListener('click', () => signOutParent());
 $('switchProfileBtn').addEventListener('click', () => {
   clearCurrentKid();
   showScreen('kidGate');
+});
+$('switchProfileBtnGuest').addEventListener('click', () => {
+  clearCurrentKid();
+  $('guestBar').classList.add('hidden');
+  renderGuestIcons();
+  showScreen('guestGate');
+});
+$('signInInsteadBtn').addEventListener('click', () => {
+  clearCurrentKid();
+  $('guestBar').classList.add('hidden');
+  showScreen('loginScreen');
 });
 </script>
 </body>

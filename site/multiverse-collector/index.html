@@ -129,8 +129,8 @@
 
   <div id="lockedScreen" class="hidden">
     <span class="lockEmoji">🔒</span>
-    <h2>Ask a parent to log in first!</h2>
-    <p>Head back to the arcade, sign in, and pick your profile.</p>
+    <h2>Pick a player first!</h2>
+    <p>Head back to the arcade, then sign in or tap "Just play for fun."</p>
     <a href="../index.html">&larr; Back to the Arcade</a>
   </div>
 
@@ -176,15 +176,17 @@
 
 <script type="module">
 import {
-  onParentChange, getCurrentKid, saveHighScore, getTopScores,
-  saveChildProgress, loadChildProgress,
+  onParentChange, getCurrentKid, saveHighScore, getTopScores, getLocalTopScores,
+  isGuestKid, saveChildProgress, loadChildProgress,
 } from '../firebase-config.js';
 
 const GAME_ID = 'multiverse-collector';
 let currentKid = null;
 
 onParentChange(async (user) => {
-  currentKid = user ? getCurrentKid() : null;
+  const kid = getCurrentKid();
+  const guest = kid && isGuestKid(kid.id);
+  currentKid = (guest || user) ? kid : null;
   if (!currentKid) {
     document.getElementById('picker').classList.add('hidden');
     document.getElementById('lockedScreen').classList.remove('hidden');
@@ -192,15 +194,20 @@ onParentChange(async (user) => {
   }
   document.getElementById('lockedScreen').classList.add('hidden');
   document.getElementById('picker').classList.remove('hidden');
-  document.getElementById('playingAsLabel').textContent = `Playing as ${currentKid.nickname}`;
+  document.getElementById('playingAsLabel').textContent = guest
+    ? `Playing as ${currentKid.nickname} · this device only`
+    : `Playing as ${currentKid.nickname}`;
   const progress = await loadChildProgress(currentKid.id, GAME_ID).catch(() => null);
   best = progress?.best || 0;
 });
 
 async function renderLeaderboard() {
   const list = document.getElementById('leaderboardList');
+  const title = document.querySelector('.lbTitle');
+  const guest = currentKid && isGuestKid(currentKid.id);
+  if (title) title.textContent = guest ? '🏆 Your Best (this device)' : '🏆 Top Scores';
   try {
-    const top = await getTopScores(GAME_ID, 5);
+    const top = guest ? await getLocalTopScores(GAME_ID, 5) : await getTopScores(GAME_ID, 5);
     list.innerHTML = '';
     if (!top.length) {
       const li = document.createElement('li');
@@ -412,7 +419,7 @@ function endGame() {
   document.getElementById('highScore').textContent = 'Best: ' + best;
   document.getElementById('gameover').classList.remove('hidden');
   if (currentKid) {
-    saveHighScore(GAME_ID, currentKid.nickname, score).catch(() => {});
+    saveHighScore(GAME_ID, currentKid.nickname, score, currentKid.id).catch(() => {});
     saveChildProgress(currentKid.id, GAME_ID, { best }).catch(() => {});
   }
   renderLeaderboard();
