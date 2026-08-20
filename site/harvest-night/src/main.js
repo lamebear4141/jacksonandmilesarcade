@@ -41,9 +41,21 @@ Object.assign(overlay.style, {
 overlay.innerHTML = 'CLICK TO ENTER THE FARM' +
   '<span style="font-size:13px;opacity:0.7;letter-spacing:0.5px">WASD move &middot; Shift sprint &middot; C crouch &middot; mouse to look</span>';
 document.body.appendChild(overlay);
-overlay.addEventListener('click', () => renderer.domElement.requestPointerLock());
+
+// Hide the overlay on click regardless of whether the browser actually grants
+// pointer lock (some browsers/embeds silently refuse it) — WASD movement works
+// without lock, so getting stuck behind a translucent overlay forever, unable
+// to see the world, is worse than losing mouse-look. Clicking the canvas again
+// re-requests lock.
+overlay.addEventListener('click', () => {
+  overlay.style.display = 'none';
+  renderer.domElement.requestPointerLock();
+});
 document.addEventListener('pointerlockchange', () => {
-  overlay.style.display = document.pointerLockElement === renderer.domElement ? 'none' : 'flex';
+  if (document.pointerLockElement !== renderer.domElement) overlay.style.display = 'flex';
+});
+document.addEventListener('pointerlockerror', () => {
+  console.warn('Pointer lock was refused by the browser — mouse look is unavailable, but WASD still works.');
 });
 
 window.addEventListener('resize', () => {

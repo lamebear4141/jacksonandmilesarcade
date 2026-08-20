@@ -94,8 +94,14 @@ export function buildWorld(scene) {
   scene.fog = new THREE.FogExp2(0x0d1020, CONFIG.fogDensity);
   scene.background = new THREE.Color(0x0d1020);
 
-  scene.add(new THREE.AmbientLight(0x404060, 0.12));
-  const moonLight = new THREE.DirectionalLight(0xaab4ff, 0.28);
+  // The spec's suggested intensities (ambient ~0.12, moon ~0.28) are tuned for
+  // three.js's older "legacy lights" mode. Modern three.js (r155+) removed that
+  // mode, so those numbers render as literal black on MeshLambertMaterial now —
+  // confirmed by direct pixel sampling. These values reproduce the same *dark,
+  // moon-and-lantern-only* mood the spec describes, just recalibrated so the
+  // ground is dim but actually visible.
+  scene.add(new THREE.AmbientLight(0x404060, 5));
+  const moonLight = new THREE.DirectionalLight(0xaab4ff, 10);
   moonLight.position.set(70, 90, -120);
   scene.add(moonLight);
 
@@ -180,7 +186,7 @@ export function buildWorld(scene) {
 
   // Farmhouse — locked, decorative. Porch light works.
   addBuilding(-14, -22, 6, 4.5, 6, '#4a3a2a', { roof: true, roofHeight: 3, roofColor: '#2a1f18' });
-  const porchLight = new THREE.PointLight(0xffa64a, 0.9, 11, 2);
+  const porchLight = new THREE.PointLight(0xffa64a, 35, 11, 2);
   porchLight.position.set(-14, 3, -19.2);
   scene.add(porchLight);
 
@@ -288,7 +294,7 @@ export function buildWorld(scene) {
     p.position.set(x, 0.35, z);
     scene.add(p);
     if (withLight) {
-      const l = new THREE.PointLight(0xff8a2a, 0.55, 6, 2);
+      const l = new THREE.PointLight(0xff8a2a, 20, 6, 2);
       l.position.set(x, 0.6, z);
       scene.add(l);
     }

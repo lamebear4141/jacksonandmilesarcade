@@ -18,7 +18,10 @@ export class Player {
     this.pitchObject.add(camera);
     this.yawObject.add(this.pitchObject);
     this.yawObject.position.copy(spawnPoint);
-    this.yawObject.rotation.y = 0; // facing +z, "north" into the farm
+    // A three.js camera looks down its local -Z axis. With zero yaw that's world -Z,
+    // which is *south*, back toward the gate. Yaw of PI points it at +Z ("north"),
+    // into the farm, matching the spec.
+    this.yawObject.rotation.y = Math.PI;
 
     this.input = { forward: false, back: false, left: false, right: false, sprint: false };
     this.locked = false;
@@ -110,8 +113,9 @@ export class Player {
       ? CONFIG.crouchSpeed
       : (sprinting ? CONFIG.sprintSpeed : CONFIG.walkSpeed);
 
-    const forward = new THREE.Vector3(Math.sin(this.yawObject.rotation.y), 0, Math.cos(this.yawObject.rotation.y));
-    const right = new THREE.Vector3(forward.z, 0, -forward.x);
+    // Matches the actual world-space direction the camera (local -Z) faces at this yaw.
+    const forward = new THREE.Vector3(-Math.sin(this.yawObject.rotation.y), 0, -Math.cos(this.yawObject.rotation.y));
+    const right = new THREE.Vector3(-forward.z, 0, forward.x);
 
     const move = new THREE.Vector3();
     if (this.input.forward) move.add(forward);
