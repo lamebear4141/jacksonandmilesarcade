@@ -6,6 +6,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["-y", "http-server", "site/harvest-night", "-p", "8210", "-c-1"],
       "port": 8210
+    },
+    {
+      "name": "site",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "http-server", "site", "-p", "8220", "-c-1"],
+      "port": 8220
     }
   ]
 }

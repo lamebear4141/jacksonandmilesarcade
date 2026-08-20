@@ -1,0 +1,161 @@
+// firebase-config.js — shared Firebase (Auth + Firestore) setup for every game.
+// No build step on this site, so the SDK is imported straight from the gstatic
+// CDN as ES modules. Any page that needs it loads this as a module:
+//   <script type="module">
+//     import { onParentChange, getCurrentKid } from '../firebase-config.js';
+//   </script>
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
+import {
+  getAuth, setPersistence, browserLocalPersistence,
+  createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
+  onAuthStateChanged,
+} from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
+import {
+  getFirestore, collection, doc, addDoc, getDoc, getDocs, setDoc,
+  query, where, limit, serverTimestamp,
+} from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDt0gGlBrdmtd6uMHL-5Cx93wFVaM2Vixg",
+  authDomain: "jacksonandmiles-arcade-60b98.firebaseapp.com",
+  projectId: "jacksonandmiles-arcade-60b98",
+  storageBucket: "jacksonandmiles-arcade-60b98.firebasestorage.app",
+  messagingSenderId: "757009166048",
+  appId: "1:757009166048:web:a18074e6e3893f00cd6a85",
+};
+
+export const app = initializeApp(firebaseConfig);
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+
+// This is already the SDK default for web, but set it explicitly: a parent
+// who signs in should stay signed in on future visits, not just this tab.
+setPersistence(auth, browserLocalPersistence).catch(() => {});
+
+/* =======================================================================
+   Parent account — real email/password login. A kid never sees or enters
+   an email or password; this is strictly the "family login" layer.
+   ======================================================================= */
+export function signUpParent(email, password) {
+  return createUserWithEmailAndPassword(auth, email, password);
+}
+export function signInParent(email, password) {
+  return signInWithEmailAndPassword(auth, email, password);
+}
+export function signOutParent() {
+  clearCurrentKid();
+  return signOut(auth);
+}
+// cb(user) fires immediately with current state, then on every change.
+export function onParentChange(cb) {
+  return onAuthStateChanged(auth, cb);
+}
+
+/* =======================================================================
+   Kids — families/{parentUID}/children/{childId}: { nickname, pin }.
+   The PIN is only ever checked against the signed-in parent's own kids
+   (Firestore rules restrict that whole subtree to request.auth.uid ==
+   parentUID), so it's just a fun "pick who's playing" gate, not security.
+   ======================================================================= */
+export async function addChild(nickname, pin) {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('Not signed in');
+  const ref = collection(db, 'families', uid, 'children');
+  const docRef = await addDoc(ref, { nickname, pin: String(pin), createdAt: serverTimestamp() });
+  return docRef.id;
+}
+
+export async function listChildren() {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return [];
+  const ref = collection(db, 'families', uid, 'children');
+  const snap = await getDocs(ref);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+export async function verifyChildPin(childId, pin) {
+  const children = await listChildren();
+  const child = children.find((c) => c.id === childId);
+  return !!child && String(child.pin) === String(pin);
+}
+
+/* =======================================================================
+   "Who's playing" — the kid selected for this browser tab session.
+   Lives in sessionStorage: it survives navigating between arcade pages in
+   this tab, but a fresh visit asks again. Not itself a security boundary.
+   ======================================================================= */
+const KID_KEY = 'arcade.currentKid';
+export function setCurrentKid(kid) {
+  sessionStorage.setItem(KID_KEY, JSON.stringify({ id: kid.id, nickname: kid.nickname }));
+}
+export function getCurrentKid() {
+  try { return JSON.parse(sessionStorage.getItem(KID_KEY)); }
+  catch { return null; }
+}
+export function clearCurrentKid() {
+  sessionStorage.removeItem(KID_KEY);
+}
+
+/* =======================================================================
+   Per-kid game progress, stored right on their child doc:
+   families/{parentUID}/children/{childId}.progress[gameId]
+   ======================================================================= */
+export async function saveChildProgress(childId, gameId, data) {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('Not signed in');
+  await setDoc(doc(db, 'families', uid, 'children', childId), {
+    progress: { [gameId]: { ...data, updatedAt: serverTimestamp() } },
+  }, { merge: true });
+}
+
+export async function loadChildProgress(childId, gameId) {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return null;
+  const snap = await getDoc(doc(db, 'families', uid, 'children', childId));
+  if (!snap.exists()) return null;
+  return snap.data()?.progress?.[gameId] || null;
+}
+
+/* =======================================================================
+   Public leaderboard — top-level "high_scores" collection. Only ever
+   stores/returns a nickname + score: never a real name, email, or which
+   family a nickname belongs to.
+   ======================================================================= */
+export async function saveHighScore(game, nickname, score) {
+  await addDoc(collection(db, 'high_scores'), { game, nickname, score, createdAt: serverTimestamp() });
+}
+
+export async function getTopScores(game, max = 10) {
+  // Equality filter only (no orderBy) so this never needs a composite index;
+  // sort client-side instead. Fine at family-arcade scale.
+  const q = query(collection(db, 'high_scores'), where('game', '==', game), limit(200));
+  const snap = await getDocs(q);
+  return snap.docs
+    .map((d) => ({ nickname: d.data().nickname, score: d.data().score }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, max);
+}
+
+/* =======================================================================
+   Firestore security rules — this repo has no deploy pipeline, so these
+   are NOT applied automatically. Paste them into Firebase Console →
+   Firestore Database → Rules for the project above:
+
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /families/{parentId}/{document=**} {
+         allow read, write: if request.auth != null && request.auth.uid == parentId;
+       }
+       match /high_scores/{scoreId} {
+         allow read: if true;
+         allow create: if request.auth != null
+           && request.resource.data.keys().hasOnly(['game', 'nickname', 'score', 'createdAt'])
+           && request.resource.data.nickname is string
+           && request.resource.data.score is number;
+         allow update, delete: if false;
+       }
+     }
+   }
+   ======================================================================= */

@@ -103,13 +103,40 @@
     transition: opacity 0.15s ease, transform 0.15s ease;
   }
   #celebration.show{ opacity:1; transform:translate(-50%,-50%) scale(1); }
+
+  #lockedScreen{
+    width:100%; max-width:520px; text-align:center; padding:60px 20px; color:var(--ink);
+  }
+  #lockedScreen .lockEmoji{ font-size:52px; display:block; margin-bottom:10px; }
+  #lockedScreen h2{ margin:0 0 8px; font-size:22px; }
+  #lockedScreen p{ color:#c9bfe8; margin:0 0 20px; font-size:14px; }
+  #lockedScreen a{
+    display:inline-block; color:#1a1030; background:var(--accent-poke,#f5c518);
+    font-weight:900; text-decoration:none; padding:12px 24px; border-radius:999px;
+    box-shadow:0 5px 0 #a97600;
+  }
+
+  #playingAsLabel{ font-weight:800; color:#ffd23f; margin:0 0 4px; font-size:13px; }
+
+  #leaderboard{ margin:14px 0; text-align:left; max-width:220px; margin-left:auto; margin-right:auto; }
+  .lbTitle{ font-size:13px; font-weight:800; text-align:center; margin:0 0 6px; color:#ffd23f; }
+  #leaderboardList{ margin:0; padding-left:20px; font-size:13px; color:#d9cfff; }
+  #leaderboardList li{ margin-bottom:2px; }
 </style>
 </head>
 <body>
 <div id="wrap">
 
-  <div id="picker">
+  <div id="lockedScreen" class="hidden">
+    <span class="lockEmoji">🔒</span>
+    <h2>Ask a parent to log in first!</h2>
+    <p>Head back to the arcade, sign in, and pick your profile.</p>
+    <a href="../index.html">&larr; Back to the Arcade</a>
+  </div>
+
+  <div id="picker" class="hidden">
     <h1>Multiverse Collector</h1>
+    <p id="playingAsLabel"></p>
     <p>Pick your hero, then catch the good stuff and dodge the bad stuff!</p>
     <div class="chars" id="charChoices">
       <button class="char-btn selected" data-emoji="🟩" data-name="Blocky">🟩<span class="name">Blocky</span></button>
@@ -132,6 +159,10 @@
       <h2>Game Over!</h2>
       <p id="finalScore">Score: 0</p>
       <p id="highScore">Best: 0</p>
+      <div id="leaderboard">
+        <p class="lbTitle">🏆 Top Scores</p>
+        <ol id="leaderboardList"></ol>
+      </div>
       <button id="playAgain">Play Again</button>
     </div>
   </div>
@@ -143,7 +174,50 @@
   </div>
 </div>
 
-<script>
+<script type="module">
+import {
+  onParentChange, getCurrentKid, saveHighScore, getTopScores,
+  saveChildProgress, loadChildProgress,
+} from '../firebase-config.js';
+
+const GAME_ID = 'multiverse-collector';
+let currentKid = null;
+
+onParentChange(async (user) => {
+  currentKid = user ? getCurrentKid() : null;
+  if (!currentKid) {
+    document.getElementById('picker').classList.add('hidden');
+    document.getElementById('lockedScreen').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('lockedScreen').classList.add('hidden');
+  document.getElementById('picker').classList.remove('hidden');
+  document.getElementById('playingAsLabel').textContent = `Playing as ${currentKid.nickname}`;
+  const progress = await loadChildProgress(currentKid.id, GAME_ID).catch(() => null);
+  best = progress?.best || 0;
+});
+
+async function renderLeaderboard() {
+  const list = document.getElementById('leaderboardList');
+  try {
+    const top = await getTopScores(GAME_ID, 5);
+    list.innerHTML = '';
+    if (!top.length) {
+      const li = document.createElement('li');
+      li.textContent = 'Be the first on the board!';
+      list.appendChild(li);
+      return;
+    }
+    top.forEach((row) => {
+      const li = document.createElement('li');
+      li.textContent = `${row.nickname} — ${row.score}`;
+      list.appendChild(li);
+    });
+  } catch (e) {
+    list.innerHTML = '';
+  }
+}
+
 // ---------- Setup ----------
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -337,6 +411,11 @@ function endGame() {
   document.getElementById('finalScore').textContent = 'Score: ' + score;
   document.getElementById('highScore').textContent = 'Best: ' + best;
   document.getElementById('gameover').classList.remove('hidden');
+  if (currentKid) {
+    saveHighScore(GAME_ID, currentKid.nickname, score).catch(() => {});
+    saveChildProgress(currentKid.id, GAME_ID, { best }).catch(() => {});
+  }
+  renderLeaderboard();
 }
 
 // ---------- Controls ----------
