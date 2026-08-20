@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "harvest-night",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "http-server", "site/harvest-night", "-p", "8210", "-c-1"],
+      "port": 8210
+    }
+  ]
+}
