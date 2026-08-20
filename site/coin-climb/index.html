@@ -231,10 +231,16 @@ function makeQuestion(topic){
     if (Math.random()<0.5) return { text:`What comes after ${n}?`, answer:n+1, hint:'' };
     return { text:`What comes before ${n}?`, answer:n-1, hint:'' };
   }
-  let a = 1+rnd(60), b = 1+rnd(60);
-  while (b === a) b = 1+rnd(60);
-  if (kind === 'bigger') return { text:`Which is BIGGER?`, answer:Math.max(a,b), hint:'', forced:[a,b] };
-  return { text:`Which is SMALLER?`, answer:Math.min(a,b), hint:'', forced:[a,b] };
+  // three distinct numbers — the choices ARE the question here, so build all
+  // three on purpose. (If we only forced two, the filler distractor could end
+  // up bigger than the "biggest", which would make the right answer look wrong.)
+  const nums = [];
+  while (nums.length < 3){
+    const n = 1+rnd(60);
+    if (!nums.includes(n)) nums.push(n);
+  }
+  if (kind === 'bigger') return { text:'Which is BIGGEST?', answer:Math.max(...nums), hint:'', forced:nums };
+  return { text:'Which is SMALLEST?', answer:Math.min(...nums), hint:'', forced:nums };
 }
 
 function makeChoices(q){

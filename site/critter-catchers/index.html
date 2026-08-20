@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Critter Catchers — Reading Quest</title>
+<style>
+  :root{
+    --sky1:#3d5afe; --sky2:#7c4dff; --grass:#2fb872;
+    --ink:#0d1b3e; --paper:#ffffff;
+    --gold:#ffc53d; --good:#22c55e; --bad:#f97362;
+    --shadow:0 8px 0 rgba(0,0,0,.18);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    font-family:"Baloo 2","Trebuchet MS","Comic Sans MS",system-ui,sans-serif;
+    background:linear-gradient(180deg,var(--sky1),var(--sky2));
+    color:var(--ink);
+    display:flex;align-items:center;justify-content:center;
+    overflow:hidden;
+  }
+  #app{
+    width:min(760px,100vw); height:min(900px,100vh);
+    background:linear-gradient(180deg,#8ed7ff 0%,#bde9ff 46%,var(--grass) 46%,#249b5c 100%);
+    position:relative; overflow:hidden;
+    display:flex; flex-direction:column;
+    box-shadow:0 20px 60px rgba(0,0,0,.35);
+  }
+  .screen{position:absolute;inset:0;display:none;flex-direction:column;padding:14px;}
+  .screen.on{display:flex;}
+
+  /* ---------- shared bits ---------- */
+  .btn{
+    border:none; border-radius:18px; padding:14px 22px;
+    font:inherit; font-weight:800; font-size:20px; color:#fff;
+    background:#2563eb; box-shadow:var(--shadow); cursor:pointer;
+    transition:transform .08s ease;
+  }
+  .btn:active{transform:translateY(4px); box-shadow:0 4px 0 rgba(0,0,0,.18);}
+  .btn.big{font-size:26px; padding:18px 34px; border-radius:24px;}
+  .btn.green{background:var(--good);}
+  .btn.gold{background:var(--gold); color:#4a3200;}
+  .btn.ghost{background:rgba(255,255,255,.9); color:var(--ink); box-shadow:0 6px 0 rgba(0,0,0,.12);}
+  .btn:disabled{opacity:.45; cursor:default;}
+  .card{background:var(--paper); border-radius:22px; padding:16px; box-shadow:0 10px 0 rgba(0,0,0,.12);}
+
+  /* ---------- title ---------- */
+  #title{align-items:center; justify-content:center; text-align:center; gap:6px;}
+  #title h1{font-size:46px; margin:0; color:#fff; text-shadow:0 5px 0 rgba(0,0,0,.25); line-height:1;}
+  #title .sub{color:#fff; font-size:20px; font-weight:700; opacity:.95; margin-bottom:6px;}
+  .parade{font-size:44px; letter-spacing:4px;}
+  #streakBadge{
+    background:rgba(255,255,255,.95); border-radius:999px; padding:8px 18px;
+    font-weight:800; font-size:18px; box-shadow:0 5px 0 rgba(0,0,0,.15);
+  }
+
+  /* ---------- HUD ---------- */
+  #hud{display:flex; gap:8px; align-items:center; justify-content:space-between; flex:0 0 auto;}
+  .chip{
+    background:rgba(255,255,255,.94); border-radius:999px; padding:6px 14px;
+    font-weight:800; font-size:16px; box-shadow:0 4px 0 rgba(0,0,0,.12); white-space:nowrap;
+  }
+  #bar{height:12px; background:rgba(255,255,255,.5); border-radius:999px; overflow:hidden; margin-top:8px; flex:0 0 auto;}
+  #barFill{height:100%; width:0%; background:var(--gold); transition:width .35s ease;}
+
+  /* ---------- play area ---------- */
+  #stage{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; margin:10px 0; min-height:0;}
+  #critter{font-size:96px; line-height:1; filter:drop-shadow(0 10px 6px rgba(0,0,0,.25)); transition:transform .3s ease, opacity .3s ease;}
+  #critter.catch{transform:scale(.1) rotate(360deg); opacity:0;}
+  #critterName{color:#fff; font-weight:900; font-size:20px; text-shadow:0 3px 0 rgba(0,0,0,.25);}
+  #prompt{
+    width:100%; background:var(--paper); border-radius:22px; padding:14px 16px;
+    box-shadow:0 8px 0 rgba(0,0,0,.14); text-align:center; overflow-y:auto; min-height:0;
+  }
+  #taskLabel{font-size:15px; font-weight:800; color:#6b7ba8; text-transform:uppercase; letter-spacing:1px;}
+  #word{font-size:56px; font-weight:900; letter-spacing:2px; margin:6px 0 2px; word-break:break-word;}
+  #word .seg{display:inline-block; padding:0 2px;}
+  #word .seg.v{color:#e2413a;}
+  #sentence{font-size:30px; font-weight:800; line-height:1.35; margin:6px 0;}
+  #story{font-size:22px; font-weight:700; line-height:1.5; text-align:left; margin:4px 0 10px;}
+  #question{font-size:26px; font-weight:900; margin:4px 0 8px;}
+  #choices{display:flex; flex-direction:column; gap:10px; margin-top:8px;}
+  .choice{
+    border:none; border-radius:16px; padding:14px; font:inherit; font-weight:800; font-size:26px;
+    background:#eef2ff; color:var(--ink); box-shadow:0 6px 0 #c7d2fe; cursor:pointer;
+  }
+  .choice:active{transform:translateY(3px); box-shadow:0 3px 0 #c7d2fe;}
+  .choice.right{background:#bbf7d0; box-shadow:0 6px 0 #4ade80;}
+  .choice.wrong{background:#fecdd3; box-shadow:0 6px 0 #fb7185;}
+  #controls{display:flex; gap:10px; align-items:center; justify-content:center; flex-wrap:wrap; flex:0 0 auto; padding-bottom:6px;}
+  #micBtn{background:#e11d48; font-size:24px; padding:16px 30px; border-radius:999px;}
+  #micBtn.live{animation:pulse .9s infinite;}
+  @keyframes pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.07);}}
+  #heard{color:#fff; font-weight:800; min-height:24px; text-align:center; text-shadow:0 2px 0 rgba(0,0,0,.25);}
+  #feedback{
+    position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+    flex-direction:column; gap:6px; pointer-events:none; z-index:5;
+  }
+  #feedback.on{display:flex;}
+  #fbIcon{font-size:120px; animation:pop .4s ease;}
+  #fbText{font-size:34px; font-weight:900; color:#fff; text-shadow:0 4px 0 rgba(0,0,0,.3);}
+  @keyframes pop{0%{transform:scale(.3);}70%{transform:scale(1.15);}100%{transform:scale(1);}}
+
+  /* ---------- report ---------- */
+  #report{overflow-y:auto; gap:10px; justify-content:center;}
+  #report h2{margin:4px 0; text-align:center; color:#fff; font-size:34px; text-shadow:0 4px 0 rgba(0,0,0,.25);}
+  .stats{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
+  .stat{background:#fff; border-radius:18px; padding:10px; text-align:center; box-shadow:0 6px 0 rgba(0,0,0,.12);}
+  .stat b{display:block; font-size:30px;}
+  .stat span{font-size:13px; font-weight:800; color:#6b7ba8;}
+  .dexgrid{display:flex; flex-wrap:wrap; gap:6px; justify-content:center; font-size:32px;}
+  .dexgrid .locked{opacity:.18; filter:grayscale(1);}
+  #saveNote{font-size:14px; color:#fff; text-align:center; font-weight:700; opacity:.9;}
+  .pill{display:inline-block; background:#fff3cd; border-radius:999px; padding:4px 12px; margin:3px; font-weight:800;}
+  .tiny{font-size:13px; color:#6b7ba8; font-weight:700;}
+  a.back{ position:absolute; top:10px; left:14px; color:#fff; text-decoration:none; font-size:13px;
+    font-weight:900; z-index:20; text-shadow:0 2px 0 rgba(0,0,0,0.3); }
+  #grownup{position:absolute; bottom:8px; left:8px; z-index:9; background:rgba(255,255,255,.35);
+    border:none; border-radius:999px; width:30px; height:30px; font-size:14px; cursor:pointer; opacity:.6;}
+  #grownup:hover{opacity:1;}
+  #parent{overflow-y:auto; background:#f6f8ff;}
+  #parent table{width:100%; border-collapse:collapse; font-size:14px;}
+  #parent th,#parent td{padding:6px; border-bottom:1px solid #e2e8f0; text-align:left;}
+</style>
+</head>
+<body>
+<div id="app">
+  <a class="back" href="../index.html">&larr; Arcade</a>
+
+  <!-- ============ TITLE ============ -->
+  <section id="title" class="screen on">
+    <div class="parade">🦊 🐲 🦉 🐢 🦋</div>
+    <h1>Critter Catchers</h1>
+    <div class="sub">Read the words → catch the critters!</div>
+    <div id="streakBadge">🔥 Day streak: 0</div>
+    <button class="btn big gold" id="startBtn">▶ Start Today's Quest</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+      <button class="btn ghost" id="dexBtn">📖 My Critter Dex</button>
+      <button class="btn ghost" id="micTestBtn">🎤 Test my mic</button>
+    </div>
+    <div id="micStatus" style="color:#fff;font-weight:800;font-size:15px;min-height:22px"></div>
+  </section>
+
+  <!-- ============ GAME ============ -->
+  <section id="game" class="screen">
+    <div id="hud">
+      <div class="chip" id="chipProgress">Critter 1 / 18</div>
+      <div class="chip" id="chipBalls">⭐ 0</div>
+      <div class="chip" id="chipStreak">🔥 0</div>
+    </div>
+    <div id="bar"><div id="barFill"></div></div>
+
+    <div id="stage">
+      <div id="critter">🦊</div>
+      <div id="critterName">A wild Emberling appeared!</div>
+      <div id="prompt">
+        <div id="taskLabel">Read it out loud</div>
+        <div id="word"></div>
+        <div id="sentence"></div>
+        <div id="story"></div>
+        <div id="question"></div>
+        <div id="choices"></div>
+      </div>
+    </div>
+
+    <div id="heard"></div>
+    <div id="controls">
+      <button class="btn" id="hearBtn">🔊 Hear it</button>
+      <button class="btn" id="micBtn">🎤 Read it!</button>
+      <button class="btn ghost" id="skipBtn">Skip ▸</button>
+    </div>
+
+    <div id="feedback"><div id="fbIcon">⭐</div><div id="fbText">Caught it!</div></div>
+  </section>
+
+  <!-- ============ REPORT ============ -->
+  <section id="report" class="screen">
+    <h2>🏅 Great job, Miles!</h2>
+    <div class="stats">
+      <div class="stat"><b id="rAcc">0%</b><span>ACCURACY</span></div>
+      <div class="stat"><b id="rCaught">0</b><span>CAUGHT TODAY</span></div>
+      <div class="stat"><b id="rStreak">0</b><span>DAY STREAK</span></div>
+    </div>
+    <div class="card">
+      <div style="font-weight:900;font-size:18px">Today's critters</div>
+      <div class="dexgrid" id="rNewDex"></div>
+    </div>
+    <div class="card" id="practiceCard">
+      <div style="font-weight:900;font-size:18px">Words to practice 💪</div>
+      <div id="rMissed"></div>
+    </div>
+    <div id="saveNote"></div>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+      <button class="btn gold" id="saveBtn">💾 Save my report</button>
+      <button class="btn ghost" id="homeBtn">🏠 Home</button>
+    </div>
+  </section>
+
+  <!-- ============ DEX ============ -->
+  <section id="dex" class="screen">
+    <h2 style="color:#fff;text-align:center;text-shadow:0 4px 0 rgba(0,0,0,.25)">📖 Critter Dex</h2>
+    <div class="card" style="flex:1;overflow-y:auto">
+      <div class="dexgrid" id="dexGrid"></div>
+    </div>
+    <div style="text-align:center;margin-top:10px"><button class="btn ghost" id="dexBack">🏠 Home</button></div>
+  </section>
+
+  <!-- ============ PARENT ============ -->
+  <section id="parent" class="screen">
+    <h2 style="text-align:center;margin:4px">Grown-up dashboard</h2>
+    <div class="card" style="flex:1;overflow:auto">
+      <div id="parentSummary"></div>
+      <table id="parentTable"></table>
+    </div>
+    <div style="text-align:center;margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+      <button class="btn gold" id="pSave">💾 Save progress file</button>
+      <button class="btn ghost" id="pBack">Back</button>
+    </div>
+  </section>
+
+  <button id="grownup" title="Grown-up dashboard">⚙️</button>
+</div>
+
+<script>
+"use strict";
+
+/* =======================================================================
+   CRITTER CATCHERS — a daily reading quest for a 1st grader
+   Content: 1st-grade sight words, phonics patterns, decodable sentences,
+            and short passages with comprehension questions.
+   Checking: reads aloud into the mic (Web Speech API). If the mic isn't
+            available it silently switches to a tap-to-answer mode.
+   ======================================================================= */
+
+/* ---------------- storage (safe wrapper) ---------------- */
+const MEM = {};
+const store = {
+  get(k){ try { const v = localStorage.getItem(k); return v==null?MEM[k]??null:v; } catch(e){ return MEM[k]??null; } },
+  set(k,v){ MEM[k]=v; try { localStorage.setItem(k,v); } catch(e){} }
+};
+const KEY = "critterCatchers.v1";
+function loadData(){
+  try { return JSON.parse(store.get(KEY)) || blank(); } catch(e){ return blank(); }
+}
+function blank(){ return { player:"Miles", days:{}, dex:[], totalCaught:0 }; }
+function saveData(d){ store.set(KEY, JSON.stringify(d)); }
+let DATA = loadData();
+
+function todayStr(){
+  const d = new Date();
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
+function dayStreak(){
+  const days = Object.keys(DATA.days).sort();
+  if(!days.length) return 0;
+  let streak = 0;
+  let cur = new Date(todayStr()+"T12:00:00");
+  // if today not played yet, start counting from yesterday
+  if(!DATA.days[todayStr()]) cur.setDate(cur.getDate()-1);
+  for(;;){
+    const s = cur.getFullYear()+"-"+String(cur.getMonth()+1).padStart(2,"0")+"-"+String(cur.getDate()).padStart(2,"0");
+    if(DATA.days[s]){ streak++; cur.setDate(cur.getDate()-1); } else break;
+  }
+  return streak;
+}
+
+/* ---------------- critters ---------------- */
+const CRITTERS = [
+  ["🦊","Emberling"],["🐲","Scaldrake"],["🦉","Hootwise"],["🐢","Shellby"],["🦋","Flitterbee"],
+  ["🐙","Inkydoo"],["🦄","Sparklehoof"],["🐝","Buzzbolt"],["🦎","Geckozap"],["🐧","Chillpip"],
+  ["🐳","Bloopwhale"],["🦖","Chompsaur"],["🐿️","Nutnab"],["🦇","Flapshadow"],["🐸","Ribbitz"],
+  ["🐬","Splashdart"],["🦅","Skytalon"],["🐺","Howlfang"],["🐌","Slowmo"],["🦩","Pinkstilt"],
+  ["🐨","Snoozle"],["🦔","Prickles"],["🦥","Slothie"],["🐼","Bamboo"],["🦜","Squawkers"],
+  ["🐊","Snapjaw"],["🦦","Otterly"],["🦡","Diggle"],["🐡","Puffup"],["🦚","Fanfeather"]
+];
+
+/* ---------------- word banks (1st grade) ---------------- */
+const SIGHT = ["after","again","any","ask","because","before","could","every","from","give",
+  "going","have","here","how","just","know","live","many","must","never","of","once","only",
+  "open","other","over","people","pretty","put","round","some","stop","take","thank","them",
+  "then","there","think","those","under","very","walk","want","were","what","when","where",
+  "which","would","your"];
+
+const PHONICS = [
+  {set:"short vowels", words:["cat","bed","pig","hop","bug","map","ten","win","dog","sun","hat","net","fish","box","cup"]},
+  {set:"blends",       words:["stop","flag","clap","drum","frog","sled","spin","trap","grin","swim","plum","crab","skip","stamp","brush"]},
+  {set:"digraphs",     words:["ship","chin","that","when","chop","bath","with","shell","chick","thick","whale","much","wish","path","shed"]},
+  {set:"silent e",     words:["cake","bike","home","cute","name","ride","note","tube","game","five","late","kite","rope","mule","smile"]},
+  {set:"vowel teams",  words:["rain","boat","tree","seed","play","coat","feet","day","meat","road","green","train","soap","clean","stay"]}
+];
+
+const SENTENCES = [
+  "The big frog can hop.","I see a red bug.","My dog ran to the pond.","We play in the sun.",
+  "She has a green hat.","The cat sat on my lap.","Can you help me find it?","He put the book away.",
+  "They went up the hill.","A fish swims in the lake.","My mom made a cake.","The bird flew over the tree.",
+  "We ride bikes after school.","Please open the blue box.","The little pig is very fast."
+];
+
+const STORIES = [
+  {text:"Sam has a pet fish. The fish is red and very fast. Sam feeds him every day after school.",
+   q:"What color is Sam's fish?", a:"Red", w:["Blue","Green"]},
+  {text:"Mia lost her hat at the park. She looked under the slide. Her dog found it in the grass!",
+   q:"Who found the hat?", a:"Her dog", w:["Her mom","A bird"]},
+  {text:"It was rainy, so Ben could not play outside. He built a big fort with his blocks. Then he read a book inside the fort.",
+   q:"Why did Ben stay inside?", a:"It was rainy", w:["He was sick","It was dark"]},
+  {text:"Ana planted a seed in a cup. She gave it water every morning. In two weeks a small green plant came up.",
+   q:"What did Ana do every morning?", a:"Gave it water", w:["Ate a snack","Dug a hole"]},
+  {text:"Leo went to the lake with Dad. They saw six ducks by the boat. Leo fed them bits of bread.",
+   q:"How many ducks did they see?", a:"Six", w:["Two","Ten"]},
+  {text:"The class made a big paper dragon. Each kid painted one part. They hung it up by the door.",
+   q:"Where did they hang the dragon?", a:"By the door", w:["On the floor","In a box"]},
+  {text:"Jo could not find her shoe. She looked in the closet and under the bed. It was in the toy box the whole time!",
+   q:"Where was the shoe?", a:"In the toy box", w:["Under the bed","In the closet"]},
+  {text:"Max helped Grandma bake bread. He stirred the dough with a big spoon. The kitchen smelled warm and sweet.",
+   q:"What did Max stir the dough with?", a:"A big spoon", w:["His hands","A fork"]}
+];
+
+/* homophones & common speech-to-text swaps we should forgive */
+const FORGIVE = {
+  "of":["off","uv"], "were":["where","wear"], "there":["their","they're"], "your":["you're"],
+  "know":["no"], "here":["hear"], "some":["sum"], "would":["wood"], "for":["four"],
+  "to":["too","two"], "ate":["eight"], "see":["sea"], "by":["buy","bye"], "one":["won"],
+  "read":["red"], "meat":["meet"], "road":["rode"], "way":["weigh"], "eye":["i"],
+  "flour":["flower"], "tail":["tale"], "sun":["son"], "mule":["mul"], "whale":["wail"]
+};
+
+/* ---------------- session build ---------------- */
+const PLAN = [
+  {t:"sight",n:6},{t:"phonics",n:5},{t:"sentence",n:4},{t:"story",n:3}
+];
+function pick(arr,n,seedSet){
+  const pool = arr.slice(); const out=[];
+  while(out.length<n && pool.length){
+    const i = Math.floor(Math.random()*pool.length);
+    out.push(pool.splice(i,1)[0]);
+  }
+  return out;
+}
+function buildSession(){
+  const items=[];
+  pick(SIGHT,6).forEach(w=>items.push({type:"sight",target:w,label:"Read this word out loud"}));
+  const phon=[];
+  PHONICS.forEach(g=>phon.push({w:pick(g.words,1)[0],set:g.set}));
+  pick(phon,5).forEach(p=>items.push({type:"phonics",target:p.w,set:p.set,label:"Sound it out, then read it"}));
+  pick(SENTENCES,4).forEach(s=>items.push({type:"sentence",target:s,label:"Read the whole sentence"}));
+  pick(STORIES,3).forEach(s=>items.push({type:"story",story:s,label:"Read the story, then answer"}));
+  // interleave so it isn't 6 of the same in a row
+  const order=[];
+  const buckets={sight:[],phonics:[],sentence:[],story:[]};
+  items.forEach(i=>buckets[i.type].push(i));
+  const pattern=["sight","phonics","sight","sentence","phonics","story","sight","phonics",
+                 "sentence","sight","phonics","story","sentence","sight","phonics","sentence","sight","story"];
+  pattern.forEach(t=>{ if(buckets[t].length) order.push(buckets[t].shift()); });
+  Object.values(buckets).forEach(b=>b.forEach(i=>order.push(i)));
+  return order;
+}
+
+/* ---------------- speech ---------------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let micOK = !!SR, recog = null, listening = false;
+
+function speak(text, rate){
+  try{
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = rate || .82; u.pitch = 1.1; u.lang="en-US";
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+
+function normalize(s){
+  return (s||"").toLowerCase().replace(/[^a-z' ]/g," ").replace(/\s+/g," ").trim();
+}
+function lev(a,b){
+  const m=a.length,n=b.length; if(!m)return n; if(!n)return m;
+  let prev=Array.from({length:n+1},(_,i)=>i), cur=new Array(n+1);
+  for(let i=1;i<=m;i++){ cur[0]=i;
+    for(let j=1;j<=n;j++){ cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1)); }
+    [prev,cur]=[cur,prev];
+  }
+  return prev[n];
+}
+function wordMatches(target,spokenWords){
+  const t = normalize(target);
+  const alts = [t].concat(FORGIVE[t]||[]);
+  return spokenWords.some(w => alts.some(a => w===a || (a.length>3 && lev(w,a)<=1)));
+}
+/* returns 0..1 how much of the target was read */
+function scoreSpeech(target, transcript){
+  const spoken = normalize(transcript).split(" ").filter(Boolean);
+  const targets = normalize(target).split(" ").filter(Boolean);
+  if(!spoken.length) return 0;
+  // A kid sounding out "be-cause" often comes back as two words. Glue
+  // adjacent chunks together and treat a match as a win.
+  if(targets.length===1){
+    const glued = [spoken.join("")];
+    for(let i=0;i<spoken.length-1;i++) glued.push(spoken[i]+spoken[i+1]);
+    for(let i=0;i<spoken.length-2;i++) glued.push(spoken[i]+spoken[i+1]+spoken[i+2]);
+    if(wordMatches(targets[0], spoken.concat(glued))) return 1;
+    return 0;
+  }
+  let hit = 0;
+  targets.forEach(t=>{ if(wordMatches(t,spoken)) hit++; });
+  return hit/targets.length;
+}
+
+/* ---------------- game state ---------------- */
+let S = null;
+const $ = id => document.getElementById(id);
+function show(id){ document.querySelectorAll(".screen").forEach(s=>s.classList.remove("on")); $(id).classList.add("on"); }
+
+function startSession(){
+  S = {
+    items: buildSession(), idx: 0, tries: 0,
+    correctFirst: 0, correctAny: 0, attempted: 0,
+    missed: [], caught: [], streak: 0, bestStreak: 0,
+    compCorrect: 0, compTotal: 0,
+    startedAt: Date.now(), mode: micOK ? "voice" : "tap"
+  };
+  show("game");
+  renderItem();
+}
+
+function currentCritter(){
+  const seed = (S.idx + Object.keys(DATA.days).length*3) % CRITTERS.length;
+  return CRITTERS[seed];
+}
+
+function renderItem(){
+  if(S.idx >= S.items.length) return finishSession();
+  S.tries = 0;
+  const it = S.items[S.idx];
+  const [emo,name] = currentCritter();
+  $("critter").textContent = emo;
+  $("critter").classList.remove("catch");
+  $("critterName").textContent = "A wild " + name + " appeared!";
+  $("chipProgress").textContent = "Critter " + (S.idx+1) + " / " + S.items.length;
+  $("chipBalls").textContent = "⭐ " + S.caught.length;
+  $("chipStreak").textContent = "🔥 " + S.streak;
+  $("barFill").style.width = (S.idx / S.items.length * 100) + "%";
+  $("heard").textContent = "";
+
+  ["word","sentence","story","question","choices"].forEach(id=>{ $(id).innerHTML=""; $(id).style.display="none"; });
+  $("taskLabel").textContent = it.label;
+
+  if(it.type==="sight"){
+    $("word").style.display="block"; $("word").textContent = it.target;
+  } else if(it.type==="phonics"){
+    $("word").style.display="block";
+    $("word").innerHTML = it.target.split("").map(ch =>
+      '<span class="seg'+("aeiou".includes(ch)?" v":"")+'">'+ch+'</span>').join("");
+    $("taskLabel").textContent = "Sound it out — " + it.set;
+  } else if(it.type==="sentence"){
+    $("sentence").style.display="block"; $("sentence").textContent = it.target;
+  } else if(it.type==="story"){
+    $("story").style.display="block"; $("story").textContent = it.story.text;
+    $("question").style.display="none";
+  }
+
+  // controls
+  const voiceItem = it.type!=="story";
+  $("micBtn").style.display = (voiceItem && S.mode==="voice") ? "" : "none";
+  $("hearBtn").style.display = voiceItem ? "" : "none";
+  $("skipBtn").style.display = voiceItem ? "" : "none";
+
+  if(it.type==="story"){
+    // read the story aloud first, then ask
+    $("hearBtn").style.display="";
+    $("micBtn").style.display = S.mode==="voice" ? "" : "none";
+    $("micBtn").textContent = "🎤 Read it!";
+    showStoryQuestion(it, false);
+  } else if(S.mode==="tap"){
+    buildTapChoices(it);
+  }
+}
+
+function showStoryQuestion(it, afterRead){
+  $("question").style.display="block";
+  $("question").textContent = it.story.q;
+  const opts = pick([it.story.a].concat(it.story.w), 3);
+  const box = $("choices"); box.style.display="flex"; box.innerHTML="";
+  opts.forEach(o=>{
+    const b=document.createElement("button");
+    b.className="choice"; b.textContent=o;
+    b.onclick=()=>{
+      if(box.dataset.done) return;
+      box.dataset.done="1";
+      const right = o===it.story.a;
+      S.compTotal++; if(right) S.compCorrect++;
+      [...box.children].forEach(c=>{
+        if(c.textContent===it.story.a) c.classList.add("right");
+        else if(c===b) c.classList.add("wrong");
+      });
+      setTimeout(()=>{ box.dataset.done=""; judge(right, right?1:0, it, true); }, 700);
+    };
+    box.appendChild(b);
+  });
+}
+
+function buildTapChoices(it){
+  // no mic: hear the word/sentence, tap the matching text
+  const box=$("choices"); box.style.display="flex"; box.innerHTML="";
+  $("taskLabel").textContent = "Tap 🔊 then tap the words you heard";
+  let options;
+  if(it.type==="sentence"){
+    const others = pick(SENTENCES.filter(s=>s!==it.target),2);
+    options = pick([it.target].concat(others),3);
+    $("sentence").style.display="none";
+  } else {
+    const pool = it.type==="sight" ? SIGHT : PHONICS.flatMap(p=>p.words);
+    const others = pick(pool.filter(w=>w!==it.target),2);
+    options = pick([it.target].concat(others),3);
+    $("word").style.display="none";
+  }
+  options.forEach(o=>{
+    const b=document.createElement("button"); b.className="choice"; b.textContent=o;
+    b.onclick=()=>{
+      if(box.dataset.done) return; box.dataset.done="1";
+      const right = o===it.target;
+      [...box.children].forEach(c=>{
+        if(c.textContent===it.target) c.classList.add("right");
+        else if(c===b) c.classList.add("wrong");
+      });
+      setTimeout(()=>{ box.dataset.done=""; judge(right, right?1:0, it, true); },700);
+    };
+    box.appendChild(b);
+  });
+  speak(it.target);
+}
+
+/* ---------------- mic ---------------- */
+function listen(){
+  const it = S.items[S.idx];
+  const target = it.type==="story" ? it.story.text : it.target;
+  if(listening || !micOK) return;
+  try{
+    recog = new SR();
+    recog.lang="en-US"; recog.interimResults=true; recog.maxAlternatives=3; recog.continuous=false;
+    let best="";
+    recog.onstart = ()=>{ listening=true; $("micBtn").classList.add("live"); $("micBtn").textContent="🎤 Listening…"; };
+    recog.onresult = e=>{
+      let txt="";
+      for(let i=0;i<e.results.length;i++){
+        for(let j=0;j<e.results[i].length;j++) txt += " " + e.results[i][j].transcript;
+      }
+      best = txt;
+      $("heard").textContent = "I heard: " + normalize(txt);
+    };
+    recog.onerror = e=>{
+      listening=false; $("micBtn").classList.remove("live"); $("micBtn").textContent="🎤 Read it!";
+      if(e.error==="not-allowed" || e.error==="service-not-allowed"){
+        micOK=false; S.mode="tap";
+        $("heard").textContent="Mic is off — tapping mode instead!";
+        renderItem();
+      } else {
+        $("heard").textContent="Didn't catch that — try again!";
+      }
+    };
+    recog.onend = ()=>{
+      listening=false; $("micBtn").classList.remove("live"); $("micBtn").textContent="🎤 Read it!";
+      if(!best.trim()) return;
+      const sc = scoreSpeech(target, best);
+      const pass = it.type==="sentence" || it.type==="story" ? sc>=0.7 : sc>=0.99;
+      judge(pass, sc, it, false);
+    };
+    recog.start();
+  }catch(e){ micOK=false; S.mode="tap"; renderItem(); }
+}
+
+/* ---------------- judging ---------------- */
+function judge(pass, score, it, isTap){
+  const target = it.type==="story" ? it.story.q : it.target;
+  if(pass){
+    S.attempted++;
+    S.correctAny++;
+    if(S.tries===0) S.correctFirst++;
+    S.streak++; S.bestStreak=Math.max(S.bestStreak,S.streak);
+    const [emo,name]=currentCritter();
+    S.caught.push(name);
+    if(!DATA.dex.includes(name)) DATA.dex.push(name);
+    $("critter").classList.add("catch");
+    flash("⭐","Caught "+name+"!");
+    setTimeout(()=>{ S.idx++; renderItem(); }, 1150);
+  } else {
+    S.tries++;
+    S.streak=0;
+    if(S.tries<2 && !isTap){
+      flash("🤔","So close — try again!");
+      $("heard").textContent = "Tap 🔊 to hear it, then read it again.";
+    } else {
+      S.attempted++;
+      const missTxt = it.type==="story" ? "understanding: "+it.story.q : it.target;
+      if(!S.missed.includes(missTxt)) S.missed.push(missTxt);
+      flash("💪","Let's practice this one!");
+      speak(it.type==="story" ? it.story.a : it.target, .7);
+      setTimeout(()=>{ S.idx++; renderItem(); }, 1900);
+    }
+  }
+}
+function flash(icon,text){
+  $("fbIcon").textContent=icon; $("fbText").textContent=text;
+  $("feedback").classList.add("on");
+  setTimeout(()=>$("feedback").classList.remove("on"), 1050);
+}
+
+/* ---------------- finish + reporting ---------------- */
+function finishSession(){
+  const secs = Math.round((Date.now()-S.startedAt)/1000);
+  const acc = S.attempted ? Math.round(S.correctFirst/S.attempted*100) : 0;
+  const t = todayStr();
+  const prior = DATA.days[t];
+  const rec = {
+    date: t,
+    seconds: (prior?prior.seconds:0) + secs,
+    attempted: (prior?prior.attempted:0) + S.attempted,
+    correctFirstTry: (prior?prior.correctFirstTry:0) + S.correctFirst,
+    accuracyPct: 0,
+    bestStreak: Math.max(prior?prior.bestStreak:0, S.bestStreak),
+    comprehensionCorrect: (prior?prior.comprehensionCorrect:0) + S.compCorrect,
+    comprehensionTotal: (prior?prior.comprehensionTotal:0) + S.compTotal,
+    wordsToPractice: [...new Set([...(prior?prior.wordsToPractice:[]), ...S.missed])],
+    crittersCaught: (prior?prior.crittersCaught:0) + S.caught.length,
+    mode: S.mode,
+    sessions: (prior?prior.sessions:0) + 1
+  };
+  rec.accuracyPct = rec.attempted ? Math.round(rec.correctFirstTry/rec.attempted*100) : 0;
+  DATA.days[t]=rec;
+  DATA.totalCaught = (DATA.totalCaught||0) + S.caught.length;
+  saveData(DATA);
+
+  $("rAcc").textContent = acc+"%";
+  $("rCaught").textContent = S.caught.length;
+  $("rStreak").textContent = dayStreak();
+  $("rNewDex").innerHTML = S.caught.map(n=>{
+    const c = CRITTERS.find(c=>c[1]===n); return "<span title='"+n+"'>"+(c?c[0]:"⭐")+"</span>";
+  }).join("");
+  $("rMissed").innerHTML = S.missed.length
+    ? S.missed.map(w=>'<span class="pill">'+w+'</span>').join("")
+    : '<span class="tiny">Nothing missed today — perfect run! 🎉</span>';
+
+  show("report");
+  setTimeout(()=>{ downloadReport(true); }, 600);
+  speak("Amazing reading, Miles! You caught "+S.caught.length+" critters today.", .95);
+}
+
+function buildReportPayload(){
+  const days = Object.values(DATA.days).sort((a,b)=>a.date<b.date?1:-1);
+  const totals = days.reduce((t,d)=>({
+    days:t.days+1, attempted:t.attempted+d.attempted, correct:t.correct+d.correctFirstTry,
+    minutes:t.minutes+d.seconds/60, comp:t.comp+d.comprehensionCorrect, compT:t.compT+d.comprehensionTotal
+  }),{days:0,attempted:0,correct:0,minutes:0,comp:0,compT:0});
+  return {
+    generatedAt: new Date().toISOString(),
+    player: "Miles",
+    grade: 1,
+    game: "Critter Catchers — Reading Quest",
+    today: DATA.days[todayStr()] || null,
+    dayStreak: dayStreak(),
+    crittersCollected: DATA.dex.length,
+    crittersTotal: CRITTERS.length,
+    lifetime: {
+      daysPlayed: totals.days,
+      itemsAttempted: totals.attempted,
+      correctFirstTry: totals.correct,
+      overallAccuracyPct: totals.attempted?Math.round(totals.correct/totals.attempted*100):0,
+      totalMinutes: Math.round(totals.minutes),
+      comprehensionPct: totals.compT?Math.round(totals.comp/totals.compT*100):0
+    },
+    history: days.slice(0,30)
+  };
+}
+function downloadReport(auto){
+  try{
+    const payload = buildReportPayload();
+    const blob = new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download="miles-reading-"+todayStr()+".json";
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},1500);
+    $("saveNote").textContent = auto
+      ? "✅ Progress file saved to Downloads (miles-reading-"+todayStr()+".json)"
+      : "✅ Saved!";
+  }catch(e){
+    $("saveNote").textContent = "Tap “Save my report” to save the progress file.";
+  }
+}
+
+/* ---------------- dex + parent ---------------- */
+function renderDex(){
+  $("dexGrid").innerHTML = CRITTERS.map(([e,n])=>
+    '<span class="'+(DATA.dex.includes(n)?"":"locked")+'" title="'+n+'">'+e+'</span>').join("");
+}
+function renderParent(){
+  const p = buildReportPayload();
+  $("parentSummary").innerHTML =
+    "<p style='font-weight:800'>Day streak: "+p.dayStreak+" &nbsp;·&nbsp; Days played: "+p.lifetime.daysPlayed+
+    " &nbsp;·&nbsp; Overall accuracy: "+p.lifetime.overallAccuracyPct+"%"+
+    " &nbsp;·&nbsp; Comprehension: "+p.lifetime.comprehensionPct+"%</p>";
+  const rows = p.history.map(d=>"<tr><td>"+d.date+"</td><td>"+Math.round(d.seconds/60)+" min</td><td>"+
+    d.correctFirstTry+"/"+d.attempted+" ("+d.accuracyPct+"%)</td><td>"+
+    d.comprehensionCorrect+"/"+d.comprehensionTotal+"</td><td>"+(d.wordsToPractice.join(", ")||"—")+"</td></tr>").join("");
+  $("parentTable").innerHTML =
+    "<tr><th>Date</th><th>Time</th><th>Words right (1st try)</th><th>Comprehension</th><th>Practice list</th></tr>"+rows;
+}
+
+/* ---------------- wiring ---------------- */
+$("startBtn").onclick = startSession;
+$("hearBtn").onclick = ()=>{
+  const it=S.items[S.idx];
+  speak(it.type==="story"?it.story.text:it.target, it.type==="phonics"?.6:.8);
+};
+$("micBtn").onclick = ()=>{ if(listening){ try{recog.stop();}catch(e){} } else listen(); };
+$("skipBtn").onclick = ()=>{
+  const it=S.items[S.idx];
+  S.attempted++; S.streak=0;
+  const m = it.type==="story"?it.story.q:it.target;
+  if(!S.missed.includes(m)) S.missed.push(m);
+  S.idx++; renderItem();
+};
+$("saveBtn").onclick = ()=>downloadReport(false);
+$("homeBtn").onclick = ()=>{ $("streakBadge").textContent="🔥 Day streak: "+dayStreak(); show("title"); };
+$("dexBtn").onclick = ()=>{ renderDex(); show("dex"); };
+$("dexBack").onclick = ()=>show("title");
+$("grownup").onclick = ()=>{ renderParent(); show("parent"); };
+$("pBack").onclick = ()=>show("title");
+$("pSave").onclick = ()=>downloadReport(false);
+$("micTestBtn").onclick = ()=>{
+  if(!micOK){ $("micStatus").textContent="This browser has no speech recognition — use Chrome. Tapping mode still works!"; return; }
+  $("micStatus").textContent="Say: \"I can read!\"";
+  const r=new SR(); r.lang="en-US";
+  r.onresult=e=>{ $("micStatus").textContent="✅ Mic works! I heard: "+e.results[0][0].transcript; };
+  r.onerror=e=>{ $("micStatus").textContent="⚠️ Mic blocked ("+e.error+"). The game will use tapping mode."; micOK=false; };
+  try{ r.start(); }catch(e){ $("micStatus").textContent="⚠️ Could not start the mic."; }
+};
+
+$("streakBadge").textContent = "🔥 Day streak: " + dayStreak();
+if(!micOK) $("micStatus").textContent = "Tip: open in Chrome for read-aloud mode. Tapping mode works everywhere.";
+
+/* expose a tiny hook for automated testing */
+window.__cc = { buildSession, scoreSpeech, buildReportPayload, startSession, get S(){return S;}, DATA:()=>DATA };
+</script>
+</body>
+</html>
