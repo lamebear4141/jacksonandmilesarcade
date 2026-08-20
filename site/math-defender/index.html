@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Math Defender</title>
+<style>
+  :root{
+    --sky-top:#1a1a3e;
+    --sky-bottom:#120a24;
+    --panel:#241640;
+    --ink:#f4f0ff;
+    --accent:#ffd23f;
+    --board-bg:#140a28;
+    --green:#5fdd6b;
+    --red:#e33e3e;
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{
+    margin:0; height:100%; overflow:hidden;
+    background:linear-gradient(180deg,var(--sky-top),var(--sky-bottom));
+    font-family:'Trebuchet MS','Arial Rounded MT Bold',sans-serif;
+    color:var(--ink); touch-action:manipulation; user-select:none;
+  }
+  #wrap{ position:relative; width:100vw; height:100vh; display:flex; flex-direction:column; align-items:center; }
+
+  /* ---------- top bar ---------- */
+  #topbar{
+    width:100%; max-width:640px; display:flex; justify-content:space-between; align-items:center;
+    padding:8px 14px; font-weight:800; font-size:17px; text-shadow:0 2px 0 rgba(0,0,0,0.3);
+  }
+  #topbar .cell{ text-align:center; min-width:64px; }
+  #topbar .label{ opacity:0.65; font-weight:600; font-size:11px; display:block; letter-spacing:0.5px; }
+  #hearts{ font-size:18px; letter-spacing:2px; }
+  #best{ color:var(--accent); }
+
+  /* ---------- canvas ---------- */
+  canvas#game{
+    background:var(--board-bg);
+    border-radius:14px;
+    box-shadow:0 0 0 4px #4a3080, 0 10px 30px rgba(0,0,0,0.5);
+    width:min(94vw,640px); max-height:38vh;
+    image-rendering:pixelated;
+  }
+
+  /* ---------- question + input ---------- */
+  #playArea{ width:100%; max-width:640px; flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  #question{
+    font-size:clamp(30px,8vw,46px); font-weight:900; margin:12px 0 8px;
+    letter-spacing:2px; text-shadow:0 3px 0 rgba(0,0,0,0.35); min-height:52px;
+    display:flex; align-items:center; gap:14px;
+  }
+  #answer{
+    width:150px; text-align:center; font-family:inherit; font-weight:900;
+    font-size:clamp(28px,7vw,42px); color:#3a2400;
+    background:linear-gradient(180deg,#fff6cf,#ffd23f);
+    border:none; border-radius:14px; padding:2px 8px; box-shadow:0 5px 0 #a97600;
+    outline:none; caret-color:#3a2400;
+  }
+  #answer.shake{ animation:shake 0.32s; }
+  @keyframes shake{
+    0%,100%{transform:translateX(0)} 20%{transform:translateX(-9px)}
+    40%{transform:translateX(9px)} 60%{transform:translateX(-6px)} 80%{transform:translateX(6px)}
+  }
+  #feedback{ height:24px; font-weight:800; font-size:16px; margin-bottom:4px; }
+  #feedback.good{ color:var(--green); }
+  #feedback.bad{ color:#ff9b8a; }
+
+  /* ---------- keypad ---------- */
+  #keypad{
+    display:grid; grid-template-columns:repeat(5,1fr); gap:8px;
+    width:min(94vw,460px); padding:0 4px 10px;
+  }
+  .key{
+    border:none; border-radius:14px; padding:14px 0;
+    background:var(--panel); color:var(--ink);
+    font-family:inherit; font-weight:900; font-size:20px;
+    box-shadow:0 5px 0 #140a28; cursor:pointer;
+  }
+  .key:active{ box-shadow:0 2px 0 #140a28; transform:translateY(3px); }
+  .key.go{ background:linear-gradient(180deg,#7ee0a8,#3fb96f); color:#06301a; box-shadow:0 5px 0 #1c7a45; }
+  .key.go:active{ box-shadow:0 2px 0 #1c7a45; }
+  .key.del{ background:linear-gradient(180deg,#ff7a5c,#e33e3e); box-shadow:0 5px 0 #9c1f1f; }
+  .key.del:active{ box-shadow:0 2px 0 #9c1f1f; }
+
+  /* ---------- overlays ---------- */
+  .overlay{
+    position:absolute; inset:0; z-index:10; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center; padding:20px 18px;
+    background:rgba(18,10,36,0.96); overflow-y:auto;
+  }
+  .overlay h1{ font-size:clamp(28px,7vw,40px); margin:0 0 4px; text-shadow:0 3px 0 rgba(0,0,0,0.35); }
+  .overlay h2{ font-size:26px; margin:0 0 8px; }
+  .overlay p{ color:#c9bfe8; margin:0 0 16px; font-size:14px; max-width:420px; line-height:1.5; }
+  .btn{
+    background:linear-gradient(180deg,#ffd23f,#e8a90c); color:#3a2400;
+    border:none; padding:14px 30px; border-radius:999px;
+    font-family:inherit; font-weight:900; font-size:17px;
+    box-shadow:0 5px 0 #a97600; cursor:pointer; letter-spacing:0.5px; margin:6px;
+  }
+  .btn:active{ box-shadow:0 2px 0 #a97600; transform:translateY(3px); }
+  .btn.ghost{
+    background:var(--panel); color:var(--ink); box-shadow:0 5px 0 #140a28;
+    font-size:14px; padding:11px 22px;
+  }
+  .btn.ghost:active{ box-shadow:0 2px 0 #140a28; }
+  .chooser{ display:flex; flex-wrap:wrap; justify-content:center; gap:10px; margin-bottom:8px; }
+  .chip{
+    border:none; border-radius:999px; padding:10px 20px; cursor:pointer;
+    font-family:inherit; font-weight:800; font-size:14px;
+    background:var(--panel); color:#c9bfe8; box-shadow:0 4px 0 #140a28;
+  }
+  .chip.on{ background:linear-gradient(180deg,#7ee0a8,#3fb96f); color:#06301a; box-shadow:0 4px 0 #1c7a45; }
+  .sectionLabel{ font-size:12px; letter-spacing:1.5px; opacity:0.6; font-weight:800; margin:14px 0 8px; }
+
+  .scoreRow{ font-size:17px; margin:3px 0; }
+  .scoreRow b{ color:var(--accent); font-size:22px; }
+  #newRecord{ color:var(--green); font-size:20px; font-weight:900; margin:10px 0; }
+  .recordBoard{
+    background:var(--panel); border-radius:16px; padding:14px 20px; margin:12px 0;
+    min-width:250px; box-shadow:0 5px 0 #140a28;
+  }
+  .recordBoard div{ display:flex; justify-content:space-between; gap:20px; font-size:15px; padding:3px 0; }
+  .recordBoard span:last-child{ color:var(--accent); font-weight:900; }
+  .hidden{ display:none !important; }
+  a.back{ position:absolute; top:10px; left:14px; color:#c9bfe8; text-decoration:none; font-size:13px; font-weight:800; z-index:20; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <a class="back" href="../index.html">&larr; Arcade</a>
+
+  <div id="topbar">
+    <div class="cell"><span class="label" id="mainLabel">TIME</span><span id="mainValue">0.0</span></div>
+    <div class="cell"><span class="label">STREAK</span><span id="streakValue">0</span></div>
+    <div class="cell"><span class="label">WALL</span><span id="hearts">💚💚💚</span></div>
+    <div class="cell"><span class="label">BEST</span><span id="best">—</span></div>
+  </div>
+
+  <canvas id="game" width="640" height="260"></canvas>
+
+  <div id="playArea">
+    <div id="question"><span id="qText">7 × 8 =</span><input id="answer" type="text" inputmode="numeric" maxlength="4" autocomplete="off"></div>
+    <div id="feedback"></div>
+    <div id="keypad"></div>
+  </div>
+
+  <!-- ================= START SCREEN ================= -->
+  <div class="overlay" id="startScreen">
+    <h1>⛏️ Math Defender</h1>
+    <p>Every problem sends a creeper at your wall. Every right answer blows one up. Get behind, and they pile up — your wall only takes 3 hits.</p>
+
+    <div class="sectionLabel">WHAT KIND OF MATH?</div>
+    <div class="chooser" id="topicChooser">
+      <button class="chip on" data-topic="times">✖️ Times Tables</button>
+      <button class="chip" data-topic="mixed">🎲 Mixed Mode</button>
+    </div>
+
+    <div class="sectionLabel">HOW DO YOU WANT TO PLAY?</div>
+    <div class="chooser" id="modeChooser">
+      <button class="chip on" data-mode="sprint">⏱️ Sprint — 20 fast</button>
+      <button class="chip" data-mode="blitz">🔥 Blitz — 60 seconds</button>
+    </div>
+
+    <div class="recordBoard" id="recordBoard"></div>
+    <button class="btn" id="startBtn">PLAY</button>
+    <button class="btn ghost" id="resetBtn">Clear my records</button>
+  </div>
+
+  <!-- ================= END SCREEN ================= -->
+  <div class="overlay hidden" id="endScreen">
+    <h2 id="endTitle">Wall Down!</h2>
+    <div id="newRecord" class="hidden">⭐ NEW RECORD! ⭐</div>
+    <div id="endStats"></div>
+    <div class="recordBoard" id="endBoard"></div>
+    <button class="btn" id="againBtn">PLAY AGAIN</button>
+    <button class="btn ghost" id="menuBtn">Change mode</button>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   MATH DEFENDER — tweak anything in here
+   ===================================================================== */
+const CONFIG = {
+  sprintQuestions: 20,      // how many questions in Sprint mode
+  blitzSeconds:    60,      // how long Blitz mode lasts
+  hearts:          3,       // how many hits your wall can take
+  wrongPenalty:    3,       // seconds added to Sprint time for a wrong answer
+  extraEvery:      5,       // every Nth question sends a bonus creeper
+  creeperSpeed:    20,      // pixels per second at the start
+  speedRamp:       1.3,     // extra speed added per creeper sent
+  creeperMax:      62,      // speed cap
+  lurchOnWrong:    26,      // pixels every creeper jumps forward on a wrong answer
+};
+/* One creeper marches out for every question you're asked, so the wave only
+   piles up if you're slow or you miss. Answer it, and it's gone. */
+
+/* ---------------- storage (safe if localStorage is blocked) ---------- */
+const store = {
+  get(k){ try { return localStorage.getItem(k); } catch(e){ return null; } },
+  set(k,v){ try { localStorage.setItem(k,v); } catch(e){} },
+  del(k){ try { localStorage.removeItem(k); } catch(e){} }
+};
+const KEY = (topic,mode) => `mathdefender.v1.${topic}.${mode}`;
+const TOPIC_NAME = { times:'Times Tables', mixed:'Mixed Mode' };
+
+function getBest(topic,mode){
+  const raw = store.get(KEY(topic,mode));
+  return raw === null ? null : parseFloat(raw);
+}
+function saveBest(topic,mode,value){
+  const cur = getBest(topic,mode);
+  // sprint = lower time is better, blitz = higher score is better
+  const better = cur === null || (mode==='sprint' ? value < cur : value > cur);
+  if (better) { store.set(KEY(topic,mode), String(value)); return true; }
+  return false;
+}
+const fmtTime = s => s.toFixed(1) + 's';
+const fmtBest = (mode,v) => v === null ? '—' : (mode==='sprint' ? fmtTime(v) : v + ' right');
+
+/* ---------------- sound (all synthesized, no files) ------------------ */
+let actx = null;
+function beep(freq, dur, type='square', vol=0.13){
+  try{
+    if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)();
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, actx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + dur);
+    o.connect(g); g.connect(actx.destination);
+    o.start(); o.stop(actx.currentTime + dur);
+  }catch(e){}
+}
+const sfx = {
+  right(){ beep(660,0.08); setTimeout(()=>beep(880,0.12),70); },
+  wrong(){ beep(180,0.22,'sawtooth',0.10); },
+  boom(){ beep(90,0.32,'sawtooth',0.16); setTimeout(()=>beep(60,0.3,'sawtooth',0.12),40); },
+  win(){ [523,659,784,1047].forEach((f,i)=>setTimeout(()=>beep(f,0.16,'square',0.14), i*110)); },
+  lose(){ [400,320,240,160].forEach((f,i)=>setTimeout(()=>beep(f,0.22,'sawtooth',0.12), i*130)); }
+};
+
+/* ---------------- question generation -------------------------------- */
+const rnd = n => Math.floor(Math.random()*n);
+function makeQuestion(topic, answered){
+  if (topic === 'times'){
+    // ramp: easy tables first, the nasty ones (6,7,8,12) show up later
+    const hard = answered > 6;
+    const pool = hard ? [2,3,4,5,6,7,8,9,10,11,12] : [2,3,4,5,6,7,9,10];
+    const a = pool[rnd(pool.length)];
+    const b = hard ? rnd(13) : rnd(11);
+    return { text:`${a} × ${b} =`, answer:a*b };
+  }
+  // ---- mixed mode: ×, ÷, +, − ----
+  const kinds = ['mul','div','add','sub'];
+  const kind = kinds[rnd(kinds.length)];
+  if (kind === 'mul'){
+    const a = 2+rnd(11), b = 2+rnd(11);
+    return { text:`${a} × ${b} =`, answer:a*b };
+  }
+  if (kind === 'div'){
+    const b = 2+rnd(11), ans = 1+rnd(12);
+    return { text:`${b*ans} ÷ ${b} =`, answer:ans };
+  }
+  if (kind === 'add'){
+    const a = 100+rnd(800), b = 100+rnd(800);
+    return { text:`${a} + ${b} =`, answer:a+b };
+  }
+  // subtraction, never negative
+  const a = 200+rnd(700), b = 100+rnd(a-100);
+  return { text:`${a} − ${b} =`, answer:a-b };
+}
+
+/* ---------------- pixel creeper -------------------------------------- */
+// 1 = body green, 2 = dark green, 3 = face black, 0 = transparent
+const CREEPER = [
+  "1111111111",
+  "1211111121",
+  "1133113311",
+  "1133113311",
+  "1113311311",
+  "1113333311",
+  "1133333311",
+  "1133003311",
+  "1211111121",
+  "1111111111",
+  "0111111110",
+  "0122112210",
+  "0111111110",
+  "0110000110",
+  "0110000110",
+  "0220000220"
+];
+const CREEPER_COLORS = { '1':'#5fdd6b', '2':'#3ba84a', '3':'#0d2410', '0':null };
+
+/* ---------------- game state ----------------------------------------- */
+const cv = document.getElementById('game'), ctx = cv.getContext('2d');
+const W = cv.width, H = cv.height, GROUND = H - 34, WALL_X = 96;
+
+let state = 'menu';
+let topic = 'times', mode = 'sprint';
+let creepers = [], particles = [];
+let hearts, correct, wrong, streak, bestStreak, elapsed, penalty, spawned, asked;
+let q = null, lastT = 0, shakeT = 0, flashT = 0, flashColor = '#ff5555';
+
+function resetGame(){
+  creepers = []; particles = [];
+  hearts = CONFIG.hearts;
+  correct = 0; wrong = 0; streak = 0; bestStreak = 0;
+  elapsed = 0; penalty = 0; spawned = 0; asked = 0;
+  shakeT = 0; flashT = 0;
+  nextQuestion();
+}
+function nextQuestion(){
+  q = makeQuestion(topic, correct);
+  document.getElementById('qText').textContent = q.text;
+  const inp = document.getElementById('answer');
+  inp.value = '';
+  if (state === 'playing') inp.focus();
+  // every question sends one creeper; every 5th sends a friend along
+  asked++;
+  spawnCreeper();
+  if (asked % CONFIG.extraEvery === 0) spawnCreeper();
+}
+
+/* ---------------- spawning & effects ---------------------------------- */
+function spawnCreeper(){
+  const speed = Math.min(CONFIG.creeperMax, CONFIG.creeperSpeed + spawned*CONFIG.speedRamp);
+  creepers.push({ x: W + 20 + rnd(60), y: GROUND, speed, scale: 2.4, step: Math.random()*6 });
+  spawned++;
+}
+function explode(x, y, color){
+  for (let i=0;i<26;i++){
+    particles.push({
+      x, y: y-18,
+      vx:(Math.random()-0.5)*260, vy:-Math.random()*220-30,
+      life:0.55+Math.random()*0.35, max:0.9,
+      size:3+rnd(4), color
+    });
+  }
+}
+function flash(color){ flashT = 0.22; flashColor = color; }
+
+/* ---------------- answer handling ------------------------------------- */
+function submit(){
+  if (state !== 'playing') return;
+  const inp = document.getElementById('answer');
+  const val = inp.value.trim();
+  if (val === '') return;
+  if (parseInt(val,10) === q.answer) rightAnswer();
+  else wrongAnswer();
+}
+function rightAnswer(){
+  correct++; streak++;
+  if (streak > bestStreak) bestStreak = streak;
+  sfx.right();
+  // blow up the creeper closest to the wall
+  if (creepers.length){
+    creepers.sort((a,b)=>a.x-b.x);
+    const c = creepers.shift();
+    explode(c.x, c.y, '#5fdd6b');
+    sfx.boom();
+  }
+  setFeedback(pickPraise(), 'good');
+  if (mode === 'sprint' && correct >= CONFIG.sprintQuestions) return endGame(true);
+  nextQuestion();
+}
+function wrongAnswer(){
+  wrong++; streak = 0;
+  sfx.wrong();
+  if (mode === 'sprint') penalty += CONFIG.wrongPenalty;
+  creepers.forEach(c => c.x -= CONFIG.lurchOnWrong);
+  setFeedback(`${q.text} ${q.answer}`, 'bad');   // show the whole problem, not a lonely number
+  shakeT = 0.3; flash('#ff5555');
+  const inp = document.getElementById('answer');
+  inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
+  nextQuestion();
+}
+const PRAISE = ['BOOM!','Nice!','Got it!','Yes!','Clean hit!','Too easy!','Nailed it!'];
+function pickPraise(){
+  if (streak >= 10) return `🔥 ${streak} IN A ROW!`;
+  if (streak >= 5)  return `⚡ ${streak} streak!`;
+  return PRAISE[rnd(PRAISE.length)];
+}
+let fbTimer = null;
+function setFeedback(text, cls){
+  const fb = document.getElementById('feedback');
+  fb.textContent = text; fb.className = cls;
+  clearTimeout(fbTimer);
+  fbTimer = setTimeout(()=>{ fb.textContent=''; fb.className=''; }, cls==='bad' ? 2200 : 1100);
+}
+
+/* ---------------- main loop -------------------------------------------- */
+function loop(t){
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - lastT)/1000 || 0);
+  lastT = t;
+  if (state === 'playing') update(dt);
+  draw();
+}
+function update(dt){
+  elapsed += dt;
+
+  for (let i=creepers.length-1;i>=0;i--){
+    const c = creepers[i];
+    c.x -= c.speed*dt;
+    c.step += dt*c.speed*0.28;
+    if (c.x <= WALL_X){
+      creepers.splice(i,1);
+      explode(WALL_X+10, GROUND, '#ff8a5c');
+      hearts--; sfx.boom(); shakeT = 0.45; flash('#ff5555');
+      if (hearts <= 0) return endGame(false);
+    }
+  }
+  for (let i=particles.length-1;i>=0;i--){
+    const p = particles[i];
+    p.x += p.vx*dt; p.y += p.vy*dt; p.vy += 700*dt; p.life -= dt;
+    if (p.life <= 0) particles.splice(i,1);
+  }
+  if (shakeT > 0) shakeT -= dt;
+  if (flashT > 0) flashT -= dt;
+
+  if (mode === 'blitz' && elapsed >= CONFIG.blitzSeconds) return endGame(true);
+  updateHUD();
+}
+function updateHUD(){
+  document.getElementById('mainValue').textContent =
+    mode === 'sprint' ? (elapsed + penalty).toFixed(1)
+                      : Math.max(0, Math.ceil(CONFIG.blitzSeconds - elapsed));
+  document.getElementById('streakValue').textContent = mode==='sprint' ? `${correct}/${CONFIG.sprintQuestions}` : correct;
+  document.getElementById('hearts').textContent = '💚'.repeat(Math.max(0,hearts)) + '🖤'.repeat(CONFIG.hearts-Math.max(0,hearts));
+}
+
+/* ---------------- drawing ---------------------------------------------- */
+function px(x,y,w,h,color){ ctx.fillStyle = color; ctx.fillRect(x|0,y|0,w|0,h|0); }
+
+function drawCreeper(c){
+  const s = c.scale;
+  const bounce = Math.abs(Math.sin(c.step)) * 3;
+  const ox = c.x - (10*s)/2;
+  const oy = c.y - CREEPER.length*s - bounce;
+  for (let r=0;r<CREEPER.length;r++){
+    const row = CREEPER[r];
+    for (let col=0;col<row.length;col++){
+      const color = CREEPER_COLORS[row[col]];
+      if (color) px(ox+col*s, oy+r*s, s+0.5, s+0.5, color);
+    }
+  }
+  // glowing eyes when it's close to the wall
+  if (c.x < WALL_X + 120){
+    ctx.globalAlpha = 0.5;
+    px(ox+2*s, oy+2*s, 2*s, 2*s, '#ff3b3b');
+    px(ox+6*s, oy+2*s, 2*s, 2*s, '#ff3b3b');
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawWall(){
+  const top = GROUND - 96;
+  for (let r=0;r<6;r++){
+    for (let cn=0;cn<5;cn++){
+      const bx = 40 + cn*11 + (r%2 ? 5 : 0);
+      const shade = ['#8c8c8c','#7a7a7a','#9a9a9a'][(r+cn)%3];
+      px(bx, top + r*16, 10, 15, shade);
+    }
+  }
+  px(30, top, 66, 3, '#b5b5b5');
+  // grass ledge
+  px(0, GROUND, WALL_X, 6, '#3ba84a');
+}
+function drawBackground(){
+  // night sky
+  const g = ctx.createLinearGradient(0,0,0,GROUND);
+  g.addColorStop(0,'#0d1030'); g.addColorStop(1,'#2a1b4d');
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,GROUND);
+  // stars (fixed positions so they don't jitter)
+  ctx.fillStyle = '#ffffff';
+  for (let i=0;i<40;i++){
+    const sx = (i*137)%W, sy = (i*79)%(GROUND-70);
+    ctx.globalAlpha = 0.25 + ((i*53)%50)/120;
+    ctx.fillRect(sx, sy, 2, 2);
+  }
+  ctx.globalAlpha = 1;
+  px(W-80, 26, 34, 34, '#f2f0d8');  // blocky moon
+  // ground
+  px(0, GROUND, W, H-GROUND, '#4a3520');
+  px(0, GROUND, W, 6, '#2f6b30');
+}
+function draw(){
+  ctx.save();
+  if (shakeT > 0){
+    const m = shakeT*22;
+    ctx.translate((Math.random()-0.5)*m, (Math.random()-0.5)*m);
+  }
+  ctx.clearRect(-20,-20,W+40,H+40);
+  drawBackground();
+  drawWall();
+  creepers.forEach(drawCreeper);
+  particles.forEach(p=>{
+    ctx.globalAlpha = Math.max(0, p.life/p.max);
+    px(p.x, p.y, p.size, p.size, p.color);
+  });
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  if (flashT > 0){
+    ctx.globalAlpha = flashT*1.4;
+    ctx.fillStyle = flashColor; ctx.fillRect(0,0,W,H);
+    ctx.globalAlpha = 1;
+  }
+}
+
+/* ---------------- start / end ------------------------------------------ */
+function renderRecordBoard(el){
+  const rows = [];
+  for (const tk of ['times','mixed']){
+    rows.push(`<div><span>${TOPIC_NAME[tk]} · Sprint</span><span>${fmtBest('sprint', getBest(tk,'sprint'))}</span></div>`);
+    rows.push(`<div><span>${TOPIC_NAME[tk]} · Blitz</span><span>${fmtBest('blitz', getBest(tk,'blitz'))}</span></div>`);
+  }
+  el.innerHTML = `<div style="opacity:.6;font-size:11px;letter-spacing:1.5px;justify-content:center">YOUR RECORDS</div>` + rows.join('');
+}
+function refreshBestLabel(){
+  document.getElementById('best').textContent = fmtBest(mode, getBest(topic,mode));
+  document.getElementById('mainLabel').textContent = mode==='sprint' ? 'TIME' : 'LEFT';
+}
+
+function startGame(){
+  state = 'playing';
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('endScreen').classList.add('hidden');
+  refreshBestLabel();
+  resetGame();
+  updateHUD();
+  document.getElementById('answer').focus();
+  beep(523,0.1); setTimeout(()=>beep(784,0.14),110);
+}
+
+function endGame(finished){
+  state = 'over';
+  const survived = hearts > 0;
+  let score = null, isRecord = false;
+
+  if (mode === 'sprint'){
+    if (finished && survived){
+      score = Math.round((elapsed + penalty)*10)/10;
+      isRecord = saveBest(topic,'sprint',score);
+    }
+  } else {
+    // blitz records count even if the wall falls — you still answered them
+    score = correct;
+    isRecord = saveBest(topic,'blitz',score);
+  }
+
+  const title = document.getElementById('endTitle');
+  if (mode==='sprint' && finished && survived){ title.textContent = '🏆 20 DOWN!'; sfx.win(); }
+  else if (mode==='blitz' && survived){ title.textContent = "⏰ Time's Up!"; sfx.win(); }
+  else { title.textContent = '💥 Wall Down!'; sfx.lose(); }
+
+  const acc = (correct+wrong) ? Math.round(correct/(correct+wrong)*100) : 0;
+  const stats = [];
+  if (mode === 'sprint'){
+    stats.push(`<div class="scoreRow">Your time: <b>${finished&&survived ? fmtTime(elapsed+penalty) : '—'}</b></div>`);
+    stats.push(`<div class="scoreRow">Solved ${correct} of ${CONFIG.sprintQuestions}</div>`);
+    if (penalty>0) stats.push(`<div class="scoreRow" style="color:#ff9b8a">+${penalty}s from ${wrong} miss${wrong===1?'':'es'}</div>`);
+  } else {
+    stats.push(`<div class="scoreRow">Right answers: <b>${correct}</b></div>`);
+  }
+  stats.push(`<div class="scoreRow">Best streak: <b>${bestStreak}</b> · ${acc}% accurate</div>`);
+  document.getElementById('endStats').innerHTML = stats.join('');
+  document.getElementById('newRecord').classList.toggle('hidden', !isRecord);
+  if (isRecord) sfx.win();
+  renderRecordBoard(document.getElementById('endBoard'));
+  document.getElementById('endScreen').classList.remove('hidden');
+}
+
+/* ---------------- wiring ------------------------------------------------ */
+const inp = document.getElementById('answer');
+inp.addEventListener('input', ()=>{
+  inp.value = inp.value.replace(/[^0-9]/g,'').slice(0,4);
+  // instant reward: as soon as the typed number IS the answer, fire
+  if (state==='playing' && inp.value !== '' && parseInt(inp.value,10) === q.answer) rightAnswer();
+});
+document.addEventListener('keydown', e=>{
+  if (e.key === 'Enter'){
+    e.preventDefault();
+    if (state === 'playing') submit();
+    else if (state === 'over') startGame();
+    else startGame();
+  }
+});
+
+// on-screen keypad
+const keypad = document.getElementById('keypad');
+['1','2','3','4','5','6','7','8','9','0'].forEach(n=>{
+  const b = document.createElement('button');
+  b.className='key'; b.textContent=n;
+  b.onclick = ()=>{ inp.value = (inp.value + n).slice(0,4); inp.dispatchEvent(new Event('input')); };
+  keypad.appendChild(b);
+});
+const del = document.createElement('button');
+del.className='key del'; del.textContent='⌫';
+del.onclick = ()=>{ inp.value = inp.value.slice(0,-1); };
+keypad.appendChild(del);
+const go = document.createElement('button');
+go.className='key go'; go.textContent='✓'; go.style.gridColumn='span 4';
+go.onclick = submit;
+keypad.appendChild(go);
+
+document.querySelectorAll('#topicChooser .chip').forEach(c=>{
+  c.onclick = ()=>{
+    document.querySelectorAll('#topicChooser .chip').forEach(x=>x.classList.remove('on'));
+    c.classList.add('on'); topic = c.dataset.topic; refreshBestLabel();
+  };
+});
+document.querySelectorAll('#modeChooser .chip').forEach(c=>{
+  c.onclick = ()=>{
+    document.querySelectorAll('#modeChooser .chip').forEach(x=>x.classList.remove('on'));
+    c.classList.add('on'); mode = c.dataset.mode; refreshBestLabel();
+  };
+});
+document.getElementById('startBtn').onclick = startGame;
+document.getElementById('againBtn').onclick = startGame;
+document.getElementById('menuBtn').onclick = ()=>{
+  state='menu';
+  document.getElementById('endScreen').classList.add('hidden');
+  renderRecordBoard(document.getElementById('recordBoard'));
+  document.getElementById('startScreen').classList.remove('hidden');
+};
+document.getElementById('resetBtn').onclick = ()=>{
+  ['times','mixed'].forEach(t=>['sprint','blitz'].forEach(m=>store.del(KEY(t,m))));
+  renderRecordBoard(document.getElementById('recordBoard'));
+  refreshBestLabel();
+};
+
+renderRecordBoard(document.getElementById('recordBoard'));
+refreshBestLabel();
+resetGame();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

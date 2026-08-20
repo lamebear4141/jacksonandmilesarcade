@@ -38,6 +38,13 @@
   a.tile:active{ transform: translateY(3px); box-shadow: 0 2px 0 #140a28; }
   a.tile .emoji{ font-size: 44px; }
   a.tile .name{ font-weight: 800; font-size: 16px; }
+  a.tile .who{
+    font-size: 11px; font-weight: 800; letter-spacing: 1px;
+    color: #1a1030; background: var(--accent);
+    padding: 3px 10px; border-radius: 999px; margin-top: -2px;
+  }
+  a.tile.math{ background: #1d2a4a; box-shadow: 0 5px 0 #0d1428; }
+  a.tile.math:active{ box-shadow: 0 2px 0 #0d1428; }
   .empty{
     background: var(--panel); border-radius: 20px; padding: 30px; color:#c9bfe8;
     border: 2px dashed #4a3080; grid-column: 1 / -1;
@@ -56,6 +63,16 @@
       <a class="tile" href="block-stacker/index.html">
         <span class="emoji">🧱</span>
         <span class="name">Block Stacker</span>
+      </a>
+      <a class="tile math" href="math-defender/index.html">
+        <span class="emoji">⛏️</span>
+        <span class="name">Math Defender</span>
+        <span class="who">JACKSON</span>
+      </a>
+      <a class="tile math" href="coin-climb/index.html">
+        <span class="emoji">🪙</span>
+        <span class="name">Coin Climb</span>
+        <span class="who">MILES</span>
       </a>
     </div>
   </div>
