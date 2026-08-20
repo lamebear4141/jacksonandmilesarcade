@@ -127,7 +127,24 @@ export class Player {
     let dy = 0;
     if (this.input.forward) dy += CONFIG.climbSpeed * dt;
     if (this.input.back) dy -= CONFIG.climbSpeed * dt;
-    this.floorY = THREE.MathUtils.clamp(this.floorY + dy, nearest.bottomY, nearest.topY);
+    const newY = THREE.MathUtils.clamp(this.floorY + dy, nearest.bottomY, nearest.topY);
+
+    // Reached the top while still climbing up — step off the ladder's column and onto
+    // the platform, and move clear of the ladder's radius so it doesn't immediately
+    // grab you again next frame (that was the bug: without this, holding forward at
+    // the top just held you in place on the ladder forever with no way off).
+    if (newY >= nearest.topY - 0.001 && dy > 0) {
+      this.floorY = nearest.topY;
+      const exitDist = nearest.radius + 0.6;
+      const dir = nearest.exitDir || { x: 0, z: 1 };
+      this.yawObject.position.x = nearest.x + dir.x * exitDist;
+      this.yawObject.position.z = nearest.z + dir.z * exitDist;
+      this.yawObject.position.y = this.floorY;
+      this.onLadder = false;
+      return;
+    }
+
+    this.floorY = newY;
     this.yawObject.position.y = this.floorY;
   }
 

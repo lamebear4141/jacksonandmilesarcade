@@ -241,7 +241,7 @@ export function buildWorld(scene) {
     loftMesh.position.set(cx, loft.y - 0.12, (loft.minZ + loft.maxZ) / 2);
     scene.add(loftMesh);
 
-    const ladder = { x: cx, z: loft.minZ - 0.5, bottomY: 0, topY: loft.y, radius: 0.7 };
+    const ladder = { x: cx, z: loft.minZ - 0.5, bottomY: 0, topY: loft.y, radius: 0.7, exitDir: { x: 0, z: 1 } };
     ladders.push(ladder);
     const railMat = new THREE.MeshLambertMaterial({ color: '#c9b98a' });
     for (const dx of [-0.35, 0.35]) {
@@ -285,7 +285,7 @@ export function buildWorld(scene) {
     topMesh.position.set(cx, top.y - 0.12, cz);
     scene.add(topMesh);
 
-    const ladder = { x: cx, z: cz, bottomY: 0, topY: top.y, radius: 0.9 };
+    const ladder = { x: cx, z: cz, bottomY: 0, topY: top.y, radius: 0.9, exitDir: { x: 0, z: 1 } };
     ladders.push(ladder);
     const railMat = new THREE.MeshLambertMaterial({ color: '#8a8272' });
     for (const dx of [-0.4, 0.4]) {
