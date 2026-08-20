@@ -7,6 +7,7 @@ import { Player } from './player.js';
 import { AudioManager } from './audio.js';
 import { HUD } from './hud.js';
 import { Objectives } from './objectives.js';
+import { Scarecrow } from './scarecrow.js';
 
 const canvas = document.getElementById('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -16,7 +17,7 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 500);
 
-const { colliders, spawnPoint, ladders, platforms, keySpots, gate } = buildWorld(scene);
+const { colliders, occluders, spawnPoint, ladders, platforms, keySpots, gate, scarecrowPost } = buildWorld(scene);
 
 const audio = new AudioManager();
 
@@ -33,7 +34,12 @@ const player = new Player({
 scene.add(player.object);
 
 const hud = new HUD();
-const objectives = new Objectives({ scene, keySpots, gate, colliders, hud, audio });
+const scarecrow = new Scarecrow({ scene, postPosition: scarecrowPost, occluders, audio });
+const objectives = new Objectives({
+  scene, keySpots, gate, colliders, hud, audio,
+  onFirstKey: (p) => scarecrow.awaken(p),
+});
+window.__debug = { player, scene, camera, objectives, keySpots, scarecrow, renderer };
 
 // ---- Click-to-play overlay (pointer lock requires a user gesture) ----
 const overlay = document.createElement('div');
@@ -75,6 +81,7 @@ const clock = new THREE.Clock();
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.05);
   player.update(dt);
+  scarecrow.update(dt, camera, player);
   objectives.update(dt, player);
   renderer.render(scene, camera);
   requestAnimationFrame(tick);

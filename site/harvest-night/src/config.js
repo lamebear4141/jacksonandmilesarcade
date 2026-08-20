@@ -20,6 +20,14 @@ export const CONFIG = {
   catchDistance: 1.6,   // how close before it gets you
   hideTime:      4.0,   // seconds crouched before it loses you
 
+  // --- The scarecrow's own timing (not in the spec's table, but tunable like everything else) ---
+  scarecrow: {
+    poseInterval:      0.35,  // seconds between snapped walk poses — the jerky, no-tween lurch
+    awakenStepDuration: 1.4,  // seconds for the scripted "step off the post" animation
+    awakenPause:        3.5,  // seconds of held dread after stepping off before it starts stalking
+    stopDistance:        2.0, // it stops closing the gap at this distance (Phase 4 adds the attack)
+  },
+
   // --- You (movement is live now; stamina/flashlight land later) ---
   walkSpeed:         4.2,
   sprintSpeed:        7.5,

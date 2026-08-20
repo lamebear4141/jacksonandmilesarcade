@@ -75,6 +75,11 @@ export function surfaceAt(x, z) {
 
 export function buildWorld(scene) {
   const colliders = [];
+  // Solid meshes the scarecrow's sightline-occlusion raycast can hit — a subset of
+  // everything in the scene (skips sky/moon/ground/decorative small props) so the
+  // per-frame raycast stays cheap and doesn't get false positives from things like
+  // the ground plane.
+  const occluders = [];
   const half = CONFIG.world.size / 2;
 
   // ---- Sky + moon ----
@@ -196,6 +201,7 @@ export function buildWorld(scene) {
     const wall = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
     wall.position.set(cx, h / 2, cz);
     scene.add(wall);
+    occluders.push(wall);
     colliders.push(new THREE.Box3().setFromCenterAndSize(
       new THREE.Vector3(cx, h / 2, cz), new THREE.Vector3(w, h, d)
     ));
@@ -315,6 +321,7 @@ export function buildWorld(scene) {
     const tank = new THREE.Mesh(new THREE.BoxGeometry(4.5, 4, 4.5), tankMat);
     tank.position.set(26, 10, -10);
     scene.add(tank);
+    occluders.push(tank);
     const cap = new THREE.Mesh(new THREE.ConeGeometry(3.4, 1.6, 4), tankMat);
     cap.rotation.y = Math.PI / 4;
     cap.position.set(26, 12.8, -10);
@@ -343,6 +350,7 @@ export function buildWorld(scene) {
     group.position.set(-8, 0, -6);
     group.rotation.y = 0.4;
     scene.add(group);
+    occluders.push(group);
     colliders.push(new THREE.Box3().setFromCenterAndSize(
       new THREE.Vector3(-8, 1, -6), new THREE.Vector3(2.8, 2, 4.2)
     ));
@@ -379,6 +387,7 @@ export function buildWorld(scene) {
     corn.instanceMatrix.needsUpdate = true;
     corn.instanceColor.needsUpdate = true;
     scene.add(corn);
+    occluders.push(corn); // the whole point of the corn: it blocks sightlines
   }
 
   // ---- Scatter props ----
@@ -388,6 +397,7 @@ export function buildWorld(scene) {
     bale.position.set(x, 0.4, z);
     bale.rotation.y = ry;
     scene.add(bale);
+    occluders.push(bale);
     colliders.push(new THREE.Box3().setFromCenterAndSize(
       new THREE.Vector3(x, 0.4, z), new THREE.Vector3(1.1, 0.8, 0.8)
     ));
@@ -413,6 +423,7 @@ export function buildWorld(scene) {
     const trunk = new THREE.Mesh(new THREE.BoxGeometry(0.35, 3.5, 0.35), mat);
     trunk.position.set(x, 1.75, z);
     scene.add(trunk);
+    occluders.push(trunk);
     for (let i = 0; i < 3; i++) {
       const branch = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.2, 0.2), mat);
       branch.position.set(x + (Math.random() - 0.5) * 0.6, 2.6 + i * 0.4, z + (Math.random() - 0.5) * 0.6);
@@ -432,6 +443,7 @@ export function buildWorld(scene) {
       const c = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), mat);
       c.position.set(x + dx, dy, z + dz);
       scene.add(c);
+      occluders.push(c);
     });
     colliders.push(new THREE.Box3().setFromCenterAndSize(
       new THREE.Vector3(x + 0.2, 0.5, z + 0.1), new THREE.Vector3(1.4, 1.2, 1.2)
@@ -445,6 +457,7 @@ export function buildWorld(scene) {
     const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.9, 8), mat);
     ring.position.set(x, 0.45, z);
     scene.add(ring);
+    occluders.push(ring);
     const postMat = new THREE.MeshLambertMaterial({ color: '#3a2a1a' });
     [[-0.7, -0.7], [0.7, -0.7], [-0.7, 0.7], [0.7, 0.7]].forEach(([dx, dz]) => {
       const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.6, 0.12), postMat);
@@ -492,12 +505,14 @@ export function buildWorld(scene) {
       new THREE.Vector3(gx, 1.0, gz), new THREE.Vector3(4.6, 1.8, 0.4)
     );
     colliders.push(gateCollider);
+    occluders.push(hinge);
 
     gate = { hinge, panel, chain, collider: gateCollider, position: new THREE.Vector3(gx, 1.0, gz) };
   }
 
   return {
     colliders,
+    occluders,
     spawnPoint: new THREE.Vector3(0, 0, -30),
     ladders,
     platforms,
@@ -507,5 +522,6 @@ export function buildWorld(scene) {
       corn: new THREE.Vector3(0, 1.0, 30),
     },
     gate,
+    scarecrowPost: new THREE.Vector3(0, 0, 30),
   };
 }

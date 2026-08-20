@@ -81,4 +81,47 @@ export class AudioManager {
     osc.start(now);
     osc.stop(now + 1.35);
   }
+
+  // The scarecrow waking up: a long low creak, then a burst of crows taking off.
+  // `pan` (-1..1) roughly places it left/right of wherever the player was facing.
+  playAwaken(pan = 0) {
+    const now = this.ctx.currentTime;
+    const hasPanner = typeof this.ctx.createStereoPanner === 'function';
+    const bus = hasPanner ? this.ctx.createStereoPanner() : this.master;
+    if (hasPanner) { bus.pan.value = pan; bus.connect(this.master); }
+
+    const creak = this.ctx.createOscillator();
+    creak.type = 'sawtooth';
+    creak.frequency.setValueAtTime(70, now);
+    creak.frequency.exponentialRampToValueAtTime(38, now + 2.2);
+    const creakFilter = this.ctx.createBiquadFilter();
+    creakFilter.type = 'lowpass';
+    creakFilter.frequency.value = 300;
+    const creakGain = this.ctx.createGain();
+    creakGain.gain.setValueAtTime(0.0001, now);
+    creakGain.gain.linearRampToValueAtTime(0.22, now + 0.3);
+    creakGain.gain.exponentialRampToValueAtTime(0.001, now + 2.4);
+    creak.connect(creakFilter).connect(creakGain).connect(bus);
+    creak.start(now);
+    creak.stop(now + 2.5);
+
+    const cawCount = 4;
+    for (let i = 0; i < cawCount; i++) {
+      const t = now + 0.4 + i * (0.09 + Math.random() * 0.08);
+      const src = this.ctx.createBufferSource();
+      src.buffer = this._noiseBuffer(0.18);
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.setValueAtTime(1800, t);
+      bp.frequency.exponentialRampToValueAtTime(700, t + 0.15);
+      bp.Q.value = 4;
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.16, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+      src.connect(bp).connect(g).connect(bus);
+      src.start(t);
+      src.stop(t + 0.22);
+    }
+  }
 }

@@ -1,5 +1,6 @@
-// objectives.js — the three keys, the gate, and the win condition. No scarecrow
-// interaction yet (that's Phase 3+); this is purely "can you complete the loop."
+// objectives.js — the three keys, the gate, and the win condition. Picking up
+// the first key wakes the scarecrow (via the onFirstKey callback) — Phase 3+
+// handles what it actually does with that; this module just fires the cue.
 
 import * as THREE from 'three';
 import { CONFIG } from './config.js';
@@ -23,12 +24,13 @@ function makeKeyMesh() {
 }
 
 export class Objectives {
-  constructor({ scene, keySpots, gate, colliders, hud, audio }) {
+  constructor({ scene, keySpots, gate, colliders, hud, audio, onFirstKey }) {
     this.scene = scene;
     this.gate = gate;
     this.colliders = colliders;
     this.hud = hud;
     this.audio = audio;
+    this.onFirstKey = onFirstKey;
 
     this.keys = KEY_DEFS.map((def) => {
       const position = keySpots[def.id];
@@ -69,6 +71,7 @@ export class Objectives {
     this.hud.setKeyCount(this.collectedCount);
     this.audio.playChime();
     this.hud.showHint(key.hint);
+    if (this.collectedCount === 1 && this.onFirstKey) this.onFirstKey(player);
   }
 
   _distanceToGateXZ(player) {
