@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Loot Drop</title>
+<style>
+  :root{
+    --bg1:#0b0f2b; --bg2:#241a4d; --panel:#171b3d; --panel2:#20255280;
+    --ink:#f2f0ff; --dim:#a9a3d0; --accent:#ffd23f; --good:#3ddc84; --bad:#ff5f6d;
+    --line:#2c3160;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; height:100%; overflow:hidden; }
+  body{
+    background:linear-gradient(180deg,var(--bg1),var(--bg2));
+    font-family:'Trebuchet MS','Arial Rounded MT Bold',sans-serif;
+    color:var(--ink); display:flex; align-items:center; justify-content:center;
+  }
+  #app{
+    width:min(820px,100vw); height:min(940px,100vh); position:relative; overflow:hidden;
+    background:radial-gradient(120% 80% at 50% 0%,#2b1f5e 0%,#12163a 55%,#0a0d24 100%);
+    box-shadow:0 24px 70px rgba(0,0,0,.5);
+  }
+  .screen{ position:absolute; inset:0; display:none; flex-direction:column; padding:34px 16px 16px; gap:10px; }
+  .screen.on{ display:flex; }
+  .scroll{ overflow-y:auto; }
+
+  h1,h2,h3{ margin:0; letter-spacing:1px; }
+  .tiny{ font-size:13px; color:var(--dim); font-weight:700; }
+  .bad{ color:var(--bad); }
+  .center{ align-items:center; justify-content:center; text-align:center; }
+
+  .btn{
+    border:none; border-radius:14px; padding:14px 22px; font:inherit; font-weight:900;
+    font-size:18px; letter-spacing:1px; text-transform:uppercase; color:#0d1030;
+    background:var(--accent); box-shadow:0 5px 0 #a67c00; cursor:pointer; transition:transform .08s;
+  }
+  .btn:active{ transform:translateY(3px); box-shadow:0 2px 0 #a67c00; }
+  .btn.big{ font-size:24px; padding:18px 34px; }
+  .btn.ghost{ background:#2a2f5e; color:var(--ink); box-shadow:0 5px 0 #14173a; }
+  .btn.ghost:active{ box-shadow:0 2px 0 #14173a; }
+  .btn.green{ background:var(--good); box-shadow:0 5px 0 #1c8b4f; }
+  .btn.red{ background:var(--bad); color:#fff; box-shadow:0 5px 0 #a32a35; }
+  .btn:disabled{ opacity:.4; }
+  .card{ background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:14px; }
+  a.back{ position:absolute; top:10px; left:14px; color:#fff; text-decoration:none; font-size:13px;
+    font-weight:900; z-index:30; text-shadow:0 2px 0 rgba(0,0,0,.4); }
+  #grownup{ position:absolute; bottom:8px; left:8px; z-index:30; background:#ffffff22; border:none;
+    border-radius:999px; width:30px; height:30px; font-size:14px; cursor:pointer; opacity:.55; }
+  #grownup:hover{ opacity:1; }
+
+  /* ---------- profile ---------- */
+  #scrProfile .logo{ font-size:52px; font-weight:900; letter-spacing:3px; text-shadow:0 5px 0 rgba(0,0,0,.4); }
+  #profileCards{ display:flex; gap:16px; flex-wrap:wrap; justify-content:center; margin-top:18px; }
+  .pcard{ background:var(--panel); border:3px solid var(--line); border-radius:22px; padding:22px 26px;
+    cursor:pointer; color:var(--ink); font:inherit; min-width:190px; box-shadow:0 6px 0 #0d1030; }
+  .pcard:active{ transform:translateY(3px); box-shadow:0 3px 0 #0d1030; }
+  .pglyph{ font-size:56px; }
+  .pname{ font-size:24px; font-weight:900; letter-spacing:1px; }
+  .pmeta{ font-size:12px; color:var(--dim); font-weight:700; margin-top:3px; }
+
+  /* ---------- lobby ---------- */
+  .lobby-top{ display:flex; align-items:center; gap:14px; }
+  #lobbyAvatarWrap{ position:relative; }
+  #lobbyAvatar{ font-size:62px; }
+  #lobbyPet{ position:absolute; right:-6px; bottom:0; font-size:26px; }
+  #lobbyName{ font-size:30px; font-weight:900; }
+  #lobbyLevel{ font-size:14px; font-weight:900; color:var(--accent); letter-spacing:2px; }
+  .bar{ height:12px; background:#ffffff1a; border-radius:999px; overflow:hidden; margin-top:6px; }
+  .bar > div{ height:100%; transition:width .4s ease; }
+  #xpFill{ background:linear-gradient(90deg,#4fa3ff,#b56bff); }
+  #luckFill{ background:linear-gradient(90deg,#3ddc84,#ffd23f,#ff5f4d); }
+  .chips{ display:flex; gap:8px; flex-wrap:wrap; }
+  .chip{ background:var(--panel2); border:1px solid var(--line); border-radius:999px;
+    padding:6px 14px; font-weight:800; font-size:14px; }
+  .lobby-actions{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:auto; }
+  .lobby-actions .btn.big{ grid-column:1/-1; }
+
+  /* ---------- drop ---------- */
+  .mode-card{ background:var(--panel); border:2px solid var(--line); border-radius:20px; padding:22px;
+    cursor:pointer; color:var(--ink); font:inherit; width:100%; text-align:left; display:flex; gap:16px; align-items:center; }
+  .mode-card:active{ transform:translateY(3px); }
+  .mode-card .mg{ font-size:46px; }
+  .mode-card b{ font-size:22px; letter-spacing:1px; display:block; }
+
+  /* ---------- play ---------- */
+  #scrPlay{ gap:8px; }
+  .play-top{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .storm{ height:8px; background:#ffffff14; border-radius:999px; overflow:hidden; }
+  #stormFill{ height:100%; width:0; background:linear-gradient(90deg,#7b5cff,#c07bff); transition:width .35s; }
+  .acc-wrap{ display:flex; align-items:center; gap:8px; }
+  .acc-track{ position:relative; flex:1; height:14px; background:#ffffff14; border-radius:999px; overflow:hidden; }
+  .acc-fill{ height:100%; width:0; background:var(--good); transition:width .35s; }
+  .acc-fill.danger{ background:var(--bad); }
+  .acc-fill.safe{ background:var(--good); }
+  .acc-line{ position:absolute; top:-3px; bottom:-3px; left:80%; width:3px; background:var(--accent); }
+  #accText{ font-weight:900; font-size:15px; min-width:44px; text-align:right; }
+  #accText.danger{ color:var(--bad); }
+  .acc-label{ font-size:11px; font-weight:900; color:var(--dim); letter-spacing:1px; }
+
+  #qBox{ flex:1; background:var(--panel); border:1px solid var(--line); border-radius:20px;
+    padding:16px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; overflow-y:auto; min-height:0; }
+  .q-label{ font-size:13px; font-weight:900; letter-spacing:2px; color:var(--dim); }
+  .q-label.bonus{ color:var(--accent); }
+  .q-text{ font-weight:900; margin:10px 0; }
+  .q-text.word{ font-size:58px; letter-spacing:3px; }
+  .q-text.sentence{ font-size:30px; line-height:1.35; }
+  .q-text.problem{ font-size:38px; line-height:1.3; }
+  .q-text.passage{ font-size:20px; line-height:1.55; text-align:left; font-weight:700; }
+  #qQuestion{ font-size:23px; font-weight:900; margin:6px 0; }
+  #choices{ display:flex; flex-direction:column; gap:9px; width:100%; max-width:460px; margin-top:8px; }
+  .choice{ border:none; border-radius:14px; padding:14px; font:inherit; font-weight:900; font-size:24px;
+    background:#2b3163; color:var(--ink); box-shadow:0 5px 0 #171b3d; cursor:pointer; }
+  .choice:active{ transform:translateY(3px); box-shadow:0 2px 0 #171b3d; }
+  .choice.right{ background:#1f7a4d; box-shadow:0 5px 0 #135231; }
+  .choice.wrong{ background:#8d2733; box-shadow:0 5px 0 #5d1a22; }
+  .play-controls{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+  #micBtn{ background:#ff3b5c; color:#fff; box-shadow:0 5px 0 #a3122f; }
+  #micBtn.live{ animation:pulse .9s infinite; }
+  @keyframes pulse{ 0%,100%{transform:scale(1);} 50%{transform:scale(1.06);} }
+  #heard{ text-align:center; font-weight:800; font-size:14px; color:var(--dim); min-height:20px; }
+  #playPet{ font-size:26px; } #playAvatar{ font-size:30px; }
+
+  #lootLayer{ position:absolute; top:120px; right:14px; display:flex; flex-direction:column; gap:8px; z-index:20; pointer-events:none; }
+  .loot-pop{ background:#11142fdd; border:2px solid; border-radius:14px; padding:8px 12px; text-align:center;
+    animation:lootIn .4s ease, lootOut .4s ease 1.2s forwards; min-width:104px; }
+  .loot-glyph{ font-size:30px; } .loot-name{ font-size:12px; font-weight:900; }
+  .loot-rarity{ font-size:9px; font-weight:900; color:#0d1030; border-radius:999px; padding:1px 6px; margin-top:3px; display:inline-block; }
+  @keyframes lootIn{ from{ transform:translateX(60px) scale(.6); opacity:0; } }
+  @keyframes lootOut{ to{ transform:translateX(60px) scale(.8); opacity:0; } }
+
+  #feedback{ position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+    flex-direction:column; gap:6px; pointer-events:none; z-index:25; }
+  #feedback.on{ display:flex; }
+  #fbIcon{ font-size:110px; animation:pop .35s ease; }
+  #fbText{ font-size:28px; font-weight:900; text-shadow:0 4px 0 rgba(0,0,0,.45); }
+  @keyframes pop{ 0%{transform:scale(.3);} 70%{transform:scale(1.15);} 100%{transform:scale(1);} }
+
+  /* ---------- result ---------- */
+  .res-title{ font-size:46px; font-weight:900; letter-spacing:3px; text-align:center; }
+  .res-title.win{ color:var(--good); text-shadow:0 5px 0 #12built; text-shadow:0 5px 0 rgba(0,0,0,.4); }
+  .res-title.lose{ color:var(--bad); text-shadow:0 5px 0 rgba(0,0,0,.4); }
+  .stats3{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .stat{ background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:10px; text-align:center; }
+  .stat b{ display:block; font-size:26px; } .stat span{ font-size:11px; color:var(--dim); font-weight:900; letter-spacing:1px; }
+  #resLoot{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+  .res-sprite{ background:#11142f; border:2px solid; border-radius:14px; padding:8px; width:92px; text-align:center; }
+  .rs-glyph{ font-size:30px; } .rs-name{ font-size:11px; font-weight:900; }
+  .rs-new{ font-size:9px; font-weight:900; background:var(--accent); color:#0d1030; border-radius:999px; margin-top:3px; }
+  .res-lost{ font-size:26px; filter:grayscale(1); opacity:.45; }
+  .res-line{ font-size:14px; font-weight:800; margin:3px 0; }
+
+  /* ---------- collection ---------- */
+  #colGrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(88px,1fr)); gap:8px; }
+  .sprite{ background:#11142f; border:2px solid; border-radius:14px; padding:8px 4px; text-align:center; position:relative; }
+  .sprite.locked{ opacity:.35; }
+  .sp-glyph{ font-size:30px; } .sp-name{ font-size:10px; font-weight:900; }
+  .sp-count{ position:absolute; top:3px; right:5px; font-size:10px; font-weight:900; color:var(--accent); }
+  .tally{ display:inline-block; border-radius:999px; padding:2px 9px; font-size:11px; font-weight:900; color:#0d1030; margin:2px; }
+
+  /* ---------- shop ---------- */
+  .shop-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(104px,1fr)); gap:8px; }
+  .shop-item{ background:#11142f; border:2px solid var(--line); border-radius:14px; padding:10px 4px;
+    color:var(--ink); font:inherit; cursor:pointer; text-align:center; }
+  .shop-item.owned{ border-color:#4fa3ff; } .shop-item.equipped{ border-color:var(--accent); background:#2a2440; }
+  .shop-item.locked{ opacity:.4; } .shop-item.poor{ opacity:.65; }
+  .si-glyph{ font-size:32px; } .si-name{ font-size:12px; font-weight:900; }
+  .si-tag{ font-size:10px; font-weight:900; color:var(--dim); margin-top:2px; }
+
+  /* ---------- compare ---------- */
+  .code-row{ display:flex; gap:6px; align-items:center; margin:5px 0; }
+  .code-row input{ flex:1; background:#0d1030; border:1px solid var(--line); border-radius:10px;
+    color:var(--ink); font:inherit; font-size:12px; padding:9px; }
+  .cmp-head{ display:flex; align-items:center; justify-content:space-around; margin-top:8px; }
+  .cmp-name{ font-size:20px; font-weight:900; } .cmp-vs{ font-weight:900; color:var(--accent); }
+  .cmp-winner{ text-align:center; font-weight:900; margin:6px 0; color:var(--accent); }
+  .cmp-table{ width:100%; border-collapse:collapse; }
+  .cmp-table td,.cmp-table th{ padding:6px; text-align:center; border-bottom:1px solid var(--line); font-size:14px; }
+  .cmp-table th{ color:var(--dim); font-size:11px; letter-spacing:1px; text-transform:uppercase; }
+  .cmp-table td.lead{ color:var(--good); font-weight:900; }
+  .cmp-only{ font-size:13px; margin-top:8px; line-height:1.7; }
+
+  /* ---------- minigames ---------- */
+  #miniHost{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; }
+  .mg-title{ font-size:32px; font-weight:900; letter-spacing:2px; color:var(--accent); }
+  .mg-sub{ font-size:15px; color:var(--dim); font-weight:800; text-align:center; }
+  .mg-row{ display:flex; gap:16px; }
+  .mg-chest{ font-size:56px; background:#11142f; border:3px solid var(--line); border-radius:18px;
+    padding:16px 20px; cursor:pointer; }
+  .mg-chest.mg-picked{ border-color:var(--accent); } .mg-chest.mg-dim{ opacity:.45; }
+  .mg-amt{ font-size:15px; font-weight:900; color:var(--accent); }
+  .mg-llama{ font-size:96px; background:none; border:none; cursor:pointer; transition:transform .05s; }
+  .mg-bar{ width:260px; height:12px; background:#ffffff1a; border-radius:999px; overflow:hidden; }
+  .mg-fill{ height:100%; width:100%; background:var(--accent); }
+  .mg-count{ font-weight:900; font-size:18px; }
+  .mg-canvas{ border-radius:14px; border:2px solid var(--line); touch-action:none; max-width:100%; }
+  .mg-field{ position:relative; width:300px; height:260px; background:#0d1030; border:2px solid var(--line); border-radius:14px; }
+  .mg-target{ position:absolute; font-size:34px; background:none; border:none; cursor:pointer; padding:0; }
+
+  /* ---------- parent ---------- */
+  #parentBody{ font-size:13px; }
+  .par-block{ margin-bottom:16px; }
+  .par-table{ width:100%; border-collapse:collapse; margin-top:6px; }
+  .par-table td,.par-table th{ padding:5px; border-bottom:1px solid var(--line); text-align:left; font-size:12px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <a class="back" href="../index.html">&larr; Arcade</a>
+
+  <!-- ===================== PROFILE ===================== -->
+  <section id="scrProfile" class="screen center on">
+    <div style="font-size:54px">🪂</div>
+    <div class="logo">LOOT DROP</div>
+    <div class="tiny">Answer right → loot chests → get home with 80%</div>
+    <div id="incomingNote" class="tiny" style="color:var(--accent)"></div>
+    <div id="profileCards"></div>
+  </section>
+
+  <!-- ====================== LOBBY ====================== -->
+  <section id="scrLobby" class="screen">
+    <div class="lobby-top">
+      <div id="lobbyAvatarWrap"><div id="lobbyAvatar">🙂</div><div id="lobbyPet"></div></div>
+      <div style="flex:1">
+        <div id="lobbyName">Player</div>
+        <div id="lobbyLevel">LEVEL 1</div>
+        <div class="bar"><div id="xpFill"></div></div>
+        <div class="tiny" id="xpText">0 / 0 XP</div>
+      </div>
+    </div>
+    <div class="chips">
+      <span class="chip" id="lobbyCoins">🪙 0</span>
+      <span class="chip" id="lobbyStreak">🔥 0</span>
+      <span class="chip" id="lobbyDex">🗂️ 0</span>
+      <span class="chip" id="lobbyToday">—</span>
+    </div>
+    <div class="card">
+      <div class="tiny">LOOT LUCK — better luck means rarer sprites</div>
+      <div class="bar"><div id="luckFill"></div></div>
+      <div class="tiny" id="luckText" style="margin-top:4px"></div>
+      <div class="tiny" id="luckWhy" style="color:var(--accent)"></div>
+    </div>
+    <div class="card" style="flex:1;min-height:0;display:flex;flex-direction:column">
+      <div class="tiny">BEST IN THE SQUAD</div>
+      <div id="lobbyShowcase" style="flex:1;overflow-y:auto"></div>
+    </div>
+    <div class="lobby-actions">
+      <button class="btn big" id="btnDrop">🪂 Drop in</button>
+      <button class="btn ghost" id="btnCollection">🗂️ Collection</button>
+      <button class="btn ghost" id="btnShop">🛒 Item shop</button>
+      <button class="btn ghost" id="btnCompare">⚔️ Compare</button>
+      <button class="btn ghost" id="btnSwitch">🔄 Switch player</button>
+    </div>
+  </section>
+
+  <!-- ======================= DROP ====================== -->
+  <section id="scrDrop" class="screen center">
+    <h2 style="font-size:28px">CHOOSE YOUR DROP</h2>
+    <div class="tiny">15 challenges · get 80% right to bring the loot home</div>
+    <div style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:440px;margin-top:14px">
+      <button class="mode-card" id="btnReading"><span class="mg">📖</span>
+        <span><b>READING RUN</b><span class="tiny">Read out loud, sound it out, supply drops</span></span></button>
+      <button class="mode-card" id="btnMath"><span class="mg">🔢</span>
+        <span><b>MATH RUN</b><span class="tiny">Fast facts, word problems, one supply drop</span></span></button>
+    </div>
+    <button class="btn ghost" id="btnDropBack" style="margin-top:16px">Back</button>
+  </section>
+
+  <!-- ======================= PLAY ====================== -->
+  <section id="scrPlay" class="screen">
+    <div class="play-top">
+      <span class="chip" id="roundLabel">RUN</span>
+      <span class="chip" id="roundCount">1 / 15</span>
+      <span class="chip" id="bagCount">🎒 0</span>
+      <span id="playAvatar">🙂</span><span id="playPet"></span>
+    </div>
+    <div class="storm"><div id="stormFill"></div></div>
+    <div class="acc-wrap">
+      <span class="acc-label">EXTRACT</span>
+      <span class="acc-track"><span class="acc-fill" id="accFill"></span><span class="acc-line"></span></span>
+      <span id="accText">—</span>
+    </div>
+
+    <div id="qBox">
+      <div class="q-label" id="qLabel"></div>
+      <div class="q-text" id="qText"></div>
+      <div id="qQuestion"></div>
+      <div id="choices"></div>
+    </div>
+
+    <div id="heard"></div>
+    <div class="play-controls">
+      <button class="btn ghost" id="hearBtn">🔊 Hear it</button>
+      <button class="btn" id="micBtn">🎤 Read it</button>
+      <button class="btn ghost" id="quitBtn">Quit</button>
+    </div>
+    <div style="text-align:center">
+      <button class="btn ghost" id="escapeBtn" style="display:none;font-size:14px;padding:8px 16px">
+        🎤 Mic not working? Tap instead</button>
+    </div>
+    <div class="tiny" id="micNote" style="text-align:center"></div>
+
+    <div id="lootLayer"></div>
+    <div id="feedback"><div id="fbIcon">⭐</div><div id="fbText"></div></div>
+  </section>
+
+  <!-- ====================== REBOOT ===================== -->
+  <section id="scrReboot" class="screen center">
+    <div style="font-size:72px">🚐</div>
+    <h2 style="font-size:32px;color:var(--accent)">REBOOT VAN</h2>
+    <div style="font-size:19px;font-weight:800;max-width:420px" id="rebootNeed"></div>
+    <div class="tiny" id="rebootCount"></div>
+    <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;justify-content:center">
+      <button class="btn green big" id="rebootYes">Let's go!</button>
+      <button class="btn ghost" id="rebootNo">No thanks</button>
+    </div>
+  </section>
+
+  <!-- ====================== RESULT ===================== -->
+  <section id="scrResult" class="screen scroll">
+    <div class="res-title" id="resTitle">EXTRACTED!</div>
+    <div class="tiny" id="resSub" style="text-align:center"></div>
+    <div class="stats3">
+      <div class="stat"><b id="resAcc">0%</b><span>ACCURACY</span></div>
+      <div class="stat"><b id="resXp">+0</b><span>XP</span></div>
+      <div class="stat"><b id="resCoins">+0</b><span>COINS</span></div>
+    </div>
+    <div class="card">
+      <div style="font-weight:900;margin-bottom:8px" id="resLootTitle"></div>
+      <div id="resLoot"></div>
+    </div>
+    <div id="resExtra"></div>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:auto;padding-top:10px">
+      <button class="btn green" id="resMiniBtn">🎁 Bonus game</button>
+      <button class="btn" id="resRetryBtn">Drop again</button>
+      <button class="btn ghost" id="resHomeBtn">🏠 Lobby</button>
+    </div>
+  </section>
+
+  <!-- ===================== MINIGAME ==================== -->
+  <section id="scrMini" class="screen"><div id="miniHost"></div></section>
+
+  <!-- ==================== COLLECTION =================== -->
+  <section id="scrCollection" class="screen scroll">
+    <h2 id="colTitle" style="font-size:24px"></h2>
+    <div class="tiny" id="colScore"></div>
+    <div id="colTally"></div>
+    <div id="colGrid" style="margin-top:8px"></div>
+    <div style="text-align:center;padding:12px"><button class="btn ghost" data-home>🏠 Lobby</button></div>
+  </section>
+
+  <!-- ====================== SHOP ======================= -->
+  <section id="scrShop" class="screen scroll">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 style="font-size:24px">🛒 ITEM SHOP</h2><span class="chip" id="shopCoins">🪙 0</span>
+    </div>
+    <div class="tiny bad" id="shopMsg" style="min-height:18px"></div>
+    <h3 style="font-size:15px;color:var(--dim)">SKINS</h3>
+    <div class="shop-grid" id="shopSkins"></div>
+    <h3 style="font-size:15px;color:var(--dim);margin-top:10px">PETS</h3>
+    <div class="shop-grid" id="shopPets"></div>
+    <div style="text-align:center;padding:12px"><button class="btn ghost" data-home>🏠 Lobby</button></div>
+  </section>
+
+  <!-- ===================== COMPARE ===================== -->
+  <section id="scrCompare" class="screen scroll">
+    <h2 style="font-size:24px">⚔️ SQUAD COMPARE</h2>
+    <div class="card">
+      <div class="tiny">YOUR SQUAD CODE — send this to your brother</div>
+      <div class="code-row"><input id="myCode" readonly><button class="btn ghost" id="copyCode">Copy</button></div>
+      <div class="code-row"><input id="myLink" readonly><button class="btn ghost" id="copyLink">Copy link</button></div>
+    </div>
+    <div class="card">
+      <div class="tiny">PASTE HIS CODE HERE</div>
+      <div class="code-row"><input id="cmpInput" placeholder="paste squad code"><button class="btn" id="cmpGo">Compare</button></div>
+    </div>
+    <div id="cmpResult"></div>
+    <div style="text-align:center;padding:12px"><button class="btn ghost" data-home>🏠 Lobby</button></div>
+  </section>
+
+  <!-- ====================== PARENT ===================== -->
+  <section id="scrParent" class="screen scroll" style="background:#0d1030">
+    <h2 style="font-size:22px">Grown-up dashboard</h2>
+    <div id="parentBody"></div>
+    <div style="display:flex;gap:8px;justify-content:center;padding:12px;flex-wrap:wrap">
+      <button class="btn" id="parentSave">💾 Save progress file</button>
+      <button class="btn ghost" data-home>Back</button>
+    </div>
+  </section>
+
+  <button id="grownup" title="Grown-up dashboard">⚙️</button>
+</div>
+
+<script type="module">
+  import { boot } from './src/ui.js';
+  boot();
+</script>
+</body>
+</html>
