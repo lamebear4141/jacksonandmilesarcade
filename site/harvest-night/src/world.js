@@ -190,11 +190,117 @@ export function buildWorld(scene) {
   porchLight.position.set(-14, 3, -19.2);
   scene.add(porchLight);
 
-  // Barn — big, red with light trim.
-  addBuilding(-24, 8, 10, 7, 14, '#7a2f28', { roof: true, roofHeight: 4, roofColor: '#3a2018', trim: '#d8d4c8' });
+  // ---- Hollow-building helper: four walls with a door gap in one, plus a roof.
+  // Used for the barn and silo, which the player has to walk into. ----
+  function addWallSeg(cx, cz, w, d, h, mat) {
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    wall.position.set(cx, h / 2, cz);
+    scene.add(wall);
+    colliders.push(new THREE.Box3().setFromCenterAndSize(
+      new THREE.Vector3(cx, h / 2, cz), new THREE.Vector3(w, h, d)
+    ));
+  }
 
-  // Silo — tall boxy tower with a conical cap.
-  addBuilding(22, 16, 5.5, 12, 5.5, '#8a7f6a', { roof: true, roofHeight: 2.4, roofColor: '#4a3a2a' });
+  const ladders = [];
+  const platforms = [];
+  let barnLoft, siloTop;
+
+  // ---- Barn — enterable, two floors. Key 1 is on the hayloft. ----
+  {
+    const cx = -24, cz = 8, w = 10, d = 14, h = 7, t = 0.3;
+    const x0 = cx - w / 2, x1 = cx + w / 2; // -29 .. -19
+    const z0 = cz - d / 2, z1 = cz + d / 2; // 1 .. 15
+    const wallMat = new THREE.MeshLambertMaterial({ map: makeNoiseTexture('#7a2f28', 16, 16) });
+
+    addWallSeg(x0, cz, t, d, h, wallMat);                 // west wall
+    addWallSeg(cx, z1, w, t, h, wallMat);                 // north wall (back)
+    addWallSeg(cx, z0, w, t, h, wallMat);                 // south wall
+    // east wall, split for a doorway facing the driveway
+    addWallSeg(x1, cz - 4.125, t, d - 8.25, h, wallMat);
+    addWallSeg(x1, cz + 4.125, t, d - 8.25, h, wallMat);
+
+    const roofMat = new THREE.MeshLambertMaterial({ color: '#3a2018' });
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(Math.max(w, d) * 0.72, 4, 4), roofMat);
+    roof.rotation.y = Math.PI / 4;
+    roof.position.set(cx, h + 4 / 2 - 0.15, cz);
+    scene.add(roof);
+
+    const floorMat = new THREE.MeshLambertMaterial({ map: makeNoiseTexture('#4a2f1a', 16, 14) });
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.6, d - 0.6), floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.set(cx, 0.02, cz);
+    scene.add(floor);
+
+    // Hayloft along the back (north) wall.
+    const loft = { minX: x0 + t, maxX: x1 - t, minZ: z1 - 3.7, maxZ: z1 - t, y: 3.4 };
+    platforms.push(loft);
+    const loftMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(loft.maxX - loft.minX, 0.25, loft.maxZ - loft.minZ),
+      floorMat
+    );
+    loftMesh.position.set(cx, loft.y - 0.12, (loft.minZ + loft.maxZ) / 2);
+    scene.add(loftMesh);
+
+    const ladder = { x: cx, z: loft.minZ - 0.5, bottomY: 0, topY: loft.y, radius: 0.7 };
+    ladders.push(ladder);
+    const railMat = new THREE.MeshLambertMaterial({ color: '#c9b98a' });
+    for (const dx of [-0.35, 0.35]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.08, ladder.topY, 0.08), railMat);
+      rail.position.set(ladder.x + dx, ladder.topY / 2, ladder.z);
+      scene.add(rail);
+    }
+    for (let ry = 0.3; ry < ladder.topY; ry += 0.35) {
+      const rung = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.06, 0.06), railMat);
+      rung.position.set(ladder.x, ry, ladder.z);
+      scene.add(rung);
+    }
+
+    barnLoft = loft;
+  }
+
+  // ---- Silo — tall, hollow, one straight ladder up a dark shaft. Key 2 at the top. ----
+  {
+    const cx = 22, cz = 16, w = 5.5, d = 5.5, h = 12, t = 0.3;
+    const x0 = cx - w / 2, x1 = cx + w / 2; // 19.25 .. 24.75
+    const z0 = cz - d / 2, z1 = cz + d / 2; // 13.25 .. 18.75
+    const wallMat = new THREE.MeshLambertMaterial({ map: makeNoiseTexture('#8a7f6a', 16, 14) });
+
+    addWallSeg(x0, cz, t, d, h, wallMat);   // west
+    addWallSeg(x1, cz, t, d, h, wallMat);   // east
+    addWallSeg(cx, z1, w, t, h, wallMat);   // north
+    // south wall, split for a doorway
+    addWallSeg(cx - 1.6875, z0, w / 2 - 1.15, t, h, wallMat);
+    addWallSeg(cx + 1.6875, z0, w / 2 - 1.15, t, h, wallMat);
+
+    const roofMat = new THREE.MeshLambertMaterial({ color: '#4a3a2a' });
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(Math.max(w, d) * 0.72, 2.4, 4), roofMat);
+    roof.rotation.y = Math.PI / 4;
+    roof.position.set(cx, h + 2.4 / 2 - 0.15, cz);
+    scene.add(roof);
+
+    const top = { minX: x0 + 0.75, maxX: x1 - 0.75, minZ: z0 + 0.75, maxZ: z1 - 0.75, y: 10.6 };
+    platforms.push(top);
+    const topMat = new THREE.MeshLambertMaterial({ color: '#4a4238' });
+    const topMesh = new THREE.Mesh(new THREE.BoxGeometry(top.maxX - top.minX, 0.25, top.maxZ - top.minZ), topMat);
+    topMesh.position.set(cx, top.y - 0.12, cz);
+    scene.add(topMesh);
+
+    const ladder = { x: cx, z: cz, bottomY: 0, topY: top.y, radius: 0.9 };
+    ladders.push(ladder);
+    const railMat = new THREE.MeshLambertMaterial({ color: '#8a8272' });
+    for (const dx of [-0.4, 0.4]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.08, ladder.topY, 0.08), railMat);
+      rail.position.set(ladder.x + dx, ladder.topY / 2, ladder.z);
+      scene.add(rail);
+    }
+    for (let ry = 0.3; ry < ladder.topY; ry += 0.35) {
+      const rung = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.06, 0.06), railMat);
+      rung.position.set(ladder.x, ry, ladder.z);
+      scene.add(rung);
+    }
+
+    siloTop = top;
+  }
 
   // ---- Water tower ----
   {
@@ -355,8 +461,51 @@ export function buildWorld(scene) {
   }
   addWell(-8, -18);
 
+  // ---- Front gate — chained shut. Opens when all three keys are handed in. ----
+  let gate;
+  {
+    const gx = 0, gz = -38;
+    const postMat = new THREE.MeshLambertMaterial({ color: '#4a3a2a' });
+    [-2.3, 2.3].forEach((dx) => {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.3, 2.2, 0.3), postMat);
+      post.position.set(gx + dx, 1.1, gz);
+      scene.add(post);
+      colliders.push(new THREE.Box3().setFromCenterAndSize(
+        new THREE.Vector3(gx + dx, 1.1, gz), new THREE.Vector3(0.3, 2.2, 0.3)
+      ));
+    });
+
+    const hinge = new THREE.Group();
+    hinge.position.set(gx - 2.15, 0, gz);
+    scene.add(hinge);
+    const panelMat = new THREE.MeshLambertMaterial({ color: '#3a2a1a' });
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(4.3, 1.8, 0.12), panelMat);
+    panel.position.set(2.15, 1.0, 0);
+    hinge.add(panel);
+
+    const chainMat = new THREE.MeshLambertMaterial({ color: '#2a2a2a' });
+    const chain = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.3), chainMat);
+    chain.position.set(2.15, 1.0, 0.1);
+    hinge.add(chain);
+
+    const gateCollider = new THREE.Box3().setFromCenterAndSize(
+      new THREE.Vector3(gx, 1.0, gz), new THREE.Vector3(4.6, 1.8, 0.4)
+    );
+    colliders.push(gateCollider);
+
+    gate = { hinge, panel, chain, collider: gateCollider, position: new THREE.Vector3(gx, 1.0, gz) };
+  }
+
   return {
     colliders,
     spawnPoint: new THREE.Vector3(0, 0, -30),
+    ladders,
+    platforms,
+    keySpots: {
+      barn: new THREE.Vector3(-24, barnLoft.y + 0.35, (barnLoft.minZ + barnLoft.maxZ) / 2),
+      silo: new THREE.Vector3(22, siloTop.y + 0.35, 16),
+      corn: new THREE.Vector3(0, 1.0, 30),
+    },
+    gate,
   };
 }

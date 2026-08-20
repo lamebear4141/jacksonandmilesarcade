@@ -36,6 +36,15 @@ export const CONFIG = {
   // --- Chicken mode ---
   babyMode: false,  // scarecrow 40% slower, no frenzy phase
 
+  // --- Objectives (Phase 2: keys, ladders, the gate) ---
+  climbSpeed:    2.4,   // ladder climb speed, units/sec
+  interactRange: 2.2,   // how close you need to be to press E on something
+  keyVisual: {
+    spinSpeed: 1.2,      // radians/sec, how fast a key spins in place
+    bobAmount: 0.15,     // how far a key floats up/down
+    bobSpeed:  1.6,
+  },
+
   // --- World (not in the spec's table, but just as worth tweaking) ---
   world: {
     size: 80,        // the farm is size x size units, fenced on all sides

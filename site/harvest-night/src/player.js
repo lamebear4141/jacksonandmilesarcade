@@ -1,13 +1,15 @@
-// player.js — movement, mouse look, stamina, crouch. Flashlight lands in Phase 5.
+// player.js — movement, mouse look, stamina, crouch, ladders. Flashlight lands in Phase 5.
 
 import * as THREE from 'three';
 import { CONFIG } from './config.js';
 
 export class Player {
-  constructor({ camera, domElement, colliders, audio, getSurface, spawnPoint }) {
+  constructor({ camera, domElement, colliders, ladders, platforms, audio, getSurface, spawnPoint }) {
     this.camera = camera;
     this.domElement = domElement;
     this.colliders = colliders;
+    this.ladders = ladders || [];
+    this.platforms = platforms || [];
     this.audio = audio;
     this.getSurface = getSurface || (() => 'grass');
 
@@ -23,9 +25,10 @@ export class Player {
     // into the farm, matching the spec.
     this.yawObject.rotation.y = Math.PI;
 
-    this.input = { forward: false, back: false, left: false, right: false, sprint: false };
+    this.input = { forward: false, back: false, left: false, right: false, sprint: false, interact: false };
     this.locked = false;
     this.crouching = false;
+    this.frozen = false; // set true to stop taking input (e.g. once the player has won)
 
     this.stamina = CONFIG.staminaSeconds;
     this.exhausted = false; // true from the moment stamina hits 0 until it's back to full
@@ -33,6 +36,9 @@ export class Player {
     this.baseEyeHeight = CONFIG.world.eyeHeight;
     this.crouchEyeHeight = CONFIG.world.eyeHeight - 0.55;
     this.currentEyeHeight = this.baseEyeHeight;
+
+    this.floorY = 0;      // height of the ground/platform currently under the player
+    this.onLadder = false;
 
     this.bobTime = 0;
     this.footstepTimer = 0;
@@ -51,7 +57,7 @@ export class Player {
       this.locked = document.pointerLockElement === this.domElement;
     });
     document.addEventListener('mousemove', (e) => {
-      if (!this.locked) return;
+      if (!this.locked || this.frozen) return;
       this.yawObject.rotation.y -= e.movementX * CONFIG.mouse.sensitivity;
       this.pitchObject.rotation.x -= e.movementY * CONFIG.mouse.sensitivity;
       this.pitchObject.rotation.x = THREE.MathUtils.clamp(
@@ -69,6 +75,7 @@ export class Player {
       case 'KeyA': case 'ArrowLeft': this.input.left = down; break;
       case 'KeyD': case 'ArrowRight': this.input.right = down; break;
       case 'ShiftLeft': case 'ShiftRight': this.input.sprint = down; break;
+      case 'KeyE': this.input.interact = down; break;
       case 'KeyC': if (down) this.crouching = !this.crouching; break;
     }
   }
@@ -91,7 +98,67 @@ export class Player {
     return pos;
   }
 
+  // A ladder only engages while you're actively pressing forward/back within its
+  // radius — let go and you drop to whatever floor is under you (no fall damage,
+  // per the spec, so an instant snap down reads as a feature, not a bug).
+  _updateLadder(dt) {
+    const px = this.yawObject.position.x, pz = this.yawObject.position.z;
+    let nearest = null, nearestDistSq = Infinity;
+    for (const l of this.ladders) {
+      const dx = px - l.x, dz = pz - l.z;
+      const distSq = dx * dx + dz * dz;
+      if (distSq < l.radius * l.radius && distSq < nearestDistSq) { nearest = l; nearestDistSq = distSq; }
+    }
+
+    const wantsToClimb = nearest && (this.input.forward || this.input.back);
+    this.onLadder = !!wantsToClimb;
+    if (!this.onLadder) return;
+
+    this.yawObject.position.x = nearest.x;
+    this.yawObject.position.z = nearest.z;
+    let dy = 0;
+    if (this.input.forward) dy += CONFIG.climbSpeed * dt;
+    if (this.input.back) dy -= CONFIG.climbSpeed * dt;
+    this.floorY = THREE.MathUtils.clamp(this.floorY + dy, nearest.bottomY, nearest.topY);
+    this.yawObject.position.y = this.floorY;
+  }
+
+  _isInPlatform(p, x, z) {
+    return x >= p.minX && x <= p.maxX && z >= p.minZ && z <= p.maxZ;
+  }
+
+  // The floor height under the player only changes to a platform's height while
+  // standing in its footprint AND already close to that height (i.e. you just
+  // climbed a ladder up to it) — otherwise walking underneath a loft would yank
+  // you up onto it. Stepping off a platform's edge without a ladder just drops
+  // you back to the ground; see the ladder comment above for why that's fine.
+  _updateFloorHeight() {
+    const x = this.yawObject.position.x, z = this.yawObject.position.z;
+    let target = 0;
+    for (const p of this.platforms) {
+      if (this._isInPlatform(p, x, z) && Math.abs(this.floorY - p.y) < 1.0) {
+        target = p.y;
+        break;
+      }
+    }
+    this.floorY = target;
+    this.yawObject.position.y = this.floorY;
+  }
+
   update(dt) {
+    if (this.frozen) return;
+
+    this._updateLadder(dt);
+
+    if (this.onLadder) {
+      // No head bob/footsteps while climbing; eye height still applies on top of floorY.
+      this.pitchObject.position.set(0, this.currentEyeHeight, 0);
+      this.camera.rotation.z = 0;
+      this.bobTime = 0;
+      this.footstepTimer = 0;
+      return;
+    }
+
     const moving = this.input.forward || this.input.back || this.input.left || this.input.right;
     // Once stamina hits zero, sprint is locked out until it's back to full — otherwise
     // it flickers between sprint and walk speed every frame right at the boundary.
@@ -132,6 +199,8 @@ export class Player {
     newPos = this._resolveCollisions(newPos);
     this.yawObject.position.x = newPos.x;
     this.yawObject.position.z = newPos.z;
+
+    this._updateFloorHeight();
 
     // Smoothly ease eye height in/out of a crouch.
     const targetEye = this.crouching ? this.crouchEyeHeight : this.baseEyeHeight;

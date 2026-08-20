@@ -43,4 +43,42 @@ export class AudioManager {
     src.start(now);
     src.stop(now + 0.13);
   }
+
+  // A small rising three-note chime for picking up a key.
+  playChime() {
+    const now = this.ctx.currentTime;
+    const notes = [660, 880, 1320];
+    notes.forEach((freq, i) => {
+      const t = now + i * 0.09;
+      const osc = this.ctx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.value = freq;
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.linearRampToValueAtTime(0.22, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+      osc.connect(gain).connect(this.master);
+      osc.start(t);
+      osc.stop(t + 0.5);
+    });
+  }
+
+  // A low wooden creak + rattle for the gate unlocking.
+  playGateUnlock() {
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(90, now);
+    osc.frequency.exponentialRampToValueAtTime(50, now + 1.2);
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(0.18, now + 0.1);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 1.3);
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 400;
+    osc.connect(filter).connect(gain).connect(this.master);
+    osc.start(now);
+    osc.stop(now + 1.35);
+  }
 }

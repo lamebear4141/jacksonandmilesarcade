@@ -34,7 +34,7 @@ Every number that affects difficulty, speed, or feel lives in [`src/config.js`](
 Being built phase by phase per `HARVEST_NIGHT_spec.md`, §10:
 
 - [x] Phase 1 — The farm (world, lighting, fog, player movement, footsteps)
-- [ ] Phase 2 — The job (keys, gate, win screen)
+- [x] Phase 2 — The job (keys, ladders, gate hold-to-unlock, win screen)
 - [ ] Phase 3 — The scarecrow (model, AI, stalking rule)
 - [ ] Phase 4 — The scare (jump scare, GOTCHA screen)
 - [ ] Phase 5 — The tension (flashlight, lanterns, hiding, heartbeat)
