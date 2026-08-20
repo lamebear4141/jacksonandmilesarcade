@@ -124,6 +124,7 @@
   .recordBoard span:last-child{ color:var(--accent); font-weight:900; }
   .hidden{ display:none !important; }
   a.back{ position:absolute; top:10px; left:14px; color:#c9bfe8; text-decoration:none; font-size:13px; font-weight:800; z-index:20; }
+  #tierNote{ color:#8f8e85; font-size:11px; margin:-6px 0 12px; }
 </style>
 </head>
 <body>
@@ -150,6 +151,7 @@
     <h1>⛏️ Math Defender</h1>
     <p>Every problem sends a creeper at your wall. Every right answer blows one up. Get behind, and they pile up — your wall only takes 3 hits.</p>
 
+    <p id="tierNote" class="hidden"></p>
     <div class="sectionLabel">WHAT KIND OF MATH?</div>
     <div class="chooser" id="topicChooser">
       <button class="chip on" data-topic="times">✖️ Times Tables</button>
@@ -178,7 +180,9 @@
   </div>
 </div>
 
-<script>
+<script type="module">
+import { onParentChange, getCurrentKid, isGuestKid, getChild, ageFromBirthday, tierForAge } from '../firebase-config.js';
+
 /* =====================================================================
    MATH DEFENDER — tweak anything in here
    ===================================================================== */
@@ -206,6 +210,44 @@ const CONFIG = {
 };
 /* One creeper marches out for every question you're asked, so the wave only
    piles up if you're slow or you miss. Answer it, and it's gone. */
+
+/* =====================================================================
+   AGE TIER — set from the signed-in kid's birthday (families/{uid}/children
+   /{childId}.birthday), via firebase-config.js's tierForAge. No kid picked,
+   a guest with no birthday, or an age of 7-8 all land on "medium", which is
+   exactly the CONFIG above — unchanged default behavior either way.
+   ===================================================================== */
+const TIER_PRESETS = {
+  easy:   { sprintQuestions:12, wrongPenalty:2, creeperSpeed:14, speedRamp:0.9, creeperMax:40,
+            addSubScale:0.15, factorMax:6,  alwaysHardTimes:false, neverRamp:true  },
+  medium: { sprintQuestions:20, wrongPenalty:3, creeperSpeed:20, speedRamp:1.3, creeperMax:62,
+            addSubScale:1,     factorMax:12, alwaysHardTimes:false, neverRamp:false },
+  hard:   { sprintQuestions:26, wrongPenalty:4, creeperSpeed:26, speedRamp:1.7, creeperMax:80,
+            addSubScale:1.6,   factorMax:15, alwaysHardTimes:true,  neverRamp:false },
+};
+let tier = 'medium';
+function applyTier(t){
+  tier = TIER_PRESETS[t] ? t : 'medium';
+  const p = TIER_PRESETS[tier];
+  CONFIG.sprintQuestions = p.sprintQuestions;
+  CONFIG.wrongPenalty = p.wrongPenalty;
+  CONFIG.creeperSpeed = p.creeperSpeed;
+  CONFIG.speedRamp = p.speedRamp;
+  CONFIG.creeperMax = p.creeperMax;
+}
+(async function detectTier(){
+  const kid = getCurrentKid();
+  if (!kid || isGuestKid(kid.id)) return;   // no signed-in kid, or a guest (no birthday on file)
+  await new Promise((resolve) => { const unsub = onParentChange(() => { unsub(); resolve(); }); });
+  const child = await getChild(kid.id).catch(() => null);
+  const age = ageFromBirthday(child?.birthday);
+  if (age == null) return;
+  applyTier(tierForAge(age));
+  const note = document.getElementById('tierNote');
+  note.textContent = `Difficulty set to ${tier[0].toUpperCase()+tier.slice(1)} for ${kid.nickname} (age ${age})`;
+  note.classList.remove('hidden');
+  refreshBestLabel();
+})();
 
 /* ---------------- storage (safe if localStorage is blocked) ---------- */
 const store = {
@@ -352,28 +394,34 @@ function timesPool(hard){
 const MIXED_KINDS = ['mul','div','add','sub'];
 
 function makeQuestion(topic, answered){
+  const p = TIER_PRESETS[tier];
   if (topic === 'times'){
-    // ramp: easy tables first, the nasty ones (8, 11, 12) show up after a few
-    const id = ADAPT.pick(timesPool(answered > 6));
+    // ramp: easy tables first, the nasty ones (8, 11, 12) show up after a few —
+    // unless the tier says to always stay easy, or always start hard
+    const useHard = p.alwaysHardTimes || (!p.neverRamp && answered > 6);
+    const id = ADAPT.pick(timesPool(useHard));
     const [a,b] = id.split('x').map(Number);
     return { text:`${a} × ${b} =`, answer:a*b, id };
   }
-  // ---- mixed mode: ×, ÷, +, − ----
+  // ---- mixed mode: ×, ÷, +, − (ranges scaled by tier) ----
   const kind = ADAPT.pick(MIXED_KINDS);
   if (kind === 'mul'){
-    const a = 2+rnd(11), b = 2+rnd(11);
+    const a = 2+rnd(p.factorMax-1), b = 2+rnd(p.factorMax-1);
     return { text:`${a} × ${b} =`, answer:a*b, id:kind };
   }
   if (kind === 'div'){
-    const b = 2+rnd(11), ans = 1+rnd(12);
+    const b = 2+rnd(p.factorMax-1), ans = 1+rnd(p.factorMax);
     return { text:`${b*ans} ÷ ${b} =`, answer:ans, id:kind };
   }
   if (kind === 'add'){
-    const a = 100+rnd(800), b = 100+rnd(800);
+    const base = Math.round(100*p.addSubScale), range = Math.round(800*p.addSubScale);
+    const a = base+rnd(range), b = base+rnd(range);
     return { text:`${a} + ${b} =`, answer:a+b, id:kind };
   }
-  // subtraction, never negative
-  const a = 200+rnd(700), b = 100+rnd(a-100);
+  // subtraction, never negative — same shape as the original formula, just scaled
+  const subBase = Math.round(200*p.addSubScale), subRange = Math.round(700*p.addSubScale);
+  const bBase = Math.round(100*p.addSubScale);
+  const a = subBase+rnd(subRange), b = bBase+rnd(a-bBase);
   return { text:`${a} − ${b} =`, answer:a-b, id:kind };
 }
 

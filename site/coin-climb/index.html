@@ -101,6 +101,7 @@
   .recordBoard span:last-child{ color:#c07800; }
   .hidden{ display:none !important; }
   a.back{ position:absolute; top:10px; left:14px; color:#fff; text-decoration:none; font-size:13px; font-weight:900; z-index:20; text-shadow:0 2px 0 rgba(0,0,0,0.3); }
+  #tierNote{ color:#eaf8ff; font-size:11px; margin:-4px 0 10px; opacity:0.85; }
 </style>
 </head>
 <body>
@@ -125,6 +126,7 @@
     <h1>🪙 Coin Climb</h1>
     <p>Every answer you get right gives you a jump and a coin. Climb all the way to the flag!</p>
 
+    <p id="tierNote" class="hidden"></p>
     <div class="sectionLabel">PICK YOUR MATH</div>
     <div class="chooser" id="topicChooser">
       <button class="chip on" data-topic="addsub">➕ Add &amp; Subtract</button>
@@ -153,7 +155,9 @@
   </div>
 </div>
 
-<script>
+<script type="module">
+import { onParentChange, getCurrentKid, isGuestKid, getChild, ageFromBirthday, tierForAge } from '../firebase-config.js';
+
 /* =====================================================================
    COIN CLIMB — tweak anything in here
    ===================================================================== */
@@ -173,6 +177,36 @@ const CONFIG = {
   cooldown:      4,     // never repeat a fact within this many questions
   maxWeakStreak: 2,     // hard ones can never come more than this many in a row
 };
+
+/* =====================================================================
+   AGE TIER — set from the signed-in kid's birthday (families/{uid}/children
+   /{childId}.birthday), via firebase-config.js's tierForAge. No kid picked,
+   a guest with no birthday, or an age of 7-8 all land on "medium", which
+   reproduces the exact number ranges below — unchanged default behavior.
+   ===================================================================== */
+const TIER_PRESETS = {
+  easy:   { addsubMax:10, countMax:20,  afterBeforeMax:30,  skipReps:3 },
+  medium: { addsubMax:20, countMax:60,  afterBeforeMax:89,  skipReps:4 },
+  hard:   { addsubMax:40, countMax:150, afterBeforeMax:200, skipReps:6 },
+};
+let tier = 'medium';
+function applyTier(t){
+  tier = TIER_PRESETS[t] ? t : 'medium';
+  ADDSUB_POOL = null;   // rebuild for the new range next time it's needed
+}
+(async function detectTier(){
+  const kid = getCurrentKid();
+  if (!kid || isGuestKid(kid.id)) return;   // no signed-in kid, or a guest (no birthday on file)
+  await new Promise((resolve) => { const unsub = onParentChange(() => { unsub(); resolve(); }); });
+  const child = await getChild(kid.id).catch(() => null);
+  const age = ageFromBirthday(child?.birthday);
+  if (age == null) return;
+  applyTier(tierForAge(age));
+  const note = document.getElementById('tierNote');
+  note.textContent = `Difficulty set to ${tier[0].toUpperCase()+tier.slice(1)} for ${kid.nickname} (age ${age})`;
+  note.classList.remove('hidden');
+  refreshBestLabel();
+})();
 
 /* ---------------- storage --------------------------------------------- */
 const store = {
@@ -294,13 +328,15 @@ const sfx = {
 const rnd = n => Math.floor(Math.random()*n);
 const pick = a => a[rnd(a.length)];
 
-/* Every add/subtract fact within 20, as an id like "9+4" or "15-6". Built once. */
+/* Every add/subtract fact within the tier's max sum, as an id like "9+4" or
+   "15-6". Rebuilt whenever the tier changes (see applyTier above). */
 let ADDSUB_POOL = null;
 function addsubPool(){
   if (ADDSUB_POOL) return ADDSUB_POOL;
+  const max = TIER_PRESETS[tier].addsubMax;
   const out = [];
-  for (let a=1; a<=12; a++) for (let b=1; b<=20-a; b++) out.push(a+'+'+b);   // sums stay within 20
-  for (let a=5; a<=20; a++) for (let b=1; b<=a-1; b++) out.push(a+'-'+b);   // never goes below zero
+  for (let a=1; a<max; a++) for (let b=1; b<=max-a; b++) out.push(a+'+'+b);   // sums stay within max
+  for (let a=2; a<=max; a++) for (let b=1; b<a; b++) out.push(a+'-'+b);       // never goes below zero
   return (ADDSUB_POOL = out);
 }
 /* Count & compare varies too much to track single questions, so we adapt by
@@ -319,16 +355,17 @@ function makeQuestion(topic){
       : { text:`${a} − ${b} = ?`, answer:a-b, hint:'', id };
   }
 
-  // ---- count & compare ----
+  // ---- count & compare (ranges scaled by tier) ----
+  const cp = TIER_PRESETS[tier];
   const id = ADAPT.pick(COUNT_KINDS);
   if (id.startsWith('skip')){
     const step = parseInt(id.slice(4), 10);
-    const start = step * (1+rnd(4));
+    const start = step * (1+rnd(cp.skipReps));
     const seq = [start, start+step, start+step*2, start+step*3];
     return { text:`${seq[0]}, ${seq[1]}, ${seq[2]}, ?`, answer:seq[3], hint:`counting by ${step}s`, id };
   }
   if (id === 'after' || id === 'before'){
-    const n = 10+rnd(80);
+    const n = 10+rnd(Math.max(1, cp.afterBeforeMax-10));
     return id === 'after'
       ? { text:`What comes after ${n}?`, answer:n+1, hint:'', id }
       : { text:`What comes before ${n}?`, answer:n-1, hint:'', id };
@@ -338,7 +375,7 @@ function makeQuestion(topic){
   // up bigger than the "biggest", which would make the right answer look wrong.)
   const nums = [];
   while (nums.length < 3){
-    const n = 1+rnd(60);
+    const n = 1+rnd(cp.countMax);
     if (!nums.includes(n)) nums.push(n);
   }
   return id === 'biggest'

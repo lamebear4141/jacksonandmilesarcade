@@ -117,6 +117,10 @@
   }
 
   #playingAsLabel{ font-weight:800; color:#ffd23f; margin:0 0 4px; font-size:13px; }
+  #switchProfileLink{
+    background:none; border:none; padding:0; font:inherit; font-size:12px; font-weight:700;
+    color:#c9bfe8; text-decoration:underline; cursor:pointer; margin:0 0 10px;
+  }
 
   #leaderboard{ margin:14px 0; text-align:left; max-width:220px; margin-left:auto; margin-right:auto; }
   .lbTitle{ font-size:13px; font-weight:800; text-align:center; margin:0 0 6px; color:#ffd23f; }
@@ -137,6 +141,7 @@
   <div id="picker" class="hidden">
     <h1>Multiverse Collector</h1>
     <p id="playingAsLabel"></p>
+    <button id="switchProfileLink" type="button">Switch profile</button>
     <p>Pick your hero, then catch the good stuff and dodge the bad stuff!</p>
     <div class="chars" id="charChoices">
       <button class="char-btn selected" data-emoji="🟩" data-name="Blocky">🟩<span class="name">Blocky</span></button>
@@ -176,12 +181,19 @@
 
 <script type="module">
 import {
-  onParentChange, getCurrentKid, saveHighScore, getTopScores, getLocalTopScores,
+  onParentChange, getCurrentKid, clearCurrentKid, saveHighScore, getTopScores, getLocalTopScores,
   isGuestKid, saveChildProgress, loadChildProgress,
 } from '../firebase-config.js';
 
 const GAME_ID = 'multiverse-collector';
 let currentKid = null;
+
+// Switching who's playing always routes back through the arcade's picker —
+// never silently, and a real kid has to re-enter their own PIN there.
+document.getElementById('switchProfileLink').addEventListener('click', () => {
+  clearCurrentKid();
+  window.location.href = '../index.html';
+});
 
 onParentChange(async (user) => {
   const kid = getCurrentKid();

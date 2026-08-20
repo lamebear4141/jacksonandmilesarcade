@@ -6,18 +6,21 @@
 
 export const CONFIG = {
   // --- The round ---
-  questionsPerRound: 15,     // how many challenges in one drop
+  questionsPerRound: 5,      // how many challenges in one drop (was 15 — shorter, snappier rounds)
   extractThreshold: 0.80,    // accuracy needed to bring your loot home
-  rebootQuestions: 3,        // Reboot Van: second-chance questions if you just miss
+  rebootQuestions: 1,        // Reboot Van: second-chance questions if you just miss (scaled with the round: was 3 of 15)
   rebootAllowedIfWithin: 0.20, // offer the van if you're within 20 points of the line
   escapeHatchMs: 12000,      // after this long waiting on the mic, offer tap mode instead
 
   // --- Rewards ---
+  // A 5-question round earns less from xpPerCorrect alone than the old 15-question
+  // one did, so the flat completion bonuses are bumped up to compensate — a full
+  // extract should still feel like a real haul, not a third of one.
   xpPerCorrect: 10,
-  xpExtractBonus: 60,
+  xpExtractBonus: 100,
   xpPerMinutePlayed: 4,
   xpEliminatedConsolation: 25,   // you still learn something losing
-  coinsPerExtract: 40,
+  coinsPerExtract: 65,
   coinsPerLevel: 75,
   bonusRoundMultiplier: 2,       // story rounds need read AND answer, so pay double
 

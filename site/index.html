@@ -94,26 +94,42 @@
     padding:9px 6px; border-radius:999px; cursor:pointer; font-family:inherit;
   }
   .authTabs .tab.active{ background:var(--accent); color:#1a1030; }
-  .authCard input{
+  .authCard input, .authCard select, .modal-card input, .modal-card select{
     width:100%; margin-bottom:10px; padding:12px 14px; border-radius:12px;
     border:none; background:#1a1030; color:var(--ink); font-size:14px; font-family:inherit;
   }
   .authCard input::placeholder{ color:#6e5f9c; }
+  .fieldLabel{ font-size:11px; color:#9a8fc2; font-weight:800; display:block; margin:8px 0 4px; }
   .bigBtn{
     width:100%; background:linear-gradient(180deg,#ffd23f,#e8a90c); color:#3a2400; border:none;
     padding:13px; border-radius:999px; font-weight:900; font-size:15px; box-shadow:0 4px 0 #a97600;
     cursor:pointer; font-family:inherit; margin-top:4px;
   }
   .bigBtn:active{ box-shadow:0 1px 0 #a97600; transform:translateY(3px); }
+  .bigBtn.outline{ background:transparent; color:var(--ink); border:2px solid var(--accent); box-shadow:none; }
+  .bigBtn.outline:active{ background:rgba(255,210,63,0.12); }
   .error{ color:#ff8a8a; font-size:12px; margin:10px 0 0; text-align:center; }
 
-  #guestModeBtn{ display:block; margin:18px auto 0; }
+  #guestModeBtn{ display:block; max-width:340px; margin:18px auto 0; }
+
+  .authDivider{
+    display:flex; align-items:center; gap:10px; margin:14px 0 10px; color:#6e5f9c;
+    font-size:11px; text-transform:uppercase; letter-spacing:0.05em;
+  }
+  .authDivider::before, .authDivider::after{ content:''; flex:1; height:1px; background:#3a2668; }
+  .googleBtn{
+    width:100%; display:flex; align-items:center; justify-content:center; gap:10px;
+    background:#fff; color:#3c4043; border:1px solid #dadce0; border-radius:999px;
+    padding:12px; font-weight:700; font-size:14px; cursor:pointer; font-family:inherit;
+  }
+  .googleBtn:active{ background:#f1f3f4; }
 
   /* ---- kid picker ---- */
   #kidGate, #guestGate{ max-width:560px; margin:0 auto; }
   #kidGate h2, #guestGate h2{ margin:0 0 4px; font-size:22px; }
   .kidIcons{ display:flex; flex-wrap:wrap; gap:14px; justify-content:center; margin:18px 0 4px; }
   .kid-btn{
+    position:relative;
     display:flex; flex-direction:column; align-items:center; gap:6px; background:var(--panel);
     border:3px solid transparent; border-radius:18px; padding:16px 14px; min-width:88px; cursor:pointer;
     box-shadow:0 4px 0 #140a28; font-family:inherit;
@@ -121,6 +137,11 @@
   .kid-btn:active{ transform:translateY(2px); box-shadow:0 2px 0 #140a28; }
   .kid-btn .emoji{ font-size:36px; }
   .kid-btn .name{ font-size:12px; font-weight:800; color:var(--ink); }
+  .editBtn{
+    position:absolute; top:-6px; right:-6px; background:var(--accent); color:#1a1030;
+    border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;
+    font-size:11px; cursor:pointer; box-shadow:0 2px 0 #a97600; line-height:1;
+  }
   .addKidTile{
     display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
     border:3px dashed #4a3080; border-radius:18px; padding:16px 14px; min-width:88px; cursor:pointer;
@@ -181,9 +202,19 @@
         <input id="authEmail" type="email" placeholder="Email" autocomplete="email">
         <input id="authPassword" type="password" placeholder="Password" autocomplete="current-password">
         <button class="bigBtn" id="authSubmit" type="button">Sign In</button>
+        <div class="authDivider">or</div>
+        <button class="googleBtn" id="googleBtn" type="button">
+          <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.5 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/>
+            <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.5 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
+            <path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.6-5.2l-6.3-5.3C29.3 35.6 26.8 36 24 36c-5.3 0-9.7-3.1-11.3-7.5l-6.5 5C9.6 39.7 16.2 44 24 44z"/>
+            <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.2 5.6l6.3 5.3C40.9 36.4 44 30.9 44 24c0-1.3-.1-2.7-.4-3.5z"/>
+          </svg>
+          Sign in with Google
+        </button>
         <p class="error hidden" id="authError"></p>
       </div>
-      <button class="linklike" id="guestModeBtn" type="button">🎮 Just play for fun — no sign-in</button>
+      <button class="bigBtn outline" id="guestModeBtn" type="button">🎮 Just play for fun — no sign-in</button>
     </div>
 
     <div id="guestGate" class="hidden">
@@ -210,6 +241,14 @@
       <div class="authCard hidden" id="addKidForm">
         <input id="newKidName" placeholder="Nickname" maxlength="20">
         <input id="newKidPin" placeholder="4-digit PIN" inputmode="numeric" maxlength="4">
+        <label class="fieldLabel" for="newKidBirthday">Birthday (used to set math difficulty)</label>
+        <input id="newKidBirthday" type="date">
+        <label class="fieldLabel" for="newKidFocus">Focus area</label>
+        <select id="newKidFocus">
+          <option value="both" selected>Both</option>
+          <option value="reading">Reading</option>
+          <option value="math">Math</option>
+        </select>
         <button class="bigBtn" id="addKidBtn" type="button">Add kid</button>
         <p class="error hidden" id="addKidError"></p>
       </div>
@@ -265,10 +304,27 @@
     </div>
   </div>
 
+  <div class="modal hidden" id="editModal">
+    <div class="modal-card" style="width:260px;text-align:left;">
+      <p class="kidName" id="editKidName" style="text-align:center;"></p>
+      <label class="fieldLabel" for="editBirthday">Birthday</label>
+      <input id="editBirthday" type="date">
+      <label class="fieldLabel" for="editFocusArea">Focus area</label>
+      <select id="editFocusArea">
+        <option value="both">Both</option>
+        <option value="reading">Reading</option>
+        <option value="math">Math</option>
+      </select>
+      <button class="bigBtn" id="editSaveBtn" type="button">Save</button>
+      <button class="linklike" id="editCancelBtn" type="button" style="display:block;margin:12px auto 0;">Cancel</button>
+      <p class="error hidden" id="editError"></p>
+    </div>
+  </div>
+
 <script type="module">
 import {
-  onParentChange, signUpParent, signInParent, signOutParent,
-  addChild, listChildren, getCurrentKid, setCurrentKid, clearCurrentKid,
+  onParentChange, signUpParent, signInParent, signOutParent, signInParentWithGoogle,
+  addChild, updateChild, listChildren, getCurrentKid, setCurrentKid, clearCurrentKid,
   isGuestKid, listLocalGuests, addLocalGuest,
 } from './firebase-config.js';
 
@@ -354,6 +410,8 @@ function friendlyAuthError(e) {
     'auth/email-already-in-use': 'That email already has a family account — try "Sign In" instead.',
     'auth/weak-password': 'Password should be at least 6 characters.',
     'auth/invalid-email': "That doesn't look like a valid email.",
+    'auth/popup-closed-by-user': 'Sign-in window closed before finishing — try again.',
+    'auth/account-exists-with-different-credential': 'That email already has a family account with a different sign-in method.',
   };
   return map[e.code] || 'Something went wrong — try again.';
 }
@@ -372,6 +430,17 @@ $('authSubmit').addEventListener('click', async () => {
   }
 });
 
+$('googleBtn').addEventListener('click', async () => {
+  const err = $('authError');
+  err.classList.add('hidden');
+  try {
+    await signInParentWithGoogle();
+  } catch (e) {
+    err.textContent = friendlyAuthError(e);
+    err.classList.remove('hidden');
+  }
+});
+
 /* ---------------------------------------------------------------- kid icons */
 const AVATARS = ['🦊', '🐼', '🐸', '🐵', '🦁', '🐯', '🐨', '🐰', '🐙', '🦄', '🐳', '🐧'];
 function avatarFor(name) {
@@ -380,7 +449,7 @@ function avatarFor(name) {
   return AVATARS[h % AVATARS.length];
 }
 
-function renderProfileIcons(wrap, addTile, list, onPick) {
+function renderProfileIcons(wrap, addTile, list, onPick, onEdit) {
   wrap.querySelectorAll('.kid-btn').forEach((el) => el.remove());
   list.forEach((kid) => {
     const btn = document.createElement('button');
@@ -393,12 +462,20 @@ function renderProfileIcons(wrap, addTile, list, onPick) {
     name.className = 'name';
     name.textContent = kid.nickname;
     btn.append(emoji, name);
+    if (onEdit) {
+      const edit = document.createElement('span');
+      edit.className = 'editBtn';
+      edit.textContent = '✏️';
+      edit.title = `Edit ${kid.nickname}'s profile`;
+      edit.addEventListener('click', (e) => { e.stopPropagation(); onEdit(kid); });
+      btn.appendChild(edit);
+    }
     btn.addEventListener('click', () => onPick(kid));
     wrap.insertBefore(btn, addTile);
   });
 }
 function renderKidIcons() {
-  renderProfileIcons($('kidIcons'), $('addKidTile'), childrenCache, openPinPad);
+  renderProfileIcons($('kidIcons'), $('addKidTile'), childrenCache, openPinPad, openEditModal);
 }
 function renderGuestIcons() {
   renderProfileIcons($('guestIcons'), $('addGuestTile'), listLocalGuests(), (guest) => {
@@ -413,15 +490,46 @@ $('addKidTile').addEventListener('click', () => $('addKidForm').classList.toggle
 $('addKidBtn').addEventListener('click', async () => {
   const name = $('newKidName').value.trim();
   const pin = $('newKidPin').value.trim();
+  const birthday = $('newKidBirthday').value || null;
+  const focusArea = $('newKidFocus').value || 'both';
   const err = $('addKidError');
   err.classList.add('hidden');
   if (!name) { err.textContent = 'Give your kid a nickname.'; err.classList.remove('hidden'); return; }
   if (!/^\d{4}$/.test(pin)) { err.textContent = 'PIN needs to be exactly 4 digits.'; err.classList.remove('hidden'); return; }
   try {
-    await addChild(name, pin);
+    await addChild(name, pin, birthday, focusArea);
     $('newKidName').value = '';
     $('newKidPin').value = '';
+    $('newKidBirthday').value = '';
+    $('newKidFocus').value = 'both';
     $('addKidForm').classList.add('hidden');
+    await refreshKidGate();
+  } catch (e) {
+    err.textContent = 'Could not save that — try again.';
+    err.classList.remove('hidden');
+  }
+});
+
+/* ---------------------------------------------------------------- edit profile (parent only) */
+function openEditModal(kid) {
+  $('editKidName').textContent = `Edit ${kid.nickname}`;
+  $('editBirthday').value = kid.birthday || '';
+  $('editFocusArea').value = kid.focusArea || 'both';
+  $('editError').classList.add('hidden');
+  $('editModal').dataset.childId = kid.id;
+  $('editModal').classList.remove('hidden');
+}
+$('editCancelBtn').addEventListener('click', () => $('editModal').classList.add('hidden'));
+$('editSaveBtn').addEventListener('click', async () => {
+  const childId = $('editModal').dataset.childId;
+  const err = $('editError');
+  err.classList.add('hidden');
+  try {
+    await updateChild(childId, {
+      birthday: $('editBirthday').value || null,
+      focusArea: $('editFocusArea').value,
+    });
+    $('editModal').classList.add('hidden');
     await refreshKidGate();
   } catch (e) {
     err.textContent = 'Could not save that — try again.';

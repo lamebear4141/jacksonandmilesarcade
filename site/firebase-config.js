@@ -9,7 +9,8 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/fireba
 import {
   getAuth, setPersistence, browserLocalPersistence,
   createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
-  onAuthStateChanged,
+  onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect,
+  getRedirectResult,
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import {
   getFirestore, collection, doc, addDoc, getDoc, getDocs, setDoc,
@@ -52,18 +53,46 @@ export function onParentChange(cb) {
   return onAuthStateChanged(auth, cb);
 }
 
+// Google sign-in for the parent account. Popups are blocked by some
+// browsers/settings, so fall back to a full-page redirect in that case —
+// onParentChange picks up the result either way once it completes.
+const googleProvider = new GoogleAuthProvider();
+export async function signInParentWithGoogle() {
+  try {
+    return await signInWithPopup(auth, googleProvider);
+  } catch (e) {
+    if (['auth/popup-blocked', 'auth/popup-closed-by-user', 'auth/cancelled-popup-request'].includes(e.code)) {
+      return signInWithRedirect(auth, googleProvider);
+    }
+    throw e;
+  }
+}
+// Consumes the result of a signInWithRedirect flow, if one is pending, so
+// any error from it (e.g. an account conflict) doesn't go silently unhandled.
+getRedirectResult(auth).catch(() => {});
+
 /* =======================================================================
-   Kids — families/{parentUID}/children/{childId}: { nickname, pin }.
+   Kids — families/{parentUID}/children/{childId}:
+   { nickname, pin, birthday: 'YYYY-MM-DD', focusArea: 'reading'|'math'|'both' }.
    The PIN is only ever checked against the signed-in parent's own kids
    (Firestore rules restrict that whole subtree to request.auth.uid ==
    parentUID), so it's just a fun "pick who's playing" gate, not security.
    ======================================================================= */
-export async function addChild(nickname, pin) {
+export async function addChild(nickname, pin, birthday, focusArea) {
   const uid = auth.currentUser?.uid;
   if (!uid) throw new Error('Not signed in');
   const ref = collection(db, 'families', uid, 'children');
-  const docRef = await addDoc(ref, { nickname, pin: String(pin), createdAt: serverTimestamp() });
+  const docRef = await addDoc(ref, {
+    nickname, pin: String(pin), birthday: birthday || null, focusArea: focusArea || 'both',
+    createdAt: serverTimestamp(),
+  });
   return docRef.id;
+}
+
+export async function updateChild(childId, updates) {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('Not signed in');
+  await setDoc(doc(db, 'families', uid, 'children', childId), updates, { merge: true });
 }
 
 export async function listChildren() {
@@ -74,10 +103,39 @@ export async function listChildren() {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
+export async function getChild(childId) {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return null;
+  const snap = await getDoc(doc(db, 'families', uid, 'children', childId));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
 export async function verifyChildPin(childId, pin) {
   const children = await listChildren();
   const child = children.find((c) => c.id === childId);
   return !!child && String(child.pin) === String(pin);
+}
+
+/* =======================================================================
+   Age → difficulty tier. Used by the math games to pick how hard the
+   numbers get: 5-6 = easiest, 7-8 = medium, 9+ = harder. No birthday on
+   file (guests, or a kid profile that hasn't set one) falls back to medium.
+   ======================================================================= */
+export function ageFromBirthday(birthday) {
+  if (!birthday) return null;
+  const b = new Date(birthday + 'T00:00:00');
+  if (Number.isNaN(b.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - b.getFullYear();
+  const m = now.getMonth() - b.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < b.getDate())) age--;
+  return age;
+}
+export function tierForAge(age) {
+  if (age == null) return 'medium';
+  if (age <= 6) return 'easy';
+  if (age <= 8) return 'medium';
+  return 'hard';
 }
 
 /* =======================================================================
@@ -95,6 +153,17 @@ export function getCurrentKid() {
 }
 export function clearCurrentKid() {
   sessionStorage.removeItem(KID_KEY);
+}
+
+// The profile lock: once a kid is picked (via PIN, or a guest nickname),
+// nothing gets to write under a DIFFERENT child's id in the same tab
+// session without going back through the picker and re-entering that
+// child's own PIN. Every score/progress write below checks this first.
+function assertActiveChild(childId) {
+  const active = getCurrentKid();
+  if (!active || active.id !== childId) {
+    throw new Error('Profile locked to a different child — switch profile and re-enter a PIN to save as someone else.');
+  }
 }
 
 /* =======================================================================
@@ -133,6 +202,7 @@ export function addLocalGuest(nickname) {
    For a guest kid it lives under a localStorage key keyed by their id.
    ======================================================================= */
 export async function saveChildProgress(childId, gameId, data) {
+  assertActiveChild(childId);
   if (isGuestKid(childId)) {
     const key = 'arcade.guestProgress.' + childId;
     const all = readLocal(key, {});
@@ -167,6 +237,7 @@ export async function loadChildProgress(childId, gameId) {
    own small local scoreboard instead, via getLocalTopScores.
    ======================================================================= */
 export async function saveHighScore(game, nickname, score, childId) {
+  assertActiveChild(childId);
   if (isGuestKid(childId)) {
     const key = 'arcade.guestScores.' + game;
     const list = readLocal(key, []);
