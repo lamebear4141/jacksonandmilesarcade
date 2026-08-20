@@ -47,6 +47,11 @@
   a.tile.math:active{ box-shadow: 0 2px 0 #0d1428; }
   a.tile.reading{ background: #1c3a2c; box-shadow: 0 5px 0 #0b1c14; }
   a.tile.reading:active{ box-shadow: 0 2px 0 #0b1c14; }
+  a.parent{
+    display: inline-block; margin-top: 34px; color: #9a8fc2;
+    font-size: 13px; font-weight: 700; text-decoration: none;
+  }
+  a.parent:hover{ color: var(--accent); text-decoration: underline; }
   .empty{
     background: var(--panel); border-radius: 20px; padding: 30px; color:#c9bfe8;
     border: 2px dashed #4a3080; grid-column: 1 / -1;
@@ -82,6 +87,7 @@
         <span class="who">MILES</span>
       </a>
     </div>
+    <a class="parent" href="parent-report/index.html">📊 Parent report</a>
   </div>
 </body>
 </html>

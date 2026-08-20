@@ -192,6 +192,17 @@ const CONFIG = {
   speedRamp:       1.3,     // extra speed added per creeper sent
   creeperMax:      62,      // speed cap
   lurchOnWrong:    26,      // pixels every creeper jumps forward on a wrong answer
+
+  // --- How hard does it push on the stuff he keeps missing? ---
+  // The game remembers which facts he gets wrong and brings them back more often.
+  // focusChance is the whole safety valve: it's the share of questions pulled from
+  // the "needs practice" list. The rest are always plain random. Keep it well under
+  // half — a game that only asks you what you're bad at is a game you stop playing.
+  focusChance:     0.35,    // 0 = never (pure random, the old behaviour), 1 = relentless
+  missWeightCap:   3,       // most weight one fact can carry, so one bad day can't haunt it
+  recoverRate:     0.5,     // 2 right answers cancel 1 wrong — facts graduate back out
+  cooldown:        4,       // never ask the same fact twice within this many questions
+  maxWeakStreak:   2,       // hard facts can never come more than this many in a row
 };
 /* One creeper marches out for every question you're asked, so the wave only
    piles up if you're slow or you miss. Answer it, and it's gone. */
@@ -219,6 +230,87 @@ function saveBest(topic,mode,value){
 const fmtTime = s => s.toFixed(1) + 's';
 const fmtBest = (mode,v) => v === null ? '—' : (mode==='sprint' ? fmtTime(v) : v + ' right');
 
+/* =====================================================================
+   ADAPTIVE PRACTICE
+   Remembers which facts he misses and brings them back more often — but
+   only for CONFIG.focusChance of questions. Everything else stays random,
+   so a run never turns into nothing but the hard stuff.
+   ===================================================================== */
+const ADAPT = {
+  key: 'mathdefender.v1.facts',
+  data: {},
+  recent: [],
+  weakStreak: 0,
+  load(){
+    try { this.data = JSON.parse(store.get(this.key) || '{}') || {}; }
+    catch(e){ this.data = {}; }
+    return this.data;
+  },
+  save(){ try { store.set(this.key, JSON.stringify(this.data)); } catch(e){} },
+  weight(id){ const r = this.data[id]; return r ? r.w : 0; },
+  seen(id){ const r = this.data[id]; return r ? r.n : 0; },
+
+  // one right answer heals half a wrong one, so 2 in a row graduates a fact out
+  record(id, wasRight){
+    if (!id) return;
+    const r = this.data[id] || (this.data[id] = { n:0, w:0, m:0 });
+    r.n++;
+    if (wasRight){ r.w = Math.max(0, r.w - CONFIG.recoverRate); }
+    else { r.w = Math.min(CONFIG.missWeightCap, r.w + 1); r.m++; }
+    this.save();
+  },
+
+  /* Pick an id out of `all`. Sometimes weighted toward weak facts, usually not.
+     Two brakes: focusChance caps how often we even try, and weakStreak makes sure
+     hard ones never arrive in a long row — that back-to-back pile-up is what
+     actually makes a kid put the game down. */
+  pick(all){
+    const weak = all.filter(id => this.weight(id) > 0);
+    const streakBlocked = this.weakStreak >= CONFIG.maxWeakStreak;
+    const useWeak = weak.length > 0 && !streakBlocked && Math.random() < CONFIG.focusChance;
+    for (let tries = 0; tries < 8; tries++){
+      const id = useWeak ? this.weightedPick(weak) : all[Math.floor(Math.random()*all.length)];
+      if (!this.recent.includes(id)) return this.remember(id);   // respect the cooldown
+    }
+    return this.remember(all[Math.floor(Math.random()*all.length)]);
+  },
+  weightedPick(weak){
+    let total = 0;
+    for (const id of weak) total += this.weight(id);
+    let r = Math.random() * total;
+    for (const id of weak){ r -= this.weight(id); if (r <= 0) return id; }
+    return weak[weak.length-1];
+  },
+  remember(id){
+    // count actual weak facts, whether they came from the weighted draw or by luck
+    this.weakStreak = this.weight(id) > 0 ? this.weakStreak + 1 : 0;
+    this.recent.push(id);
+    while (this.recent.length > CONFIG.cooldown) this.recent.shift();
+    return id;
+  },
+
+  // the parent report reads this
+  practiceList(n=5){
+    return Object.entries(this.data)
+      .filter(([,r]) => r.w > 0)
+      .sort((a,b) => b[1].w - a[1].w)
+      .slice(0,n)
+      .map(([id,r]) => ({ id, misses:r.m, seen:r.n }));
+  },
+  reset(){ this.data = {}; this.recent = []; this.weakStreak = 0; this.save(); }
+};
+ADAPT.load();
+
+/* ---------------- shared session log (the parent report reads this) ---- */
+function logSession(entry){
+  try{
+    const list = JSON.parse(store.get('arcade.v1.sessions') || '[]');
+    list.push(entry);
+    while (list.length > 80) list.shift();          // keep it small
+    store.set('arcade.v1.sessions', JSON.stringify(list));
+  }catch(e){}
+}
+
 /* ---------------- sound (all synthesized, no files) ------------------ */
 let actx = null;
 function beep(freq, dur, type='square', vol=0.13){
@@ -242,33 +334,47 @@ const sfx = {
 
 /* ---------------- question generation -------------------------------- */
 const rnd = n => Math.floor(Math.random()*n);
+
+/* Every ×-fact as an id like "7x8". Built once per difficulty tier. */
+const TIMES_POOL = {};
+function timesPool(hard){
+  const k = hard ? 'hard' : 'easy';
+  if (TIMES_POOL[k]) return TIMES_POOL[k];
+  const as = hard ? [2,3,4,5,6,7,8,9,10,11,12] : [2,3,4,5,6,7,9,10];
+  const bMax = hard ? 12 : 10;
+  const out = [];
+  for (const a of as) for (let b=0; b<=bMax; b++) out.push(a+'x'+b);
+  return (TIMES_POOL[k] = out);
+}
+/* Mixed mode's space is ~1,000,000 problems, so tracking single problems is
+   pointless. We adapt at the operation level instead: miss a lot of division
+   and you'll see more division. */
+const MIXED_KINDS = ['mul','div','add','sub'];
+
 function makeQuestion(topic, answered){
   if (topic === 'times'){
-    // ramp: easy tables first, the nasty ones (6,7,8,12) show up later
-    const hard = answered > 6;
-    const pool = hard ? [2,3,4,5,6,7,8,9,10,11,12] : [2,3,4,5,6,7,9,10];
-    const a = pool[rnd(pool.length)];
-    const b = hard ? rnd(13) : rnd(11);
-    return { text:`${a} × ${b} =`, answer:a*b };
+    // ramp: easy tables first, the nasty ones (8, 11, 12) show up after a few
+    const id = ADAPT.pick(timesPool(answered > 6));
+    const [a,b] = id.split('x').map(Number);
+    return { text:`${a} × ${b} =`, answer:a*b, id };
   }
   // ---- mixed mode: ×, ÷, +, − ----
-  const kinds = ['mul','div','add','sub'];
-  const kind = kinds[rnd(kinds.length)];
+  const kind = ADAPT.pick(MIXED_KINDS);
   if (kind === 'mul'){
     const a = 2+rnd(11), b = 2+rnd(11);
-    return { text:`${a} × ${b} =`, answer:a*b };
+    return { text:`${a} × ${b} =`, answer:a*b, id:kind };
   }
   if (kind === 'div'){
     const b = 2+rnd(11), ans = 1+rnd(12);
-    return { text:`${b*ans} ÷ ${b} =`, answer:ans };
+    return { text:`${b*ans} ÷ ${b} =`, answer:ans, id:kind };
   }
   if (kind === 'add'){
     const a = 100+rnd(800), b = 100+rnd(800);
-    return { text:`${a} + ${b} =`, answer:a+b };
+    return { text:`${a} + ${b} =`, answer:a+b, id:kind };
   }
   // subtraction, never negative
   const a = 200+rnd(700), b = 100+rnd(a-100);
-  return { text:`${a} − ${b} =`, answer:a-b };
+  return { text:`${a} − ${b} =`, answer:a-b, id:kind };
 }
 
 /* ---------------- pixel creeper -------------------------------------- */
@@ -300,15 +406,16 @@ const W = cv.width, H = cv.height, GROUND = H - 34, WALL_X = 96;
 let state = 'menu';
 let topic = 'times', mode = 'sprint';
 let creepers = [], particles = [];
-let hearts, correct, wrong, streak, bestStreak, elapsed, penalty, spawned, asked;
+let hearts, correct, wrong, streak, bestStreak, elapsed, penalty, spawned, asked, comebacks;
 let q = null, lastT = 0, shakeT = 0, flashT = 0, flashColor = '#ff5555';
 
 function resetGame(){
   creepers = []; particles = [];
   hearts = CONFIG.hearts;
   correct = 0; wrong = 0; streak = 0; bestStreak = 0;
-  elapsed = 0; penalty = 0; spawned = 0; asked = 0;
+  elapsed = 0; penalty = 0; spawned = 0; asked = 0; comebacks = 0;
   shakeT = 0; flashT = 0;
+  ADAPT.recent = []; ADAPT.weakStreak = 0;
   nextQuestion();
 }
 function nextQuestion(){
@@ -351,6 +458,9 @@ function submit(){
   else wrongAnswer();
 }
 function rightAnswer(){
+  const wasWeak = ADAPT.weight(q.id) > 0;   // check BEFORE recording clears it
+  ADAPT.record(q.id, true);
+  if (wasWeak) comebacks++;
   correct++; streak++;
   if (streak > bestStreak) bestStreak = streak;
   sfx.right();
@@ -361,11 +471,12 @@ function rightAnswer(){
     explode(c.x, c.y, '#5fdd6b');
     sfx.boom();
   }
-  setFeedback(pickPraise(), 'good');
+  setFeedback(wasWeak ? '💪 GOT IT BACK!' : pickPraise(), 'good');
   if (mode === 'sprint' && correct >= CONFIG.sprintQuestions) return endGame(true);
   nextQuestion();
 }
 function wrongAnswer(){
+  ADAPT.record(q.id, false);
   wrong++; streak = 0;
   sfx.wrong();
   if (mode === 'sprint') penalty += CONFIG.wrongPenalty;
@@ -557,6 +668,10 @@ function endGame(finished){
   else { title.textContent = '💥 Wall Down!'; sfx.lose(); }
 
   const acc = (correct+wrong) ? Math.round(correct/(correct+wrong)*100) : 0;
+  logSession({ t:Date.now(), who:'Jackson', game:'Math Defender',
+               topic:TOPIC_NAME[topic], mode, correct, wrong, acc,
+               score, bestStreak, comebacks, finished:survived });
+
   const stats = [];
   if (mode === 'sprint'){
     stats.push(`<div class="scoreRow">Your time: <b>${finished&&survived ? fmtTime(elapsed+penalty) : '—'}</b></div>`);
@@ -566,6 +681,8 @@ function endGame(finished){
     stats.push(`<div class="scoreRow">Right answers: <b>${correct}</b></div>`);
   }
   stats.push(`<div class="scoreRow">Best streak: <b>${bestStreak}</b> · ${acc}% accurate</div>`);
+  if (comebacks > 0)
+    stats.push(`<div class="scoreRow" style="color:#5fdd6b">💪 ${comebacks} comeback${comebacks===1?'':'s'} — facts you'd missed before</div>`);
   document.getElementById('endStats').innerHTML = stats.join('');
   document.getElementById('newRecord').classList.toggle('hidden', !isRecord);
   if (isRecord) sfx.win();
@@ -628,6 +745,7 @@ document.getElementById('menuBtn').onclick = ()=>{
 };
 document.getElementById('resetBtn').onclick = ()=>{
   ['times','mixed'].forEach(t=>['sprint','blitz'].forEach(m=>store.del(KEY(t,m))));
+  ADAPT.reset();                     // forget the practice list too
   renderRecordBoard(document.getElementById('recordBoard'));
   refreshBestLabel();
 };

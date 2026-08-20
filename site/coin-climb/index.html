@@ -161,6 +161,17 @@ const CONFIG = {
   climbSteps:    15,    // how many right answers to reach the flag
   blitzSeconds:  60,    // how long Coin Rush lasts
   wrongPause:    900,   // ms the right answer stays highlighted after a miss
+
+  // --- How hard does it push on the stuff he keeps missing? ---
+  // The game remembers what he gets wrong and brings it back more often. focusChance
+  // is the safety valve: the share of questions pulled from the "needs practice" list.
+  // Everything else is plain random. It's set low on purpose — he's 6, and a game
+  // that only asks what you're bad at is a game you quit.
+  focusChance:   0.30,  // 0 = never (pure random), 1 = relentless
+  missWeightCap: 3,     // most weight one fact can carry
+  recoverRate:   0.5,   // 2 right answers cancel 1 wrong — facts graduate back out
+  cooldown:      4,     // never repeat a fact within this many questions
+  maxWeakStreak: 2,     // hard ones can never come more than this many in a row
 };
 
 /* ---------------- storage --------------------------------------------- */
@@ -182,6 +193,81 @@ function saveBest(t,m,v){
 }
 const fmtTime = s=>s.toFixed(1)+'s';
 const fmtBest = (m,v)=> v===null ? '—' : (m==='sprint' ? fmtTime(v) : v+' coins');
+
+/* =====================================================================
+   ADAPTIVE PRACTICE
+   Remembers what he misses and brings it back more often — but only for
+   CONFIG.focusChance of questions. The rest stay random, so a run never
+   turns into nothing but the hard stuff.
+   ===================================================================== */
+const ADAPT = {
+  key: 'coinclimb.v1.facts',
+  data: {},
+  recent: [],
+  weakStreak: 0,
+  load(){
+    try { this.data = JSON.parse(store.get(this.key) || '{}') || {}; }
+    catch(e){ this.data = {}; }
+    return this.data;
+  },
+  save(){ try { store.set(this.key, JSON.stringify(this.data)); } catch(e){} },
+  weight(id){ const r = this.data[id]; return r ? r.w : 0; },
+  seen(id){ const r = this.data[id]; return r ? r.n : 0; },
+
+  record(id, wasRight){
+    if (!id) return;
+    const r = this.data[id] || (this.data[id] = { n:0, w:0, m:0 });
+    r.n++;
+    if (wasRight){ r.w = Math.max(0, r.w - CONFIG.recoverRate); }
+    else { r.w = Math.min(CONFIG.missWeightCap, r.w + 1); r.m++; }
+    this.save();
+  },
+  /* Two brakes: focusChance caps how often we even reach for a weak fact, and
+     weakStreak stops hard ones arriving back-to-back-to-back. */
+  pick(all){
+    const weak = all.filter(id => this.weight(id) > 0);
+    const streakBlocked = this.weakStreak >= CONFIG.maxWeakStreak;
+    const useWeak = weak.length > 0 && !streakBlocked && Math.random() < CONFIG.focusChance;
+    for (let tries = 0; tries < 8; tries++){
+      const id = useWeak ? this.weightedPick(weak) : all[Math.floor(Math.random()*all.length)];
+      if (!this.recent.includes(id)) return this.remember(id);
+    }
+    return this.remember(all[Math.floor(Math.random()*all.length)]);
+  },
+  weightedPick(weak){
+    let total = 0;
+    for (const id of weak) total += this.weight(id);
+    let r = Math.random() * total;
+    for (const id of weak){ r -= this.weight(id); if (r <= 0) return id; }
+    return weak[weak.length-1];
+  },
+  remember(id){
+    // count actual weak facts, whether they came from the weighted draw or by luck
+    this.weakStreak = this.weight(id) > 0 ? this.weakStreak + 1 : 0;
+    this.recent.push(id);
+    while (this.recent.length > CONFIG.cooldown) this.recent.shift();
+    return id;
+  },
+  practiceList(n=5){
+    return Object.entries(this.data)
+      .filter(([,r]) => r.w > 0)
+      .sort((a,b) => b[1].w - a[1].w)
+      .slice(0,n)
+      .map(([id,r]) => ({ id, misses:r.m, seen:r.n }));
+  },
+  reset(){ this.data = {}; this.recent = []; this.weakStreak = 0; this.save(); }
+};
+ADAPT.load();
+
+/* ---------------- shared session log (the parent report reads this) ---- */
+function logSession(entry){
+  try{
+    const list = JSON.parse(store.get('arcade.v1.sessions') || '[]');
+    list.push(entry);
+    while (list.length > 80) list.shift();
+    store.set('arcade.v1.sessions', JSON.stringify(list));
+  }catch(e){}
+}
 
 /* ---------------- sound ------------------------------------------------ */
 let actx = null;
@@ -208,28 +294,44 @@ const sfx = {
 const rnd = n => Math.floor(Math.random()*n);
 const pick = a => a[rnd(a.length)];
 
+/* Every add/subtract fact within 20, as an id like "9+4" or "15-6". Built once. */
+let ADDSUB_POOL = null;
+function addsubPool(){
+  if (ADDSUB_POOL) return ADDSUB_POOL;
+  const out = [];
+  for (let a=1; a<=12; a++) for (let b=1; b<=20-a; b++) out.push(a+'+'+b);   // sums stay within 20
+  for (let a=5; a<=20; a++) for (let b=1; b<=a-1; b++) out.push(a+'-'+b);   // never goes below zero
+  return (ADDSUB_POOL = out);
+}
+/* Count & compare varies too much to track single questions, so we adapt by
+   kind: struggle with counting by 5s and you'll see more counting by 5s.
+   'skip' kinds are listed once each but there are three of them, which keeps
+   roughly the original 2-in-5 share of skip-counting questions. */
+const COUNT_KINDS = ['skip2','skip5','skip10','after','before','biggest','smallest'];
+
 function makeQuestion(topic){
   if (topic === 'addsub'){
-    if (Math.random() < 0.5){
-      const a = 1+rnd(12), b = 1+rnd(20-a);              // sums stay within 20
-      return { text:`${a} + ${b} = ?`, answer:a+b, hint:'' };
-    }
-    const a = 5+rnd(16), b = 1+rnd(a-1);                  // never goes below zero
-    return { text:`${a} − ${b} = ?`, answer:a-b, hint:'' };
+    const id = ADAPT.pick(addsubPool());
+    const plus = id.includes('+');
+    const [a,b] = id.split(plus ? '+' : '-').map(Number);
+    return plus
+      ? { text:`${a} + ${b} = ?`, answer:a+b, hint:'', id }
+      : { text:`${a} − ${b} = ?`, answer:a-b, hint:'', id };
   }
 
   // ---- count & compare ----
-  const kind = pick(['skip','skip','bigger','smaller','next']);
-  if (kind === 'skip'){
-    const step = pick([2,5,10]);
+  const id = ADAPT.pick(COUNT_KINDS);
+  if (id.startsWith('skip')){
+    const step = parseInt(id.slice(4), 10);
     const start = step * (1+rnd(4));
     const seq = [start, start+step, start+step*2, start+step*3];
-    return { text:`${seq[0]}, ${seq[1]}, ${seq[2]}, ?`, answer:seq[3], hint:`counting by ${step}s` };
+    return { text:`${seq[0]}, ${seq[1]}, ${seq[2]}, ?`, answer:seq[3], hint:`counting by ${step}s`, id };
   }
-  if (kind === 'next'){
+  if (id === 'after' || id === 'before'){
     const n = 10+rnd(80);
-    if (Math.random()<0.5) return { text:`What comes after ${n}?`, answer:n+1, hint:'' };
-    return { text:`What comes before ${n}?`, answer:n-1, hint:'' };
+    return id === 'after'
+      ? { text:`What comes after ${n}?`, answer:n+1, hint:'', id }
+      : { text:`What comes before ${n}?`, answer:n-1, hint:'', id };
   }
   // three distinct numbers — the choices ARE the question here, so build all
   // three on purpose. (If we only forced two, the filler distractor could end
@@ -239,8 +341,9 @@ function makeQuestion(topic){
     const n = 1+rnd(60);
     if (!nums.includes(n)) nums.push(n);
   }
-  if (kind === 'bigger') return { text:'Which is BIGGEST?', answer:Math.max(...nums), hint:'', forced:nums };
-  return { text:'Which is SMALLEST?', answer:Math.min(...nums), hint:'', forced:nums };
+  return id === 'biggest'
+    ? { text:'Which is BIGGEST?',  answer:Math.max(...nums), hint:'', forced:nums, id }
+    : { text:'Which is SMALLEST?', answer:Math.min(...nums), hint:'', forced:nums, id };
 }
 
 function makeChoices(q){
@@ -286,13 +389,13 @@ const STEP_H = 13;              // how far up the hero appears to move per step
 const HERO_X = 130;
 
 let state='menu', topic='addsub', mode='sprint';
-let coins, wrong, streak, bestStreak, elapsed, climb, locked;
+let coins, wrong, streak, bestStreak, elapsed, climb, locked, comebacks;
 let q=null, choices=[], sparkles=[], flyCoins=[], heroY=0, heroTargetY=0, heroSquash=0;
 let lastT=0, camOffset=0, camTarget=0;
 
 function resetGame(){
-  coins=0; wrong=0; streak=0; bestStreak=0; elapsed=0; climb=0; locked=false;
-  sparkles=[]; flyCoins=[];
+  coins=0; wrong=0; streak=0; bestStreak=0; elapsed=0; climb=0; locked=false; comebacks=0;
+  sparkles=[]; flyCoins=[]; ADAPT.recent=[]; ADAPT.weakStreak=0;
   heroY=0; heroTargetY=0; heroSquash=0; camOffset=0; camTarget=0;
   nextQuestion();
 }
@@ -320,6 +423,9 @@ function answer(value, btn){
   if (state!=='playing' || locked) return;
   if (value === q.answer){
     locked = true;
+    const wasWeak = ADAPT.weight(q.id) > 0;   // check BEFORE recording clears it
+    ADAPT.record(q.id, true);
+    if (wasWeak){ comebacks++; document.getElementById('qHint').textContent = '💪 You got that one back!'; }
     btn.classList.add('right');
     coins++; streak++; climb++;
     if (streak>bestStreak) bestStreak=streak;
@@ -330,9 +436,10 @@ function answer(value, btn){
     flyCoins.push({ x:HERO_X, y:BASE_Y-heroY-70, t:0 });
     updateHUD();
     if (mode==='sprint' && climb >= CONFIG.climbSteps) return setTimeout(()=>endGame(true), 420);
-    setTimeout(nextQuestion, 230);
+    setTimeout(nextQuestion, wasWeak ? 750 : 230);   // let the comeback message land
   } else {
     locked = true;
+    ADAPT.record(q.id, false);
     wrong++; streak = 0;
     sfx.oops();
     btn.classList.add('wrong');
@@ -508,10 +615,16 @@ function endGame(){
   }
   sfx.win();
   const acc = (coins+wrong) ? Math.round(coins/(coins+wrong)*100) : 0;
+  logSession({ t:Date.now(), who:'Miles', game:'Coin Climb',
+               topic:TOPIC_NAME[topic], mode, correct:coins, wrong, acc,
+               score, bestStreak, comebacks, finished:true });
+
   const stats = [];
   if (mode==='sprint') stats.push(`<div class="scoreRow">Your time: <b>${fmtTime(elapsed)}</b></div>`);
   stats.push(`<div class="scoreRow">Coins: <b>${coins}</b> 🪙</div>`);
   stats.push(`<div class="scoreRow">Best streak: <b>${bestStreak}</b> · ${acc}% right</div>`);
+  if (comebacks > 0)
+    stats.push(`<div class="scoreRow" style="color:#fff2a8">💪 ${comebacks} comeback${comebacks===1?'':'s'} — ones you'd missed before!</div>`);
   document.getElementById('endStats').innerHTML = stats.join('');
   document.getElementById('newRecord').classList.toggle('hidden', !isRecord);
   renderRecordBoard(document.getElementById('endBoard'));
@@ -544,6 +657,7 @@ document.getElementById('menuBtn').onclick = ()=>{
 };
 document.getElementById('resetBtn').onclick = ()=>{
   ['addsub','count'].forEach(t=>['sprint','blitz'].forEach(m=>store.del(KEY(t,m))));
+  ADAPT.reset();                     // forget the practice list too
   renderRecordBoard(document.getElementById('recordBoard'));
   refreshBestLabel();
 };
