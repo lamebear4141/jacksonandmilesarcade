@@ -1,10 +1,31 @@
 /* =====================================================================
-   LOOT DROP — profiles, saving, progression, squad codes
-   Two profiles (miles / jackson) live side by side in localStorage.
-   ===================================================================== */
-import { CONFIG, SPRITES, RARITY, RARITY_ORDER, SKINS, PETS, levelFromXp, GRADES } from './config.js';
+   LOOT DROP — state: the bridge to the site-wide character.
 
-const KEY = 'lootdrop.v1';
+   Loot Drop used to keep two hardcoded profiles (miles / jackson) in its
+   own localStorage blob. The character is site-wide now, so this module
+   became an ADAPTER:
+
+     · XP, coins, skins, pets, sprite counts and the day streak are THE
+       SHARED CHARACTER's — loaded once at boot into a session profile
+       object shaped exactly like the old one, so game.js keeps mutating
+       it synchronously mid-round without knowing anything changed.
+
+     · At the end of a round, syncRoundToCharacter() diffs the session
+       profile against a snapshot taken at round start and pushes exactly
+       that delta through awardRun() — one write, increments only.
+
+     · Loot-Drop-SPECIFIC history stays Loot Drop's: the daily records
+       (`days`, which power loot luck and the grown-up view) and the
+       reading/math lifetime split live in localStorage under
+       lootdrop.v2.{childId}, per child.
+
+   The extraction rule, reboot van, luck and rarity rolls are untouched —
+   those are game mechanics, not progression.
+   ===================================================================== */
+import { CONFIG, SPRITES, RARITY, RARITY_ORDER, SKINS, PETS, levelFromXp, GRADES, spriteId } from './config.js';
+import { spriteIndex } from '../../assets/catalog.js';
+import { loadCharacter, awardRun, grantCoins, equipItem, getChild, ageFromBirthday, isGuestKid } from '../../firebase-config.js';
+
 const MEM = {};
 const store = {
   get(k){ try { const v = localStorage.getItem(k); return v == null ? (MEM[k] ?? null) : v; } catch(e){ return MEM[k] ?? null; } },
@@ -20,44 +41,140 @@ function dayBefore(s, n){
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
 
-function blankProfile(who){
+/* ---------------- local (Loot-Drop-only) history ---------------- */
+const LOCAL_KEY = (childId) => 'lootdrop.v2.' + childId;
+
+function blankLocal(){
   return {
-    who, xp:0, coins:0,
-    counts: new Array(SPRITES.length).fill(0),   // how many of each sprite
-    skin:'rookie', pet:'none',
-    ownedSkins:['rookie'], ownedPets:['none'],
-    days:{},                 // date -> daily record
-    lifetime:{ rounds:0, extracted:0, eliminated:0, attempted:0, correct:0, seconds:0,
-               readAttempted:0, readCorrect:0, mathAttempted:0, mathCorrect:0 },
-    claimedStreakGifts:[],
+    days: {},               // date -> daily record (luck + grown-up view)
+    lifetime: { rounds:0, extracted:0, eliminated:0, attempted:0, correct:0, seconds:0,
+                readAttempted:0, readCorrect:0, mathAttempted:0, mathCorrect:0 },
+    migrated: null,         // null = never asked; 'miles'|'jackson'|'fresh'
   };
 }
-function blankAll(){ return { version:1, profiles:{ miles:blankProfile('miles'), jackson:blankProfile('jackson') } }; }
-
-export function loadAll(){
+function readLocal(childId){
   try {
-    const raw = JSON.parse(store.get(KEY));
-    if (!raw || !raw.profiles) return blankAll();
-    // heal older/short arrays if the sprite list ever grows
-    Object.values(raw.profiles).forEach(p => {
-      if (!Array.isArray(p.counts)) p.counts = new Array(SPRITES.length).fill(0);
-      while (p.counts.length < SPRITES.length) p.counts.push(0);
-      p.ownedSkins ||= ['rookie']; p.ownedPets ||= ['none'];
-      p.claimedStreakGifts ||= []; p.days ||= {};
-      p.lifetime ||= blankProfile(p.who).lifetime;
-    });
-    return raw;
-  } catch(e){ return blankAll(); }
+    const raw = JSON.parse(store.get(LOCAL_KEY(childId)));
+    if (!raw) return blankLocal();
+    return { ...blankLocal(), ...raw, lifetime: { ...blankLocal().lifetime, ...(raw.lifetime||{}) } };
+  } catch(e){ return blankLocal(); }
 }
-export function saveAll(all){ store.set(KEY, JSON.stringify(all)); }
+function writeLocal(childId, local){ store.set(LOCAL_KEY(childId), JSON.stringify(local)); }
 
-/* ---------------- derived ---------------- */
+/* ---------------- boot: character -> session profile ---------------- */
+let CURRENT = null;   // { childId, local }
+
+/** Load the shared character and shape it like a Loot Drop profile.
+    game.js mutates this object synchronously all round long. */
+export async function initFor(kid){
+  const character = await loadCharacter(kid.id);
+  const local = readLocal(kid.id);
+  CURRENT = { childId: kid.id, local };
+
+  // Content difficulty from the birthday on the child's profile — the
+  // same source the math games use. Two bands exist: grade 1 and grade 3.
+  // No birthday (guests) gets the gentler band; reading too easy beats
+  // reading too hard.
+  let grade = 1;
+  if (!isGuestKid(kid.id)){
+    try {
+      const child = await getChild(kid.id);
+      const age = ageFromBirthday(child?.birthday);
+      if (age != null && age >= 8) grade = 3;
+    } catch(e){ /* stay gentle */ }
+  }
+
+  const counts = new Array(SPRITES.length).fill(0);
+  for (const [id, n] of Object.entries(character.counts || {})){
+    const i = spriteIndex(id);
+    if (i >= 0) counts[i] = n;
+  }
+
+  return {
+    who: kid.id, id: kid.id, name: kid.nickname, grade,
+    xp: character.xp || 0,
+    coins: character.coins || 0,
+    skin: character.skin || 'rookie',
+    pet: character.pet || 'none',
+    ownedSkins: [...(character.ownedSkins || ['rookie'])],
+    ownedPets: [...(character.ownedPets || ['none'])],
+    counts,
+    dayStreak: character.dayStreak || 0,
+    lastPlayed: character.lastPlayed || null,
+    claimedStreakGifts: [...(character.claimedStreakGifts || [])],
+    days: local.days,
+    lifetime: local.lifetime,
+  };
+}
+
+/** Persist the Loot-Drop-only history (days + read/math lifetime).
+    Everything shared flows through syncRoundToCharacter instead. */
+export function saveAll(all){
+  if (!CURRENT) return;
+  const p = all?.profiles?.[CURRENT.childId];
+  if (!p) return;
+  CURRENT.local.days = p.days;
+  CURRENT.local.lifetime = p.lifetime;
+  writeLocal(CURRENT.childId, CURRENT.local);
+}
+
+/* ---------------- the round -> character sync ---------------- */
+
+/** Everything a round can change on the shared character, frozen at
+    round start so the delta is exact no matter what the round grants. */
+export function takeSnapshot(p){
+  return {
+    xp: p.xp, coins: p.coins,
+    counts: p.counts.slice(),
+    ownedSkins: p.ownedSkins.slice(),
+    ownedPets: p.ownedPets.slice(),
+    claimedStreakGifts: p.claimedStreakGifts.slice(),
+  };
+}
+
+/**
+ * Push one finished round to the shared character as a single award:
+ * the exact xp/coin delta (Loot Drop's richer totals — sprite bonuses,
+ * level coins, streak gifts — ride through awardRun's override), the
+ * sprites won, and anything gifts unlocked. Returns awardRun's outcome.
+ */
+export async function syncRoundToCharacter(kid, p, snap, meta){
+  const sprites = [];
+  p.counts.forEach((n, i) => {
+    for (let k = (snap.counts[i] || 0); k < n; k++) sprites.push(spriteId(i));
+  });
+  const outcome = await awardRun(kid.id, 'loot-drop', {
+    asked: meta.asked, correct: meta.correct,
+    seconds: meta.seconds, score: meta.score,
+    sprites,
+    grantSkins: p.ownedSkins.filter((s) => !snap.ownedSkins.includes(s)),
+    grantPets:  p.ownedPets.filter((s) => !snap.ownedPets.includes(s)),
+    claimStreakGifts: p.claimedStreakGifts.filter((d) => !snap.claimedStreakGifts.includes(d)),
+    override: { xp: p.xp - snap.xp, coins: Math.max(0, p.coins - snap.coins) },
+  });
+  // keep the session profile's streak in step with what awardRun rolled
+  p.dayStreak = outcome.dayStreak;
+  p.lastPlayed = today();
+  return outcome;
+}
+
+/** The bonus mini-game pays a few coins outside a run. */
+export async function minigameCoins(kid, p, coins){
+  p.coins += coins;
+  try { await grantCoins(kid.id, coins); } catch(e){ /* keep playing */ }
+}
+
+/* ---------------- derived (same shapes as always) ---------------- */
 export function dayStreak(p){
-  const t = today();
-  let n = 0;
-  let cursor = p.days[t] ? t : dayBefore(t, 1);
-  while (p.days[cursor]){ n++; cursor = dayBefore(cursor, 1); }
-  return n;
+  const t = today(), y = dayBefore(t, 1);
+  // played Loot Drop today already? count today even if the shared roll
+  // hasn't happened yet this session — matches the old feel exactly
+  if (p.days?.[t]){
+    if (p.lastPlayed === t) return p.dayStreak || 1;
+    return p.lastPlayed === y ? (p.dayStreak || 0) + 1 : 1;
+  }
+  if (p.lastPlayed === t) return p.dayStreak || 0;
+  return p.lastPlayed === y ? (p.dayStreak || 0) : 0;
 }
 export function minutesToday(p){
   const d = p.days[today()];
@@ -88,7 +205,7 @@ export function ensureDay(p){
   return p.days[t];
 }
 
-/* ---------------- progression ---------------- */
+/* ---------------- progression (session-local; synced by the diff) ---------------- */
 export function addXp(p, amount){
   const before = levelFromXp(p.xp).level;
   p.xp += amount;
@@ -111,27 +228,6 @@ export function pickSpriteOfRarity(rarity){
   return idxs[Math.floor(Math.random()*idxs.length)];
 }
 
-export function unlockablesFor(p){
-  const lvl = levelInfo(p).level;
-  return {
-    skins: SKINS.map(s => ({ ...s, owned:p.ownedSkins.includes(s.id), locked: lvl < s.level })),
-    pets:  PETS.map(s => ({ ...s, owned:p.ownedPets.includes(s.id),  locked: lvl < s.level })),
-  };
-}
-export function buy(p, type, id){
-  const list = type === 'skin' ? SKINS : PETS;
-  const item = list.find(i => i.id === id);
-  if (!item) return { ok:false, why:'not found' };
-  const owned = type === 'skin' ? p.ownedSkins : p.ownedPets;
-  if (owned.includes(id)) return { ok:false, why:'owned' };
-  if (levelInfo(p).level < item.level) return { ok:false, why:'level' };
-  if (p.coins < item.cost) return { ok:false, why:'coins' };
-  p.coins -= item.cost;
-  owned.push(id);
-  if (type === 'skin') p.skin = id; else p.pet = id;
-  return { ok:true, item };
-}
-
 /* streak gifts — claimed once each */
 export function checkStreakGift(p){
   const s = dayStreak(p);
@@ -147,7 +243,101 @@ export function checkStreakGift(p){
 }
 
 /* =====================================================================
-   SQUAD CODE — compact, shareable, no backend.
+   ONE-TIME MIGRATION — the old lootdrop.v1 blob, claimed profile by
+   profile. Never guess which boy is which: the signed-in child (or the
+   parent beside them) picks, and each old profile can only be claimed
+   once. The old blob is left in place until both are claimed, so the
+   second brother's loot is still there waiting for him.
+   ===================================================================== */
+const LEGACY_KEY = 'lootdrop.v1';
+const CLAIMED_KEY = 'lootdrop.v1.claimed';
+
+function readLegacy(){
+  try {
+    const raw = JSON.parse(store.get(LEGACY_KEY));
+    return raw?.profiles ? raw.profiles : null;
+  } catch(e){ return null; }
+}
+function readClaimed(){
+  try { return JSON.parse(store.get(CLAIMED_KEY)) || {}; } catch(e){ return {}; }
+}
+
+/**
+ * Is there anything to offer this child? Only when the old blob exists,
+ * has unclaimed profiles with actual progress, this child hasn't already
+ * answered, and their shared character is still blank (never merge into
+ * a character that already earned things).
+ */
+export function migrationOffer(kid, p){
+  if (CURRENT?.local.migrated) return null;
+  if (p.xp > 0 || totalSprites(p) > 0) return null;
+  const legacy = readLegacy();
+  if (!legacy) return null;
+  const claimed = readClaimed();
+  const offers = ['miles', 'jackson']
+    .filter((who) => legacy[who] && !claimed[who])
+    .map((who) => {
+      const lp = legacy[who];
+      const counts = Array.isArray(lp.counts) ? lp.counts : [];
+      return {
+        who, name: GRADES[who]?.name || who,
+        level: levelFromXp(lp.xp || 0).level,
+        xp: lp.xp || 0, coins: lp.coins || 0,
+        sprites: counts.reduce((a,b)=>a+(b||0),0),
+      };
+    })
+    .filter((o) => o.xp > 0 || o.sprites > 0 || o.coins > 0);
+  return offers.length ? offers : null;
+}
+
+/** Bring one old profile's earnings onto this child's shared character. */
+export async function migrateLegacy(kid, p, who){
+  const legacy = readLegacy();
+  const lp = legacy?.[who];
+  if (!lp) return { ok:false };
+
+  const counts = Array.isArray(lp.counts) ? lp.counts : [];
+  const sprites = [];
+  counts.forEach((n, i) => { for (let k = 0; k < (n||0); k++) sprites.push(spriteId(i)); });
+
+  const outcome = await awardRun(kid.id, 'loot-drop', {
+    asked: 0, correct: 0, seconds: 0, score: 0,
+    sprites,
+    grantSkins: (lp.ownedSkins || []).filter((s) => s !== 'rookie'),
+    grantPets:  (lp.ownedPets  || []).filter((s) => s !== 'none'),
+    claimStreakGifts: lp.claimedStreakGifts || [],
+    override: { xp: lp.xp || 0, coins: lp.coins || 0 },
+  });
+
+  // What they WORE comes along too, not just what they owned. Ownership
+  // was written by the award above, so the equip's owned-check passes.
+  if (lp.skin && lp.skin !== 'rookie') await equipItem(kid.id, 'skin', lp.skin).catch(() => {});
+  if (lp.pet && lp.pet !== 'none')     await equipItem(kid.id, 'pet',  lp.pet).catch(() => {});
+
+  // Loot-Drop-only history rides along locally.
+  CURRENT.local.days = lp.days || {};
+  CURRENT.local.lifetime = { ...blankLocal().lifetime, ...(lp.lifetime || {}) };
+  CURRENT.local.migrated = who;
+  writeLocal(kid.id, CURRENT.local);
+  const claimed = readClaimed();
+  claimed[who] = kid.id;
+  store.set(CLAIMED_KEY, JSON.stringify(claimed));
+
+  // refresh the session profile in place
+  const fresh = await initFor(kid);
+  Object.assign(p, fresh);
+  return { ok:true, outcome };
+}
+
+/** The child chose to start fresh — don't ask again. */
+export function declineMigration(kid){
+  CURRENT.local.migrated = 'fresh';
+  writeLocal(kid.id, CURRENT.local);
+}
+
+/* =====================================================================
+   SQUAD CODE — compact, shareable, no backend. Unchanged wire format,
+   still the only way to compare with a cousin in a different family.
    Layout: [ver][who][level][streak][rounds hi][rounds lo][counts 4bits each]
    ===================================================================== */
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
@@ -171,7 +361,10 @@ function codeToBytes(code){
 export function makeSquadCode(p){
   const lvl = Math.min(255, levelInfo(p).level);
   const rounds = Math.min(65535, p.lifetime.rounds);
-  const bytes = [1, p.who === 'jackson' ? 1 : 0, lvl, Math.min(255, dayStreak(p)),
+  // the who-byte kept meaning "miles or jackson" in old codes; a migrated
+  // child keeps their old identity bit so existing shared codes line up
+  const whoBit = CURRENT?.local.migrated === 'jackson' ? 1 : 0;
+  const bytes = [1, whoBit, lvl, Math.min(255, dayStreak(p)),
                  (rounds >> 8) & 255, rounds & 255];
   for (let i = 0; i < SPRITES.length; i += 2){
     const a = Math.min(15, p.counts[i] || 0);
@@ -191,8 +384,8 @@ export function readSquadCode(code){
     if (i+1 < SPRITES.length) counts[i+1] = byte & 15;
   }
   const who = b[1] === 1 ? 'jackson' : 'miles';
-  const fake = { who, counts, xp:0, lifetime:{ rounds:(b[4]<<8)|b[5] } };
-  return { who, name: GRADES[who].name, level:b[2], streak:b[3],
+  const fake = { counts };
+  return { who, name: GRADES[who]?.name || 'Rival', level:b[2], streak:b[3],
            rounds:(b[4]<<8)|b[5], counts,
            total: counts.reduce((x,y)=>x+y,0),
            unique: counts.filter(c=>c>0).length,
@@ -200,17 +393,16 @@ export function readSquadCode(code){
 }
 
 /* =====================================================================
-   Nightly report payload — one file covering both boys.
+   Grown-up view payload — this child only, from the local history.
    ===================================================================== */
-export function buildReport(all){
-  const out = { generatedAt:new Date().toISOString(), game:'Loot Drop', date:today(), players:{} };
-  ['miles','jackson'].forEach(who => {
-    const p = all.profiles[who];
-    const d = p.days[today()] || null;
-    const hist = Object.values(p.days).sort((a,b)=> a.date < b.date ? 1 : -1).slice(0, 30);
-    const lt = p.lifetime;
-    out.players[who] = {
-      name: GRADES[who].name, grade: GRADES[who].grade,
+export function buildReport(p){
+  const d = p.days[today()] || null;
+  const hist = Object.values(p.days).sort((a,b)=> a.date < b.date ? 1 : -1).slice(0, 30);
+  const lt = p.lifetime;
+  return {
+    generatedAt: new Date().toISOString(), game:'Loot Drop', date: today(),
+    player: {
+      name: p.name,
       playedToday: !!d,
       today: d && { minutes: Math.round(d.seconds/60), rounds:d.rounds, extracted:d.extracted,
         attempted:d.attempted, correct:d.correct,
@@ -229,14 +421,13 @@ export function buildReport(all){
                   minutes: Math.round(lt.seconds/60) },
       history: hist,
       squadCode: makeSquadCode(p),
-    };
-  });
-  return out;
+    },
+  };
 }
 
-export function downloadReport(all){
+export function downloadReport(p){
   try {
-    const blob = new Blob([JSON.stringify(buildReport(all), null, 2)], { type:'application/json' });
+    const blob = new Blob([JSON.stringify(buildReport(p), null, 2)], { type:'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'lootdrop-' + today() + '.json';
@@ -247,8 +438,10 @@ export function downloadReport(all){
 }
 
 /* =====================================================================
-   SYNC HOOK — drop in a backend later without touching anything else.
-   Set window.LOOTDROP_SYNC = { push(profile), pull(who) } and it's used.
+   SYNC HOOK — kept as the seam for cross-family compare. Siblings now
+   compare automatically on the family leaderboard; codes remain the only
+   way to compare with a cousin in a different family.
+   Set window.LOOTDROP_SYNC = { push(who, code), pull(who) } and it's used.
    ===================================================================== */
 export async function syncPush(p){
   const s = window.LOOTDROP_SYNC;

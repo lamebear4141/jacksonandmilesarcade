@@ -3,7 +3,7 @@
    Drop in, answer, loot chests into your BACKPACK, then try to extract.
    Loot is only yours if you finish at or above the extraction line.
    ===================================================================== */
-import { CONFIG, RARITY, luckScore, rollRarity, GRADES } from './config.js';
+import { CONFIG, RARITY, luckScore, rollRarity } from './config.js';
 import { buildRound } from './content.js';
 import * as S from './state.js';
 import * as Speech from './speech.js';
@@ -11,7 +11,10 @@ import * as Speech from './speech.js';
 const $ = id => document.getElementById(id);
 
 export function startRound({ profile, mode, onFinish }){
-  const grade = GRADES[profile.who].grade;
+  // Content comes in two bands (grade 1 and grade 3). The profile carries
+  // the right one, derived from the child's birthday at boot — no more
+  // hardcoded miles/jackson.
+  const grade = profile.grade || 1;
   const R = {
     profile, mode, grade,
     items: buildRound(grade, mode, CONFIG.questionsPerRound),

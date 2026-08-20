@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Block Stacker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/arcade.css">
 <style>
   :root{
     --sky-top:#2b1b52;
@@ -87,8 +91,6 @@
 </head>
 <body>
 <div id="wrap">
-  <a class="back" href="../index.html">&larr; Arcade</a>
-
   <div id="intro">
     <h1>🧱 Block Stacker</h1>
     <p>Stack the falling blocks and clear full rows to score!</p>
@@ -108,6 +110,7 @@
       <h2>Game Over!</h2>
       <p id="finalScore">Score: 0</p>
       <p id="highScore">Best: 0</p>
+      <p id="awardLine" style="color:#ffd23f;font-weight:800;min-height:1.2em;"></p>
       <button id="playAgain">Play Again</button>
     </div>
   </div>
@@ -121,7 +124,18 @@
   </div>
 </div>
 
-<script>
+<script type="module">
+import { requireKid, mountBar, finishRun, celebrateLevelUp, describeAward } from '../assets/arcade-shell.js';
+
+// No profile, no game — requireKid replaces the page with a friendly
+// picker prompt and we never boot.
+const kid = await requireKid({ gameName: 'Block Stacker' });
+if (kid) {
+  await mountBar({ title: 'Block Stacker', mount: document.getElementById('wrap') });
+  main();
+}
+
+function main(){
 // ---------- Board setup ----------
 const COLS = 10, ROWS = 20, CELL = 26;
 const canvas = document.getElementById('game');
@@ -142,6 +156,7 @@ const COLORS = { I:'#4fd6f5', O:'#ffd23f', T:'#b06cf0', S:'#5cd66a', Z:'#e33e3e'
 const TYPES = Object.keys(SHAPES);
 
 let board, current, next, score, lines, level, running, dropTimer, dropInterval, best = 0, lastTime;
+let piecesPlaced = 0, runStart = 0;   // milestones + clock for the character award
 
 function emptyBoard(){
   return Array.from({length:ROWS}, () => Array(COLS).fill(null));
@@ -178,6 +193,7 @@ function collides(matrix, offX, offY){
 }
 
 function lockPiece(){
+  piecesPlaced++;
   const { matrix, x: ox, y: oy, type } = current;
   for (let y=0; y<matrix.length; y++){
     for (let x=0; x<matrix[y].length; x++){
@@ -254,6 +270,7 @@ function hardDrop(){
 function resetGame(){
   board = emptyBoard();
   score = 0; lines = 0; level = 1;
+  piecesPlaced = 0; runStart = Date.now();
   dropInterval = 1000;
   running = true;
   current = spawnPiece(randomType());
@@ -327,12 +344,20 @@ function loop(now){
   requestAnimationFrame(loop);
 }
 
-function endGame(){
+async function endGame(){
   running = false;
   best = Math.max(best, score);
   document.getElementById('finalScore').textContent = 'Score: ' + score;
   document.getElementById('highScore').textContent = 'Best: ' + best;
   document.getElementById('gameover').classList.remove('hidden');
+  // Milestones, not score: blocks placed / 10, so idling can't farm coins.
+  const units = Math.floor(piecesPlaced / 10);
+  const seconds = Math.round((Date.now() - runStart) / 1000);
+  const award = document.getElementById('awardLine');
+  award.textContent = 'Saving…';
+  const outcome = await finishRun('block-stacker', { units, seconds, score });
+  award.textContent = describeAward(outcome);
+  celebrateLevelUp(outcome);
 }
 
 // ---------- Controls ----------
@@ -382,6 +407,7 @@ document.getElementById('playAgain').addEventListener('click', () => {
   resetGame();
   requestAnimationFrame(loop);
 });
+} // end main()
 </script>
 </body>
 </html>

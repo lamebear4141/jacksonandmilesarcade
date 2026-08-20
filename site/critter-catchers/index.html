@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/arcade.css">
 <title>Critter Catchers — Reading Quest</title>
 <style>
   :root{
@@ -176,7 +180,7 @@
 
   <!-- ============ REPORT ============ -->
   <section id="report" class="screen">
-    <h2>🏅 Great job, Miles!</h2>
+    <h2>🏅 Great job!</h2>
     <div class="stats">
       <div class="stat"><b id="rAcc">0%</b><span>ACCURACY</span></div>
       <div class="stat"><b id="rCaught">0</b><span>CAUGHT TODAY</span></div>
@@ -190,6 +194,7 @@
       <div style="font-weight:900;font-size:18px">Words to practice 💪</div>
       <div id="rMissed"></div>
     </div>
+    <p id="awardLine" style="text-align:center;font-weight:900;color:#b8860b;min-height:1.3em"></p>
     <div id="saveNote"></div>
     <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
       <button class="btn gold" id="saveBtn">💾 Save my report</button>
@@ -222,8 +227,17 @@
   <button id="grownup" title="Grown-up dashboard">⚙️</button>
 </div>
 
-<script>
-"use strict";
+<script type="module">
+import { requireKid, mountBar, finishRun, celebrateLevelUp, describeAward }
+  from '../assets/arcade-shell.js';
+
+const kid = await requireKid({ gameName: 'Critter Catchers' });
+if (kid) {
+  await mountBar({ title: 'Critter Catchers' });
+  main(kid);
+}
+
+function main(kid){
 
 /* =======================================================================
    CRITTER CATCHERS — a daily reading quest for a 1st grader
@@ -561,7 +575,18 @@ function listen(){
       listening=false; $("micBtn").classList.remove("live"); $("micBtn").textContent="🎤 Read it!";
       if(!best.trim()) return;
       const sc = scoreSpeech(target, best);
-      const pass = it.type==="sentence" || it.type==="story" ? sc>=0.7 : sc>=0.99;
+      if(it.type==="story"){
+        // THE GATE (same rule Loot Drop enforces): reading the passage
+        // aloud is practice, never the answer. Before this, a good read
+        // called judge(pass) directly and caught the critter with the
+        // comprehension question still unanswered — which would have made
+        // story items the fastest coin farm in the arcade. The critter is
+        // only ever caught by answering the question below.
+        if(sc>=0.7) flash("👍","Great reading! Now answer the question!");
+        else flash("🤔","Read it once more — or just answer the question!");
+        return;
+      }
+      const pass = it.type==="sentence" ? sc>=0.7 : sc>=0.99;
       judge(pass, sc, it, false);
     };
     recog.start();
@@ -640,8 +665,18 @@ function finishSession(){
     : '<span class="tiny">Nothing missed today — perfect run! 🎉</span>';
 
   show("report");
-  setTimeout(()=>{ downloadReport(true); }, 600);
-  speak("Amazing reading, Miles! You caught "+S.caught.length+" critters today.", .95);
+  speak("Amazing reading, "+kid.nickname+"! You caught "+S.caught.length+" critters today.", .95);
+
+  // The character award. Correct = first-try correct, matching the
+  // game's own accuracy number — and thanks to the story gate above, a
+  // story item only counts when the QUESTION was answered.
+  const award = $("awardLine");
+  award.textContent = "Saving…";
+  finishRun('critter-catchers', { asked: S.attempted, correct: S.correctFirst, seconds: secs })
+    .then((outcome) => {
+      award.textContent = describeAward(outcome);
+      celebrateLevelUp(outcome);
+    });
 }
 
 function buildReportPayload(){
@@ -740,6 +775,7 @@ if(!micOK) $("micStatus").textContent = "Tip: open in Chrome for read-aloud mode
 
 /* expose a tiny hook for automated testing */
 window.__cc = { buildSession, scoreSpeech, buildReportPayload, startSession, get S(){return S;}, DATA:()=>DATA };
+} // end main()
 </script>
 </body>
 </html>

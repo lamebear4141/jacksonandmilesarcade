@@ -68,6 +68,7 @@ export class HUD {
       flexDirection: 'column', gap: '14px', background: 'rgba(15,10,25,0)',
       transition: 'background 1.5s ease', zIndex: '60', pointerEvents: 'auto', textAlign: 'center',
     });
+    this.winScreen.id = 'winScreen';   // the page shell appends the XP/coins award here
     this.winTitle = el('div', { fontSize: '48px', fontWeight: '900', letterSpacing: '2px' }, 'YOU MADE IT');
     this.winTime = el('div', { fontSize: '20px', color: '#f4f0ff' }, '');
     this.winRestart = el('button', {

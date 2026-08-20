@@ -2,208 +2,227 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>The Arcade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/arcade.css">
 <style>
-  :root{
-    --sky-top:#1a1a3e;
-    --sky-bottom:#3d2b6e;
-    --panel:#241640;
-    --ink:#f4f0ff;
-    --accent:#ffd23f;
-  }
-  * { box-sizing: border-box; }
-  html,body{
-    margin:0; min-height:100%;
-    background: linear-gradient(180deg,var(--sky-top),var(--sky-bottom));
-    font-family: 'Trebuchet MS', 'Arial Rounded MT Bold', sans-serif;
-    color: var(--ink);
-  }
-  .hidden{ display:none !important; }
-  .wrap{ max-width: 720px; margin: 0 auto; padding: 40px 20px; text-align:center; }
-  h1{
-    font-size: 40px; margin: 0 0 6px;
-    text-shadow: 0 3px 0 rgba(0,0,0,0.35);
-  }
-  p.sub{ color:#c9bfe8; margin:0 0 32px; font-size:15px; }
-  .grid{
-    display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:18px;
-  }
-  a.tile{
-    display:flex; flex-direction:column; align-items:center; gap:10px;
-    background: var(--panel); border-radius: 20px; padding: 26px 16px;
-    text-decoration:none; color: var(--ink);
-    box-shadow: 0 5px 0 #140a28;
-    transition: transform 0.12s ease;
-  }
-  a.tile:active{ transform: translateY(3px); box-shadow: 0 2px 0 #140a28; }
-  a.tile .emoji{ font-size: 44px; }
-  a.tile .name{ font-weight: 800; font-size: 16px; }
-  a.tile .who{
-    font-size: 11px; font-weight: 800; letter-spacing: 1px;
-    color: #1a1030; background: var(--accent);
-    padding: 3px 10px; border-radius: 999px; margin-top: -2px;
-  }
-  a.tile.math{ background: #1d2a4a; box-shadow: 0 5px 0 #0d1428; }
-  a.tile.math:active{ box-shadow: 0 2px 0 #0d1428; }
-  a.tile.reading{ background: #1c3a2c; box-shadow: 0 5px 0 #0b1c14; }
-  a.tile.reading:active{ box-shadow: 0 2px 0 #0b1c14; }
-  a.tile.feature{
-    grid-column: 1 / -1;
-    background: linear-gradient(135deg,#2b1f5e 0%,#123a52 100%);
-    box-shadow: 0 5px 0 #0d1030;
-    border: 2px solid rgba(255,210,63,0.35);
-  }
-  a.tile.feature:active{ box-shadow: 0 2px 0 #0d1030; }
-  a.tile.feature .emoji{ font-size: 56px; }
-  a.tile.feature .name{ font-size: 24px; letter-spacing: 2px; }
-  a.tile.feature .blurb{ font-size: 13px; color:#c9bfe8; max-width: 430px; line-height:1.5; }
-  .whos{ display:flex; gap:6px; }
-  a.parent{
-    display: inline-block; margin-top: 34px; color: #9a8fc2;
-    font-size: 13px; font-weight: 700; text-decoration: none;
-  }
-  a.parent:hover{ color: var(--accent); text-decoration: underline; }
-  .empty{
-    background: var(--panel); border-radius: 20px; padding: 30px; color:#c9bfe8;
-    border: 2px dashed #4a3080; grid-column: 1 / -1;
-  }
-
-  /* ---- parent / guest bars (small print, always tucked above everything else) ---- */
-  #authBar, #guestBar{
-    display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:12px;
-    font-size:12px; color:#9a8fc2; margin-bottom:22px;
-  }
-  #authBar span, #guestBar span{ color:#c9bfe8; }
-  .linklike{
-    background:none; border:none; padding:0; font:inherit; font-size:12px; font-weight:700;
-    color:#9a8fc2; text-decoration:none; cursor:pointer;
-  }
-  .linklike:hover{ color:var(--accent); text-decoration:underline; }
-
-  /* ---- shared card look for login + add-kid forms ---- */
-  .authCard{
-    background: var(--panel); border-radius: 20px; padding: 26px 22px; max-width: 340px;
-    margin: 0 auto; box-shadow: 0 5px 0 #140a28; text-align:left;
-  }
-  .authCard h2{ margin:0 0 4px; font-size:20px; text-align:center; }
-  .authCard > p.sub{ margin:0 0 18px; font-size:13px; text-align:center; }
-  .authTabs{ display:flex; gap:6px; margin-bottom:16px; background:#1a1030; border-radius:999px; padding:4px; }
-  .authTabs .tab{
-    flex:1; background:none; border:none; color:#9a8fc2; font-weight:800; font-size:11px;
-    padding:9px 6px; border-radius:999px; cursor:pointer; font-family:inherit;
-  }
-  .authTabs .tab.active{ background:var(--accent); color:#1a1030; }
-  .authCard input, .authCard select, .modal-card input, .modal-card select{
-    width:100%; margin-bottom:10px; padding:12px 14px; border-radius:12px;
-    border:none; background:#1a1030; color:var(--ink); font-size:14px; font-family:inherit;
-  }
-  .authCard input::placeholder{ color:#6e5f9c; }
-  .fieldLabel{ font-size:11px; color:#9a8fc2; font-weight:800; display:block; margin:8px 0 4px; }
-  .bigBtn{
-    width:100%; background:linear-gradient(180deg,#ffd23f,#e8a90c); color:#3a2400; border:none;
-    padding:13px; border-radius:999px; font-weight:900; font-size:15px; box-shadow:0 4px 0 #a97600;
-    cursor:pointer; font-family:inherit; margin-top:4px;
-  }
-  .bigBtn:active{ box-shadow:0 1px 0 #a97600; transform:translateY(3px); }
-  .bigBtn.outline{ background:transparent; color:var(--ink); border:2px solid var(--accent); box-shadow:none; }
-  .bigBtn.outline:active{ background:rgba(255,210,63,0.12); }
-  .error{ color:#ff8a8a; font-size:12px; margin:10px 0 0; text-align:center; }
-
+  /* Only what is specific to this page's layout. Everything else — tiles,
+     cards, buttons, the PIN pad, the profile picker — now comes from
+     assets/arcade.css and is shared with every game. */
   #guestModeBtn{ display:block; max-width:340px; margin:18px auto 0; }
-
-  .authDivider{
-    display:flex; align-items:center; gap:10px; margin:14px 0 10px; color:#6e5f9c;
-    font-size:11px; text-transform:uppercase; letter-spacing:0.05em;
-  }
-  .authDivider::before, .authDivider::after{ content:''; flex:1; height:1px; background:#3a2668; }
-  .googleBtn{
-    width:100%; display:flex; align-items:center; justify-content:center; gap:10px;
-    background:#fff; color:#3c4043; border:1px solid #dadce0; border-radius:999px;
-    padding:12px; font-weight:700; font-size:14px; cursor:pointer; font-family:inherit;
-  }
-  .googleBtn:active{ background:#f1f3f4; }
-
-  /* ---- kid picker ---- */
   #kidGate, #guestGate{ max-width:560px; margin:0 auto; }
   #kidGate h2, #guestGate h2{ margin:0 0 4px; font-size:22px; }
-  .kidIcons{ display:flex; flex-wrap:wrap; gap:14px; justify-content:center; margin:18px 0 4px; }
-  .kid-btn{
-    position:relative;
-    display:flex; flex-direction:column; align-items:center; gap:6px; background:var(--panel);
-    border:3px solid transparent; border-radius:18px; padding:16px 14px; min-width:88px; cursor:pointer;
-    box-shadow:0 4px 0 #140a28; font-family:inherit;
-  }
-  .kid-btn:active{ transform:translateY(2px); box-shadow:0 2px 0 #140a28; }
-  .kid-btn .emoji{ font-size:36px; }
-  .kid-btn .name{ font-size:12px; font-weight:800; color:var(--ink); }
-  .editBtn{
-    position:absolute; top:-6px; right:-6px; background:var(--accent); color:#1a1030;
-    border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center;
-    font-size:11px; cursor:pointer; box-shadow:0 2px 0 #a97600; line-height:1;
-  }
-  .addKidTile{
-    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
-    border:3px dashed #4a3080; border-radius:18px; padding:16px 14px; min-width:88px; cursor:pointer;
-    color:#9a8fc2; font-weight:800; font-size:12px; background:none; font-family:inherit;
-  }
-  .addKidTile .plus{ font-size:26px; }
-  #addKidForm{ margin-top:18px; }
+  #addKidForm, #addGuestForm{ margin-top:18px; }
 
-  /* ---- PIN pad modal ---- */
-  .modal{
-    position:fixed; inset:0; background:rgba(10,5,25,0.75); display:flex;
-    align-items:center; justify-content:center; z-index:50; padding:20px;
-  }
-  .modal-card{
-    background:var(--panel); border-radius:20px; padding:26px; text-align:center; width:240px;
-    box-shadow:0 10px 30px rgba(0,0,0,0.5);
-  }
-  .modal-card .kidName{ font-weight:800; font-size:16px; margin:0 0 2px; }
-  .modal-card .hint{ color:#9a8fc2; font-size:12px; margin:0 0 6px; }
-  .pin-dots{ display:flex; gap:10px; justify-content:center; margin:14px 0; }
-  .pin-dots span{ width:14px; height:14px; border-radius:50%; border:2px solid #4a3080; }
-  .pin-dots span.filled{ background:var(--accent); border-color:var(--accent); }
-  .pin-keys{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:4px; }
-  .pin-keys button{
-    padding:14px 0; border-radius:12px; border:none; background:#1a1030; color:var(--ink);
-    font-size:18px; font-weight:800; cursor:pointer; font-family:inherit;
-  }
-  .pin-keys button:active{ background:#2a1c50; }
+  /* ==================================================================
+     THE FRONT DOOR — scenery and lockup for the pre-login screen only.
+     Everything here is scoped to #frontDoor; no other screen loads any
+     of it, which is why it lives in this page and not arcade.css.
+     ================================================================== */
 
-  #playingAs{ font-size:13px; color:#c9bfe8; margin:-18px 0 22px; }
+  /* ---- scenery: hills pinned to the bottom, clouds drifting by ---- */
+  .fd-hills{
+    position:fixed; left:0; bottom:0; width:100vw; height:150px;
+    z-index:0; pointer-events:none;
+  }
+  .fd-cloud{
+    position:fixed; left:0; z-index:0; pointer-events:none;
+    animation:fd-drift linear infinite;
+  }
+  .fd-cloud--1{ top:9vh;  width:150px; animation-duration:44s; }
+  .fd-cloud--2{ top:22vh; width:110px; animation-duration:62s; animation-delay:-20s; }
+  .fd-cloud--3{ top:5vh;  width:90px;  animation-duration:76s; animation-delay:-45s; }
+  @keyframes fd-drift{
+    from{ transform:translateX(-170px); }
+    to{ transform:translateX(110vw); }
+  }
+
+  /* coins and stars floating up from the playground */
+  .fd-riser{
+    position:fixed; bottom:-60px; z-index:0; pointer-events:none;
+    font-size:26px; animation:fd-rise linear forwards;
+  }
+  @keyframes fd-rise{
+    from{ transform:translateY(0) rotateY(0); opacity:1; }
+    85%{ opacity:1; }
+    to{ transform:translateY(-70vh) rotateY(1080deg); opacity:0; }
+  }
+
+  /* ---- the content column ---- */
+  .fd-content{
+    position:relative; z-index:2; display:flex; flex-direction:column;
+    align-items:center; gap:16px; padding-bottom:150px;
+  }
+
+  /* ---- logo lockup ---- */
+  .fd-family{
+    background:var(--ac-edge); color:#fff; border-radius:999px;
+    padding:6px 20px; font-size:14px; font-weight:800; letter-spacing:3px;
+  }
+  .fd-logo{
+    font-family:var(--ac-font); font-weight:800;
+    font-size:clamp(52px,12vw,110px); line-height:1; letter-spacing:2px;
+    color:var(--ac-yellow);
+    -webkit-text-stroke:9px var(--ac-edge); paint-order:stroke fill;
+    text-shadow:0 8px 0 rgba(30,43,99,0.30);
+    user-select:none;
+  }
+  .fd-logo span{ display:inline-block; animation:fd-hop 2.4s ease-in-out infinite; }
+  .fd-logo span:nth-child(1){ animation-delay:0s; }
+  .fd-logo span:nth-child(2){ animation-delay:0.12s; }
+  .fd-logo span:nth-child(3){ animation-delay:0.24s; }
+  .fd-logo span:nth-child(4){ animation-delay:0.36s; }
+  .fd-logo span:nth-child(5){ animation-delay:0.48s; }
+  .fd-logo span:nth-child(6){ animation-delay:0.60s; }
+  @keyframes fd-hop{
+    0%, 12%, 100%{ transform:translateY(0); }
+    6%{ transform:translateY(-16px); }
+  }
+
+  /* ---- the mascot ---- */
+  .mascot{ width:120px; animation:ac-floaty 3.4s ease-in-out infinite; animation-delay:0.6s; }
+  .mascot.cheer{ animation:fd-cheer 0.7s ease-in-out; }
+  @keyframes fd-cheer{
+    0%,100%{ transform:rotate(0) scale(1); }
+    25%{ transform:rotate(-9deg) scale(1.1); }
+    50%{ transform:rotate(8deg) scale(1.12); }
+    75%{ transform:rotate(-5deg) scale(1.06); }
+  }
+
+  /* ---- the two big choices ---- */
+  .fd-btns{ display:flex; flex-direction:column; gap:14px; width:min(430px,92%); }
+  .fd-play{ animation:ac-breathe 1.6s ease-in-out infinite; }
+
+  /* ---- the public ticker ---- */
+  .fd-ticker{
+    display:flex; align-items:center; gap:10px; max-width:min(430px,92%);
+    background:var(--ac-panel); border:3px solid var(--ac-edge); border-radius:999px;
+    padding:8px 18px; font-size:13px; font-weight:800; color:var(--ac-text);
+    box-shadow:0 var(--ac-lift-sm) 0 var(--ac-edge);
+  }
+  .fd-dot{
+    width:10px; height:10px; border-radius:50%; background:var(--ac-good);
+    position:relative; flex:none;
+  }
+  .fd-dot::after{
+    content:''; position:absolute; inset:-3px; border-radius:50%;
+    border:2px solid var(--ac-good); animation:fd-ping 1.6s ease-out infinite;
+  }
+  @keyframes fd-ping{
+    from{ transform:scale(0.6); opacity:1; }
+    to{ transform:scale(1.8); opacity:0; }
+  }
+  .fd-ticker__label{ color:var(--ac-text-dim); letter-spacing:2px; font-size:10px; flex:none; }
+  #fdTickerMsg{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  /* ---- corner chrome ---- */
+  .fd-corner{ position:fixed; top:14px; right:14px; z-index:5; display:flex; gap:10px; align-items:center; }
+  .fd-sound{
+    width:44px; height:44px; border-radius:50%; background:var(--ac-panel);
+    border:3px solid var(--ac-edge); box-shadow:0 4px 0 var(--ac-edge);
+    font-size:19px; cursor:pointer; transition:transform 0.06s, box-shadow 0.06s;
+  }
+  .fd-sound:active{ transform:translateY(4px); box-shadow:0 0 0 var(--ac-edge); }
+  .fd-grownups{ font-size:12px; padding:10px 14px; margin-top:0; }
+
+  /* ---- reduced motion: the front door goes still, stays usable ---- */
+  @media (prefers-reduced-motion: reduce){
+    .fd-cloud, .fd-riser, .fd-logo span, .fd-play, .mascot, .fd-dot::after{ animation:none !important; }
+  }
 </style>
 </head>
-<body>
-  <div class="wrap">
-    <h1>🕹️ The Arcade</h1>
+<body class="ac-page">
+  <div class="ac-page__inner">
+    <h1 id="pageTitle" class="hidden">🕹️ The Arcade</h1>
 
-    <div id="authBar" class="hidden">
-      <span id="parentEmail"></span>
-      <button class="linklike hidden" id="switchProfileBtn">Switch profile</button>
-      <a class="linklike" href="parent-report/index.html">📊 Parent report</a>
-      <button class="linklike" id="logoutBtn">Log out</button>
-    </div>
+    <!-- ============= THE FRONT DOOR =============
+         What greets a kid: sky, hills, clouds, the logo, the mascot and
+         two big choices. The email/password card is never the first
+         thing they see — it's the same card as always, revealed when
+         "play with my profile" is pressed and nobody's signed in. -->
+    <div id="frontDoor">
+      <svg class="fd-hills" viewBox="0 0 1440 160" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0,84 Q240,14 520,72 Q800,120 1040,62 Q1260,16 1440,82 L1440,160 L0,160 Z"
+              fill="#5FD963" stroke="#1E2B63" stroke-width="6"/>
+        <path d="M0,112 Q360,64 760,106 Q1120,142 1440,102 L1440,160 L0,160 Z"
+              fill="#31A84A" stroke="#1E2B63" stroke-width="6"/>
+      </svg>
+      <svg class="fd-cloud fd-cloud--1" viewBox="0 0 140 60" aria-hidden="true">
+        <path d="M12,46 Q8,26 30,25 Q34,8 55,12 Q70,0 85,12 Q106,8 108,28 Q128,30 124,46 Z"
+              fill="#FFFFFF" stroke="#1E2B63" stroke-width="5" stroke-linejoin="round"/>
+      </svg>
+      <svg class="fd-cloud fd-cloud--2" viewBox="0 0 140 60" aria-hidden="true">
+        <path d="M12,46 Q8,26 30,25 Q34,8 55,12 Q70,0 85,12 Q106,8 108,28 Q128,30 124,46 Z"
+              fill="#FFFFFF" stroke="#1E2B63" stroke-width="5" stroke-linejoin="round"/>
+      </svg>
+      <svg class="fd-cloud fd-cloud--3" viewBox="0 0 140 60" aria-hidden="true">
+        <path d="M12,46 Q8,26 30,25 Q34,8 55,12 Q70,0 85,12 Q106,8 108,28 Q128,30 124,46 Z"
+              fill="#FFFFFF" stroke="#1E2B63" stroke-width="5" stroke-linejoin="round"/>
+      </svg>
 
-    <div id="guestBar" class="hidden">
-      <span id="guestLabel"></span>
-      <button class="linklike hidden" id="switchProfileBtnGuest">Switch player</button>
-      <button class="linklike" id="signInInsteadBtn">Sign in to save stats</button>
-    </div>
+      <div class="fd-corner">
+        <button class="fd-sound" id="sndToggle" type="button" title="Sound on/off">🔊</button>
+        <a class="ac-btn ac-btn--outline ac-btn--inline fd-grownups" href="parent-report/index.html">👨‍👩‍👦 Grown-ups</a>
+      </div>
 
-    <div id="loginScreen">
-      <div class="authCard">
-        <h2>👪 Family Login</h2>
-        <p class="sub">Parents only — sign in so the kids can start playing.</p>
-        <div class="authTabs">
-          <button class="tab active" id="tabSignin" type="button">Sign In</button>
-          <button class="tab" id="tabSignup" type="button">Create Family Account</button>
+      <div class="fd-content">
+        <div class="fd-family">JACKSON &amp; MILES</div>
+        <div class="fd-logo" aria-label="ARCADE"><span>A</span><span>R</span><span>C</span><span>A</span><span>D</span><span>E</span></div>
+
+        <svg viewBox="0 0 120 120" class="mascot" id="mascot" aria-hidden="true">
+          <ellipse cx="60" cy="112" rx="30" ry="6" fill="rgba(30,43,99,.18)"/>
+          <line x1="60" y1="30" x2="60" y2="14" stroke="#1E2B63" stroke-width="6" stroke-linecap="round"/>
+          <circle cx="60" cy="11" r="8" fill="#FF5A5A" stroke="#1E2B63" stroke-width="5"/>
+          <rect x="20" y="28" width="80" height="70" rx="24" fill="#FFC93C" stroke="#1E2B63" stroke-width="6"/>
+          <rect x="31" y="44" width="58" height="32" rx="13" fill="#1E2B63"/>
+          <circle cx="47" cy="60" r="7" fill="#8FE8FF"/><circle cx="73" cy="60" r="7" fill="#8FE8FF"/>
+          <circle cx="49" cy="58" r="2.4" fill="#fff"/><circle cx="75" cy="58" r="2.4" fill="#fff"/>
+          <rect x="42" y="98" width="14" height="16" rx="5" fill="#4C9BFF" stroke="#1E2B63" stroke-width="5"/>
+          <rect x="64" y="98" width="14" height="16" rx="5" fill="#4C9BFF" stroke="#1E2B63" stroke-width="5"/>
+        </svg>
+
+        <div class="fd-btns">
+          <button class="ac-btn ac-btn--xl fd-play" id="fdPlay" type="button">🕹️ PLAY WITH MY PROFILE</button>
+          <button class="ac-btn ac-btn--green ac-btn--xl" id="fdFun" type="button">🎮 JUST PLAY FOR FUN</button>
         </div>
-        <input id="authEmail" type="email" placeholder="Email" autocomplete="email">
-        <input id="authPassword" type="password" placeholder="Password" autocomplete="current-password">
-        <button class="bigBtn" id="authSubmit" type="button">Sign In</button>
-        <div class="authDivider">or</div>
-        <button class="googleBtn" id="googleBtn" type="button">
+
+        <div class="fd-ticker">
+          <span class="fd-dot"></span>
+          <span class="fd-ticker__label">NOW&nbsp;PLAYING</span>
+          <span id="fdTickerMsg">🕹️ 7 games inside…</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="authBar" class="ac-bar hidden">
+      <span id="parentEmail"></span>
+      <button class="ac-btn--ghost hidden" id="switchProfileBtn">Switch profile</button>
+      <a class="ac-btn--ghost" href="parent-report/index.html">📊 Parent report</a>
+      <button class="ac-btn--ghost" id="logoutBtn">Log out</button>
+    </div>
+
+    <div id="guestBar" class="ac-bar hidden">
+      <span id="guestLabel"></span>
+      <button class="ac-btn--ghost hidden" id="switchProfileBtnGuest">Switch player</button>
+      <button class="ac-btn--ghost" id="signInInsteadBtn">Sign in to save stats</button>
+    </div>
+
+    <div id="loginScreen" class="hidden">
+      <div class="ac-card">
+        <h2>👪 Family Login</h2>
+        <p class="ac-sub">Parents only — sign in so the kids can start playing.</p>
+        <div class="ac-tabs">
+          <button class="ac-tabs__tab is-active" id="tabSignin" type="button">Sign In</button>
+          <button class="ac-tabs__tab" id="tabSignup" type="button">Create Family Account</button>
+        </div>
+        <input class="ac-input" id="authEmail" type="email" placeholder="Email" autocomplete="email">
+        <input class="ac-input" id="authPassword" type="password" placeholder="Password" autocomplete="current-password">
+        <button class="ac-btn" id="authSubmit" type="button">Sign In</button>
+        <div class="ac-divider">or</div>
+        <button class="ac-btn--google" id="googleBtn" type="button">
           <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
             <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.5 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/>
             <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.5 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
@@ -212,112 +231,85 @@
           </svg>
           Sign in with Google
         </button>
-        <p class="error hidden" id="authError"></p>
+        <p class="ac-error hidden" id="authError"></p>
       </div>
-      <button class="bigBtn outline" id="guestModeBtn" type="button">🎮 Just play for fun — no sign-in</button>
+      <button class="ac-btn ac-btn--outline" id="guestModeBtn" type="button">🎮 Just play for fun — no sign-in</button>
     </div>
 
     <div id="guestGate" class="hidden">
       <h2>Playing without signing in</h2>
-      <p class="sub">Scores stay on this device only.
-        <button class="linklike" id="goToLoginBtn" type="button">Sign in instead</button>
+      <p class="ac-sub">Scores stay on this device only.
+        <button class="ac-btn--ghost" id="goToLoginBtn" type="button">Sign in instead</button>
         to save stats and build streaks.</p>
-      <div class="kidIcons" id="guestIcons">
-        <button class="addKidTile" id="addGuestTile" type="button"><span class="plus">➕</span>Add a player</button>
+      <div class="ac-profiles" id="guestIcons">
+        <button class="ac-profile--add" id="addGuestTile" type="button"><span class="ac-profile__plus">➕</span>Add a player</button>
       </div>
-      <div class="authCard hidden" id="addGuestForm">
-        <input id="newGuestName" placeholder="Nickname" maxlength="20">
-        <button class="bigBtn" id="addGuestBtn" type="button">Let's play!</button>
-        <p class="error hidden" id="addGuestError"></p>
+      <div class="ac-card hidden" id="addGuestForm">
+        <input class="ac-input" id="newGuestName" placeholder="Nickname" maxlength="20">
+        <button class="ac-btn" id="addGuestBtn" type="button">Let's play!</button>
+        <p class="ac-error hidden" id="addGuestError"></p>
       </div>
     </div>
 
     <div id="kidGate" class="hidden">
       <h2>Who's playing?</h2>
-      <p class="sub">Pick your profile and enter your PIN.</p>
-      <div class="kidIcons" id="kidIcons">
-        <button class="addKidTile" id="addKidTile" type="button"><span class="plus">➕</span>Add a kid</button>
+      <p class="ac-sub">Pick your profile and enter your PIN.</p>
+      <div class="ac-profiles" id="kidIcons">
+        <button class="ac-profile--add" id="addKidTile" type="button"><span class="ac-profile__plus">➕</span>Add a kid</button>
       </div>
-      <div class="authCard hidden" id="addKidForm">
-        <input id="newKidName" placeholder="Nickname" maxlength="20">
-        <input id="newKidPin" placeholder="4-digit PIN" inputmode="numeric" maxlength="4">
-        <label class="fieldLabel" for="newKidBirthday">Birthday (used to set math difficulty)</label>
-        <input id="newKidBirthday" type="date">
-        <label class="fieldLabel" for="newKidFocus">Focus area</label>
-        <select id="newKidFocus">
+      <div class="ac-card hidden" id="addKidForm">
+        <input class="ac-input" id="newKidName" placeholder="Nickname" maxlength="20">
+        <input class="ac-input" id="newKidPin" placeholder="4-digit PIN" inputmode="numeric" maxlength="4">
+        <label class="ac-label" for="newKidBirthday">Birthday (used to set math difficulty)</label>
+        <input class="ac-input" id="newKidBirthday" type="date">
+        <label class="ac-label" for="newKidFocus">Focus area</label>
+        <select class="ac-select" id="newKidFocus">
           <option value="both" selected>Both</option>
           <option value="reading">Reading</option>
           <option value="math">Math</option>
         </select>
-        <button class="bigBtn" id="addKidBtn" type="button">Add kid</button>
-        <p class="error hidden" id="addKidError"></p>
+        <button class="ac-btn" id="addKidBtn" type="button">Add kid</button>
+        <p class="ac-error hidden" id="addKidError"></p>
       </div>
     </div>
 
-    <div id="arcadeGrid" class="hidden">
-      <p class="sub" id="playingAs"></p>
-      <p class="sub">Pick a game to play!</p>
-      <div class="grid">
-        <a class="tile feature" href="loot-drop/index.html">
-          <span class="emoji">🪂</span>
-          <span class="name">LOOT DROP</span>
-          <span class="blurb">Read and solve to loot chests &mdash; but you need 80% to get home with them.
-            Collect 60 sprites, level up, buy skins and pets, then compare squads.</span>
-          <span class="whos"><span class="who">MILES</span><span class="who">JACKSON</span></span>
-        </a>
-        <a class="tile" href="multiverse-collector/index.html">
-          <span class="emoji">🟩</span>
-          <span class="name">Multiverse Collector</span>
-        </a>
-        <a class="tile" href="block-stacker/index.html">
-          <span class="emoji">🧱</span>
-          <span class="name">Block Stacker</span>
-        </a>
-        <a class="tile math" href="math-defender/index.html">
-          <span class="emoji">⛏️</span>
-          <span class="name">Math Defender</span>
-          <span class="who">JACKSON</span>
-        </a>
-        <a class="tile math" href="coin-climb/index.html">
-          <span class="emoji">🪙</span>
-          <span class="name">Coin Climb</span>
-          <span class="who">MILES</span>
-        </a>
-      </div>
-    </div>
+    <!-- Character Home mounts here once a kid is picked: header card +
+         PLAY / LOCKER / SHOP / TRADE / leaderboard tabs, all rendered by
+         assets/home.js and friends. -->
+    <div id="characterHome" class="hidden"></div>
   </div>
 
-  <div class="modal hidden" id="pinModal">
-    <div class="modal-card">
-      <p class="kidName" id="pinKidName"></p>
-      <p class="hint">Enter your 4-digit PIN</p>
-      <div class="pin-dots">
+  <div class="ac-modal hidden" id="pinModal">
+    <div class="ac-modal__card">
+      <p class="ac-modal__name" id="pinKidName"></p>
+      <p class="ac-modal__hint">Enter your 4-digit PIN</p>
+      <div class="ac-pin__dots">
         <span></span><span></span><span></span><span></span>
       </div>
-      <div class="pin-keys">
+      <div class="ac-pin__keys">
         <button data-k="1" type="button">1</button><button data-k="2" type="button">2</button><button data-k="3" type="button">3</button>
         <button data-k="4" type="button">4</button><button data-k="5" type="button">5</button><button data-k="6" type="button">6</button>
         <button data-k="7" type="button">7</button><button data-k="8" type="button">8</button><button data-k="9" type="button">9</button>
         <button id="pinCancel" type="button">✕</button><button data-k="0" type="button">0</button><button id="pinBack" type="button">⌫</button>
       </div>
-      <p class="error hidden" id="pinError">Wrong PIN — try again!</p>
+      <p class="ac-error hidden" id="pinError">Not quite — try again 🙂</p>
     </div>
   </div>
 
-  <div class="modal hidden" id="editModal">
-    <div class="modal-card" style="width:260px;text-align:left;">
-      <p class="kidName" id="editKidName" style="text-align:center;"></p>
-      <label class="fieldLabel" for="editBirthday">Birthday</label>
-      <input id="editBirthday" type="date">
-      <label class="fieldLabel" for="editFocusArea">Focus area</label>
-      <select id="editFocusArea">
+  <div class="ac-modal hidden" id="editModal">
+    <div class="ac-modal__card ac-modal__card--form">
+      <p class="ac-modal__name" id="editKidName" style="text-align:center;"></p>
+      <label class="ac-label" for="editBirthday">Birthday</label>
+      <input class="ac-input" id="editBirthday" type="date">
+      <label class="ac-label" for="editFocusArea">Focus area</label>
+      <select class="ac-select" id="editFocusArea">
         <option value="both">Both</option>
         <option value="reading">Reading</option>
         <option value="math">Math</option>
       </select>
-      <button class="bigBtn" id="editSaveBtn" type="button">Save</button>
-      <button class="linklike" id="editCancelBtn" type="button" style="display:block;margin:12px auto 0;">Cancel</button>
-      <p class="error hidden" id="editError"></p>
+      <button class="ac-btn" id="editSaveBtn" type="button">Save</button>
+      <button class="ac-btn--ghost" id="editCancelBtn" type="button" style="display:block;margin:12px auto 0;">Cancel</button>
+      <p class="ac-error hidden" id="editError"></p>
     </div>
   </div>
 
@@ -326,21 +318,30 @@ import {
   onParentChange, signUpParent, signInParent, signOutParent, signInParentWithGoogle,
   addChild, updateChild, listChildren, getCurrentKid, setCurrentKid, clearCurrentKid,
   isGuestKid, listLocalGuests, addLocalGuest,
+  getTopScores,
 } from './firebase-config.js';
+import { mountHome } from './assets/home.js';
+import { GAMES } from './assets/catalog.js';
+// Effects (confetti, fanfare) come from the shell when present — every
+// call below is optional-chained, so navigation NEVER waits on them.
+import * as shell from './assets/arcade-shell.js';
 
 const $ = (id) => document.getElementById(id);
 let childrenCache = [];
 
 /* ---------------------------------------------------------------- screens */
 function showScreen(name) {
-  ['loginScreen', 'guestGate', 'kidGate', 'arcadeGrid'].forEach((id) => {
+  ['frontDoor', 'loginScreen', 'guestGate', 'kidGate', 'characterHome'].forEach((id) => {
     $(id).classList.toggle('hidden', id !== name);
   });
+  // The front door has its own logo lockup; the little h1 is for the
+  // inner screens only.
+  $('pageTitle').classList.toggle('hidden', name === 'frontDoor');
 }
 
 function enterArcade(kid) {
-  $('playingAs').textContent = `Playing as ${kid.nickname}`;
-  showScreen('arcadeGrid');
+  showScreen('characterHome');
+  mountHome($('characterHome'), kid);
 }
 
 function enterArcadeAsReal(kid) {
@@ -370,12 +371,24 @@ async function refreshKidGate() {
   }
 }
 
+let currentUser = null;
+
 onParentChange(async (user) => {
+  currentUser = user;
   if (user) {
     $('parentEmail').textContent = user.email;
     $('authBar').classList.remove('hidden');
     $('guestBar').classList.add('hidden');
-    await refreshKidGate();
+    // Mid-session kid: straight back to their character, no front door.
+    childrenCache = await listChildren().catch(() => []);
+    renderKidIcons();
+    const current = getCurrentKid();
+    if (current && childrenCache.some((c) => c.id === current.id)) {
+      enterArcadeAsReal(current);
+    } else {
+      clearCurrentKid();
+      showScreen('frontDoor');   // PLAY goes straight to the kid gate
+    }
     return;
   }
   $('authBar').classList.add('hidden');
@@ -385,7 +398,7 @@ onParentChange(async (user) => {
   } else {
     clearCurrentKid();
     $('guestBar').classList.add('hidden');
-    showScreen('loginScreen');
+    showScreen('frontDoor');     // PLAY reveals the login card
   }
 });
 
@@ -393,8 +406,8 @@ onParentChange(async (user) => {
 let authMode = 'signin';
 function setAuthMode(mode) {
   authMode = mode;
-  $('tabSignin').classList.toggle('active', mode === 'signin');
-  $('tabSignup').classList.toggle('active', mode === 'signup');
+  $('tabSignin').classList.toggle('is-active', mode === 'signin');
+  $('tabSignup').classList.toggle('is-active', mode === 'signup');
   $('authSubmit').textContent = mode === 'signin' ? 'Sign In' : 'Create Family Account';
   $('authPassword').autocomplete = mode === 'signin' ? 'current-password' : 'new-password';
   $('authError').classList.add('hidden');
@@ -450,21 +463,21 @@ function avatarFor(name) {
 }
 
 function renderProfileIcons(wrap, addTile, list, onPick, onEdit) {
-  wrap.querySelectorAll('.kid-btn').forEach((el) => el.remove());
+  wrap.querySelectorAll('.ac-profile').forEach((el) => el.remove());
   list.forEach((kid) => {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'kid-btn';
+    btn.className = 'ac-profile';
     const emoji = document.createElement('span');
-    emoji.className = 'emoji';
+    emoji.className = 'ac-profile__emoji';
     emoji.textContent = avatarFor(kid.nickname);
     const name = document.createElement('span');
-    name.className = 'name';
+    name.className = 'ac-profile__name';
     name.textContent = kid.nickname;
     btn.append(emoji, name);
     if (onEdit) {
       const edit = document.createElement('span');
-      edit.className = 'editBtn';
+      edit.className = 'ac-profile__edit';
       edit.textContent = '✏️';
       edit.title = `Edit ${kid.nickname}'s profile`;
       edit.addEventListener('click', (e) => { e.stopPropagation(); onEdit(kid); });
@@ -562,7 +575,7 @@ let pinTarget = null;
 let pinValue = '';
 
 function updatePinDots() {
-  document.querySelectorAll('.pin-dots span').forEach((el, i) => el.classList.toggle('filled', i < pinValue.length));
+  document.querySelectorAll('.ac-pin__dots span').forEach((el, i) => el.classList.toggle('is-filled', i < pinValue.length));
 }
 function openPinPad(kid) {
   pinTarget = kid;
@@ -576,20 +589,30 @@ function closePinPad() {
   $('pinModal').classList.add('hidden');
   pinTarget = null;
   pinValue = '';
+  updatePinDots();
 }
 function checkPin() {
+  const card = document.querySelector('#pinModal .ac-modal__card');
   if (pinTarget && String(pinTarget.pin) === pinValue) {
     const kid = { id: pinTarget.id, nickname: pinTarget.nickname };
+    // burst where the card is, then get on with it — never wait for it
+    shell.celebrate?.(card);
     setCurrentKid(kid);
     closePinPad();
     enterArcadeAsReal(kid);
   } else {
+    // Wrong things wiggle themselves and stay gentle — no screen shake,
+    // no buzzer, and the copy on screen says "try again", not "wrong".
+    shell.sfx?.play?.('nope');
+    card.classList.remove('ac-wiggle');
+    void card.offsetWidth;
+    card.classList.add('ac-wiggle');
     $('pinError').classList.remove('hidden');
     pinValue = '';
     updatePinDots();
   }
 }
-document.querySelectorAll('.pin-keys button[data-k]').forEach((btn) => {
+document.querySelectorAll('.ac-pin__keys button[data-k]').forEach((btn) => {
   btn.addEventListener('click', () => {
     if (pinValue.length >= 4) return;
     pinValue += btn.dataset.k;
@@ -599,6 +622,23 @@ document.querySelectorAll('.pin-keys button[data-k]').forEach((btn) => {
 });
 $('pinBack').addEventListener('click', () => { pinValue = pinValue.slice(0, -1); updatePinDots(); });
 $('pinCancel').addEventListener('click', closePinPad);
+
+// A physical keyboard works too — type the digits, Backspace to fix,
+// Escape to close. Touch and keys land in the same pinValue.
+document.addEventListener('keydown', (e) => {
+  if ($('pinModal').classList.contains('hidden')) return;
+  if (/^[0-9]$/.test(e.key)) {
+    if (pinValue.length >= 4) return;
+    pinValue += e.key;
+    updatePinDots();
+    if (pinValue.length === 4) checkPin();
+  } else if (e.key === 'Backspace') {
+    pinValue = pinValue.slice(0, -1);
+    updatePinDots();
+  } else if (e.key === 'Escape') {
+    closePinPad();
+  }
+});
 
 /* ---------------------------------------------------------------- parent / guest controls */
 $('logoutBtn').addEventListener('click', () => signOutParent());
@@ -617,6 +657,89 @@ $('signInInsteadBtn').addEventListener('click', () => {
   $('guestBar').classList.add('hidden');
   showScreen('loginScreen');
 });
+
+/* ================================================================
+   THE FRONT DOOR — behaviour. Scenery and effects are decoration:
+   every navigation below happens immediately and never waits for a
+   sound, a burst or an animation to finish.
+   ================================================================ */
+const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---- the two big choices ---- */
+$('fdPlay').addEventListener('click', (e) => {
+  // celebration first (all fire-and-forget)...
+  shell.sfx?.play?.('win');
+  const r = e.currentTarget.getBoundingClientRect();
+  shell.confetti?.(r.left + r.width / 2, r.top, 90);
+  if (!REDUCED_MOTION) {
+    document.body.classList.add('shake');
+    setTimeout(() => document.body.classList.remove('shake'), 400);
+    const m = $('mascot');
+    m.classList.remove('cheer'); void m.getBoundingClientRect(); m.classList.add('cheer');
+  }
+  // ...and the reveal happens NOW, not after any of that.
+  showScreen(currentUser ? 'kidGate' : 'loginScreen');
+});
+
+$('fdFun').addEventListener('click', () => {
+  shell.sfx?.play?.('pop');
+  renderGuestIcons();
+  showScreen('guestGate');
+});
+
+/* ---- rising coins & stars ---- */
+const RISERS = ['🪙', '⭐', '🍄', '💎', '🟩'];
+setInterval(() => {
+  if (REDUCED_MOTION || document.hidden) return;
+  const fd = $('frontDoor');
+  if (fd.classList.contains('hidden')) return;
+  if (fd.querySelectorAll('.fd-riser').length > 14) return;  // never flood the DOM
+  const s = document.createElement('span');
+  s.className = 'fd-riser';
+  s.textContent = RISERS[Math.floor(Math.random() * RISERS.length)];
+  s.style.left = (4 + Math.random() * 90) + 'vw';
+  s.style.animationDuration = (7 + Math.random() * 5) + 's';
+  s.addEventListener('animationend', () => s.remove());
+  fd.appendChild(s);
+}, 1200);
+
+/* ---- the public ticker ----
+   Only ever shows what's already in the public high_scores collection:
+   nickname + score + game. Falls back to static lines while loading. */
+const tickerMsgs = [
+  '🕹️ 7 games inside…',
+  '⚡ Practice games earn 4× coins!',
+  '🪂 Collect all 60 sprites!',
+];
+let tickerIdx = 0;
+(async () => {
+  try {
+    const boards = await Promise.all(
+      ['multiverse-collector', 'block-stacker', 'loot-drop'].map(async (g) => {
+        const rows = await getTopScores(g, 2).catch(() => []);
+        return rows.map((r) => `🏆 ${r.nickname} — ${r.score.toLocaleString()} in ${GAMES[g]?.name || g}`);
+      }));
+    boards.flat().forEach((m) => tickerMsgs.push(m));
+  } catch (e) { /* static lines carry it */ }
+})();
+setInterval(() => {
+  if ($('frontDoor').classList.contains('hidden')) return;
+  tickerIdx = (tickerIdx + 1) % tickerMsgs.length;
+  $('fdTickerMsg').textContent = tickerMsgs[tickerIdx];
+}, 3000);
+
+/* ---- sound toggle ----
+   The preference lives in localStorage('arcade.sound'); the shell's sfx
+   reads the same key, so this works before and after R4 lands. */
+function soundIsOn() { return localStorage.getItem('arcade.sound') !== 'off'; }
+function paintSound() { $('sndToggle').textContent = soundIsOn() ? '🔊' : '🔇'; }
+$('sndToggle').addEventListener('click', () => {
+  localStorage.setItem('arcade.sound', soundIsOn() ? 'off' : 'on');
+  shell.sfx?.setMuted?.(!soundIsOn());
+  paintSound();
+  if (soundIsOn()) shell.sfx?.play?.('tap');
+});
+paintSound();
 </script>
 </body>
 </html>

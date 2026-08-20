@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/arcade.css">
 <title>Math Defender</title>
 <style>
   :root{
@@ -174,6 +178,7 @@
     <h2 id="endTitle">Wall Down!</h2>
     <div id="newRecord" class="hidden">⭐ NEW RECORD! ⭐</div>
     <div id="endStats"></div>
+    <div id="awardLine" class="scoreRow" style="color:#ffd23f;font-weight:900;min-height:1.2em"></div>
     <div class="recordBoard" id="endBoard"></div>
     <button class="btn" id="againBtn">PLAY AGAIN</button>
     <button class="btn ghost" id="menuBtn">Change mode</button>
@@ -182,6 +187,16 @@
 
 <script type="module">
 import { onParentChange, getCurrentKid, isGuestKid, getChild, ageFromBirthday, tierForAge } from '../firebase-config.js';
+import { requireKid, mountBar, finishRun, celebrateLevelUp, describeAward } from '../assets/arcade-shell.js';
+
+// No profile, no game — the gate replaces the page and nothing below runs.
+const kid = await requireKid({ gameName: 'Math Defender' });
+if (kid) {
+  await mountBar({ title: 'Math Defender' });
+  main(kid);
+}
+
+function main(kid){
 
 /* =====================================================================
    MATH DEFENDER — tweak anything in here
@@ -455,6 +470,7 @@ let state = 'menu';
 let topic = 'times', mode = 'sprint';
 let creepers = [], particles = [];
 let hearts, correct, wrong, streak, bestStreak, elapsed, penalty, spawned, asked, comebacks;
+let runStart = 0;   // wall clock for the character award
 let q = null, lastT = 0, shakeT = 0, flashT = 0, flashColor = '#ff5555';
 
 function resetGame(){
@@ -684,6 +700,7 @@ function refreshBestLabel(){
 }
 
 function startGame(){
+  runStart = Date.now();
   state = 'playing';
   document.getElementById('startScreen').classList.add('hidden');
   document.getElementById('endScreen').classList.add('hidden');
@@ -736,6 +753,20 @@ function endGame(finished){
   if (isRecord) sfx.win();
   renderRecordBoard(document.getElementById('endBoard'));
   document.getElementById('endScreen').classList.remove('hidden');
+
+  // The character award: correct answers are the units, and the 80%
+  // clear bonus comes from the same accuracy the end screen shows.
+  const awardEl = document.getElementById('awardLine');
+  awardEl.textContent = 'Saving…';
+  finishRun('math-defender', {
+    asked: correct + wrong,
+    correct: correct,
+    seconds: Math.round((Date.now() - runStart) / 1000),
+    score: score == null ? correct : score,
+  }).then((outcome) => {
+    awardEl.textContent = describeAward(outcome);
+    celebrateLevelUp(outcome);
+  });
 }
 
 /* ---------------- wiring ------------------------------------------------ */
@@ -802,6 +833,7 @@ renderRecordBoard(document.getElementById('recordBoard'));
 refreshBestLabel();
 resetGame();
 requestAnimationFrame(loop);
+} // end main()
 </script>
 </body>
 </html>

@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Multiverse Collector</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/arcade.css">
 <style>
   :root{
     --sky-top:#d9baff;
@@ -164,6 +168,7 @@
       <h2>Game Over!</h2>
       <p id="finalScore">Score: 0</p>
       <p id="highScore">Best: 0</p>
+      <p id="awardLine" style="color:#ffd23f;font-weight:800;min-height:1.2em;"></p>
       <div id="leaderboard">
         <p class="lbTitle">🏆 Top Scores</p>
         <ol id="leaderboardList"></ol>
@@ -184,6 +189,7 @@ import {
   onParentChange, getCurrentKid, clearCurrentKid, saveHighScore, getTopScores, getLocalTopScores,
   isGuestKid, saveChildProgress, loadChildProgress,
 } from '../firebase-config.js';
+import { mountBar, finishRun, celebrateLevelUp, describeAward } from '../assets/arcade-shell.js';
 
 const GAME_ID = 'multiverse-collector';
 let currentKid = null;
@@ -206,6 +212,10 @@ onParentChange(async (user) => {
   }
   document.getElementById('lockedScreen').classList.add('hidden');
   document.getElementById('picker').classList.remove('hidden');
+  if (!window.__barMounted) {
+    window.__barMounted = true;
+    mountBar({ title: 'Multiverse Collector', mount: document.getElementById('wrap') });
+  }
   document.getElementById('playingAsLabel').textContent = guest
     ? `Playing as ${currentKid.nickname} · this device only`
     : `Playing as ${currentKid.nickname}`;
@@ -264,6 +274,7 @@ const DEATH = '☠️';
 const DEATH_CHANCE = 0.02;
 
 let player, items, keys, score, lives, running, spawnTimer, speedMultiplier, showerInterval, best = 0;
+let captured = 0, runStart = 0;   // creatures caught + clock, for the character award
 
 function resetGame() {
   player = { x: W/2 - 24, y: H - 70, w: 48, h: 48, vy: 0, speed: 6, onGround: true };
@@ -274,6 +285,7 @@ function resetGame() {
   running = true;
   spawnTimer = 0;
   speedMultiplier = 1;
+  captured = 0; runStart = Date.now();
   stopShower();
   updateHud();
 }
@@ -335,10 +347,10 @@ function update() {
     if (rectsOverlap(player.x, player.y, player.w, player.h, it.x - it.size/2, it.y - it.size/2, it.size, it.size)) {
       if (it.death) { lives = 0; flashScreen('#ff0000', 0.6); stopShower(); }
       else if (it.bad) { lives--; flashScreen('#e33e3e'); stopShower(); }
-      else if (it.rare) { score += 1000; flashScreen('#ffd23f', 0.5); celebrate(); stopShower(); }
-      else if (it.stick) { score += 10; flashScreen('#4fc3f7', 0.3); startShower(); }
-      else if (it.fortnite) { score += 10; speedMultiplier += FORTNITE_SPEEDUP; flashScreen('#4fc3f7', 0.25); stopShower(); }
-      else { score += 10; flashScreen('#ffd23f', 0.15); stopShower(); }
+      else if (it.rare) { captured++; score += 1000; flashScreen('#ffd23f', 0.5); celebrate(); stopShower(); }
+      else if (it.stick) { captured++; score += 10; flashScreen('#4fc3f7', 0.3); startShower(); }
+      else if (it.fortnite) { captured++; score += 10; speedMultiplier += FORTNITE_SPEEDUP; flashScreen('#4fc3f7', 0.25); stopShower(); }
+      else { captured++; score += 10; flashScreen('#ffd23f', 0.15); stopShower(); }
       items.splice(i,1);
       updateHud();
       if (lives <= 0) endGame();
@@ -424,7 +436,7 @@ function loop() {
   if (running) requestAnimationFrame(loop);
 }
 
-function endGame() {
+async function endGame() {
   running = false;
   best = Math.max(best, score);
   document.getElementById('finalScore').textContent = 'Score: ' + score;
@@ -435,6 +447,13 @@ function endGame() {
     saveChildProgress(currentKid.id, GAME_ID, { best }).catch(() => {});
   }
   renderLeaderboard();
+  // The character award: creatures caught are the milestones.
+  const seconds = Math.round((Date.now() - runStart) / 1000);
+  const award = document.getElementById('awardLine');
+  award.textContent = 'Saving…';
+  const outcome = await finishRun(GAME_ID, { units: captured, seconds, score });
+  award.textContent = describeAward(outcome);
+  celebrateLevelUp(outcome);
 }
 
 // ---------- Controls ----------

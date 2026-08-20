@@ -91,6 +91,11 @@ export class Objectives {
     this.hud.setHoldProgress(0);
     this.hud.hidePrompt();
     this.hud.showWinScreen(this.elapsedSeconds);
+    // Tell the page shell the run is over so it can award the character.
+    // Fire-and-forget: the win screen never waits on the save.
+    document.dispatchEvent(new CustomEvent('harvest:won', {
+      detail: { keys: this.collectedCount, seconds: this.elapsedSeconds },
+    }));
   }
 
   update(dt, player) {

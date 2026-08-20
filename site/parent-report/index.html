@@ -5,387 +5,304 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Arcade Progress — Parent Report</title>
 <style>
-  .viz-root{
-    color-scheme: light;
-    --surface-1:      #fcfcfb;
-    --surface-2:      #f2f2f0;
-    --border:         #e2e2de;
-    --text-primary:   #0b0b0b;
-    --text-secondary: #52514e;
-    --text-muted:     #7a7975;
-    --series-1:       #2a78d6;   /* Jackson */
-    --series-2:       #eb6834;   /* Miles */
-    --grid:           #e8e8e4;
-  }
-  @media (prefers-color-scheme: dark){
-    :root:where(:not([data-theme="light"])) .viz-root{
-      color-scheme: dark;
-      --surface-1:      #1a1a19;
-      --surface-2:      #232322;
-      --border:         #35352f;
-      --text-primary:   #ffffff;
-      --text-secondary: #c3c2b7;
-      --text-muted:     #8f8e85;
-      --series-1:       #3987e5;
-      --series-2:       #d95926;
-      --grid:           #2c2c28;
-    }
-  }
-  :root[data-theme="dark"] .viz-root{
-    color-scheme: dark;
-    --surface-1:#1a1a19; --surface-2:#232322; --border:#35352f;
-    --text-primary:#ffffff; --text-secondary:#c3c2b7; --text-muted:#8f8e85;
-    --series-1:#3987e5; --series-2:#d95926; --grid:#2c2c28;
-  }
-
+  /* Deliberately plain, grown-up document styling — this page does NOT
+     load arcade.css. The kids' Playground look stops at the login. */
+  :root{ --ink:#1c2333; --dim:#5a6478; --line:#d9dee8; --accent:#2456c4;
+         --bg:#f7f8fb; --learn:#1e7a46; --fun:#8a5a10; }
   *{ box-sizing:border-box; }
   body{
-    margin:0; background:var(--surface-2); color:var(--text-primary);
-    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
-    font-size:15px; line-height:1.5;
+    margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.55 Georgia, 'Times New Roman', serif;
   }
-  .page{ max-width:760px; margin:0 auto; padding:28px 20px 60px; }
-  header{ margin-bottom:8px; }
-  h1{ font-size:26px; margin:0 0 4px; letter-spacing:-0.01em; }
-  .sub{ color:var(--text-secondary); font-size:14px; margin:0 0 24px; }
-
+  .wrap{ max-width:820px; margin:0 auto; padding:36px 22px 60px; }
+  a{ color:var(--accent); }
+  h1{ font-size:26px; margin:0 0 4px; }
+  h2{ font-size:19px; margin:0 0 2px; }
+  .sub{ color:var(--dim); font-size:14px; margin:0 0 26px; }
+  .back{ font-size:14px; display:inline-block; margin-bottom:22px; text-decoration:none; }
   .card{
-    background:var(--surface-1); border:1px solid var(--border);
-    border-radius:12px; padding:20px 22px; margin-bottom:18px;
+    background:#fff; border:1px solid var(--line); border-radius:10px;
+    padding:20px 22px; margin-bottom:18px;
   }
-  .kidHead{ display:flex; align-items:baseline; gap:10px; margin:0 0 2px; }
-  .kidHead h2{ font-size:19px; margin:0; }
-  .swatch{ width:11px; height:11px; border-radius:3px; flex:none; align-self:center; }
-  .kidHead .game{ color:var(--text-muted); font-size:13px; }
-
-  /* hero number */
-  .hero{ display:flex; align-items:baseline; gap:12px; margin:14px 0 2px; }
-  .hero .big{ font-size:42px; font-weight:650; letter-spacing:-0.02em; line-height:1; }
-  .hero .delta{ font-size:14px; font-weight:600; }
-  .up{ color:#008300; } .down{ color:#c0392b; } .flat{ color:var(--text-muted); }
-  .heroLabel{ color:var(--text-secondary); font-size:13px; margin-bottom:18px; }
-
-  /* stat row */
-  .stats{ display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:1px;
-          background:var(--border); border:1px solid var(--border); border-radius:9px;
-          overflow:hidden; margin:16px 0 22px; }
-  .stat{ background:var(--surface-1); padding:11px 13px; }
-  .stat .v{ font-size:19px; font-weight:650; letter-spacing:-0.01em; }
-  .stat .k{ font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; margin-top:2px; }
-
-  /* chart */
-  .chartTitle{ font-size:13px; font-weight:600; color:var(--text-secondary); margin:0 0 12px; }
-  .chart{ position:relative; height:132px; display:flex; align-items:flex-end; gap:6px;
-          border-bottom:1px solid var(--grid); padding-bottom:0; }
-  .bar{ flex:1 1 0; min-width:0; position:relative; display:flex; flex-direction:column;
-        justify-content:flex-end; align-items:center; height:100%; cursor:default; }
-  .bar .fill{ width:100%; border-radius:4px 4px 0 0; background:var(--series-1); }
-  .bar.miles .fill{ background:var(--series-2); }
-  .bar .lab{ position:absolute; top:-2px; font-size:10px; color:var(--text-secondary);
-             font-weight:600; width:100%; text-align:center; }
-  .axis{ display:flex; gap:6px; margin-top:6px; }
-  .axis span{ flex:1 1 0; min-width:0; text-align:center; font-size:10px; color:var(--text-muted);
-              overflow:hidden; white-space:nowrap; }
-  .gridline{ position:absolute; left:0; right:0; border-top:1px dashed var(--grid);
-             font-size:10px; color:var(--text-muted); }
-  .gridline span{ position:absolute; right:0; top:-14px; background:var(--surface-1); padding-left:5px; }
-
-  #tip{
-    position:fixed; pointer-events:none; z-index:50; opacity:0; transition:opacity .1s;
-    background:var(--text-primary); color:var(--surface-1); font-size:12px; line-height:1.4;
-    padding:7px 10px; border-radius:7px; max-width:220px; white-space:nowrap;
+  .notice{
+    background:#fff8e6; border:1px solid #e8d49a; border-radius:10px;
+    padding:14px 18px; margin-bottom:18px; font-size:14px; color:#6b5410;
   }
-
-  /* practice list */
-  .practice{ margin-top:6px; }
-  .practice h3{ font-size:13px; font-weight:600; color:var(--text-secondary); margin:20px 0 8px; }
-  .facts{ display:flex; flex-wrap:wrap; gap:7px; }
-  .fact{ background:var(--surface-2); border:1px solid var(--border); border-radius:7px;
-         padding:6px 11px; font-size:14px; font-variant-numeric:tabular-nums; }
-  .fact b{ font-weight:650; }
-  .fact i{ font-style:normal; color:var(--text-muted); font-size:12px; margin-left:6px; }
-
-  details{ margin-top:18px; border-top:1px solid var(--border); padding-top:12px; }
-  summary{ cursor:pointer; font-size:13px; color:var(--text-secondary); }
-  table{ border-collapse:collapse; width:100%; margin-top:10px; font-size:13px; }
-  th,td{ text-align:left; padding:6px 8px; border-bottom:1px solid var(--border);
-         font-variant-numeric:tabular-nums; }
-  th{ font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-muted); font-weight:600; }
-
-  .actions{ display:flex; flex-wrap:wrap; gap:10px; margin-top:6px; }
-  .btn{
-    border:1px solid var(--border); background:var(--surface-1); color:var(--text-primary);
-    font:inherit; font-size:14px; font-weight:550; padding:10px 18px; border-radius:8px; cursor:pointer;
+  table{ width:100%; border-collapse:collapse; font-size:14px; }
+  th, td{ text-align:left; padding:7px 9px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th{ font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--dim); font-weight:600; }
+  td.num, th.num{ text-align:right; font-variant-numeric:tabular-nums; }
+  tr:last-child td{ border-bottom:none; }
+  tr.total td{ border-top:2px solid var(--ink); font-weight:700; }
+  .muted{ color:var(--dim); font-size:13px; }
+  .kid-head{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px; }
+  .kid-meta{ color:var(--dim); font-size:13px; }
+  .tag{ display:inline-block; font-size:11px; font-weight:700; letter-spacing:0.04em;
+        border-radius:999px; padding:1px 9px; vertical-align:1px; }
+  .tag.learn{ background:#e2f4e9; color:var(--learn); }
+  .tag.fun{ background:#f7ecd4; color:var(--fun); }
+  .split{ display:flex; gap:24px; flex-wrap:wrap; margin:10px 0 4px; }
+  .split .box{ flex:1; min-width:200px; border:1px solid var(--line); border-radius:8px; padding:10px 14px; }
+  .split .box b{ font-size:20px; display:block; }
+  .split .box span{ font-size:12px; color:var(--dim); }
+  .ratio{ font-size:13px; color:var(--dim); margin:6px 0 0; }
+  .gate{ text-align:center; padding:40px 20px; }
+  .gate h2{ font-size:20px; margin:0 0 8px; }
+  .hidden{ display:none !important; }
+  button.linkish{
+    background:none; border:none; padding:0; font:inherit; color:var(--accent);
+    text-decoration:underline; cursor:pointer;
   }
-  .btn:hover{ background:var(--surface-2); }
-  .btn.primary{ background:var(--series-1); border-color:var(--series-1); color:#fff; }
-  .btn.primary:hover{ filter:brightness(1.08); }
-  .note{ color:var(--text-muted); font-size:12.5px; margin-top:12px; line-height:1.55; }
-  .empty{ color:var(--text-secondary); font-size:14px; padding:6px 0 2px; }
-  .empty b{ color:var(--text-primary); }
-  a.back{ color:var(--text-secondary); font-size:13px; text-decoration:none; }
-  a.back:hover{ text-decoration:underline; }
-  @media print{ .actions,.back{ display:none; } body{ background:#fff; } }
+  button.plain{
+    font:inherit; font-size:14px; padding:8px 16px; border:1px solid var(--line);
+    border-radius:8px; background:#fff; cursor:pointer; margin:4px 6px 0 0;
+  }
+  button.plain:hover{ border-color:var(--accent); }
+  details{ margin-top:8px; }
+  summary{ cursor:pointer; font-size:14px; color:var(--accent); }
+  @media print{ .back, .noprint{ display:none; } body{ background:#fff; } .card{ border:none; padding:10px 0; } }
 </style>
 </head>
-<body class="viz-root">
-<div class="page">
+<body>
+<div class="wrap">
   <a class="back" href="../index.html">&larr; Back to the Arcade</a>
-  <header>
-    <h1>Arcade Progress</h1>
-    <p class="sub" id="sub">Reading what's saved in this browser…</p>
-  </header>
+  <h1>Arcade Progress</h1>
+  <p class="sub">A grown-ups' view of how the kids are doing. Only you can see this —
+     it reads your own children's saved sessions from the family account, so it works
+     from any device you sign in on.</p>
 
-  <div id="report"></div>
+  <div id="loading" class="card muted">Checking who's signed in&hellip;</div>
 
-  <div class="card">
-    <div class="actions">
-      <button class="btn primary" id="emailBtn">Email this to me</button>
-      <button class="btn" id="copyBtn">Copy as text</button>
-      <button class="btn" id="printBtn">Print / Save PDF</button>
+  <!-- Not signed in: this page is for the signed-in parent only. -->
+  <div id="gate" class="card gate hidden">
+    <h2>Parents only</h2>
+    <p class="muted">Sign in with your family account at the arcade first, then come back here —
+       the report shows your own children and nothing else.</p>
+    <p><a href="../index.html">Go to the arcade sign-in</a></p>
+  </div>
+
+  <div id="report" class="hidden">
+    <!-- One-time import of the pre-profile local log. Only appears on the
+         browser that actually holds one, and only until it's answered. -->
+    <div id="legacyCard" class="notice hidden">
+      <b>Old play history found on this computer.</b>
+      <span id="legacyDesc"></span>
+      It's from before kid profiles existed, so it doesn't say who was playing —
+      assign all of it to one child, or discard it. (It carries no XP or coins
+      either way; it only fills in the history table.)
+      <div id="legacyBtns" class="noprint"></div>
+      <div id="legacyStatus" class="muted"></div>
     </div>
-    <p class="note" id="note"></p>
+
+    <div id="kids"></div>
+
+    <p class="muted noprint">Signed in as <span id="who"></span>
+       · <button class="linkish" id="refreshBtn">Refresh</button>
+       · <button class="linkish" onclick="window.print()">Print / save PDF</button></p>
   </div>
 </div>
-<div id="tip"></div>
 
-<script>
-/* =====================================================================
-   PARENT REPORT
-   Reads what the two games saved in this browser. No server, no account,
-   nothing leaves the machine unless you press the email button.
-   ===================================================================== */
-const PARENT_EMAIL = '';   // left blank on purpose — fill in the To: field yourself when the mail app opens
-const RECENT_N     = 5;                     // sessions averaged for the headline number
-const CHART_N      = 10;                    // sessions shown in the bar chart
+<script type="module">
+import { onParentChange, listChildren, listFamilyCharacters, listSessions, db, auth }
+  from '../firebase-config.js';
+import { GAMES } from '../assets/catalog.js';
+import { collection, doc, writeBatch, Timestamp }
+  from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
-const store = {
-  get(k){ try { return localStorage.getItem(k); } catch(e){ return null; } }
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => (n || 0).toLocaleString();
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ---------------- the report ---------------- */
+const dateOf = (ms) => {
+  if (!ms) return '—';
+  const d = new Date(ms);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 };
-const json = (k, fallback) => {
-  try { return JSON.parse(store.get(k) || 'null') ?? fallback; }
-  catch(e){ return fallback; }
-};
 
-const KIDS = [
-  { who:'Jackson', game:'Math Defender', slug:'mathdefender', cls:'',
-    topics:{ times:'Times Tables', mixed:'Mixed Mode' },
-    modes:{ sprint:'Sprint', blitz:'Blitz' }, unit:{ sprint:'s', blitz:' right' } },
-  { who:'Miles', game:'Coin Climb', slug:'coinclimb', cls:'miles',
-    topics:{ addsub:'Add & Subtract', count:'Count & Compare' },
-    modes:{ sprint:'Race', blitz:'Coin Rush' }, unit:{ sprint:'s', blitz:' coins' } },
-];
+function gameName(id){ return GAMES[id]?.name || id; }
+function gameKind(id){ return GAMES[id]?.kind || 'learn'; }
 
-const sessions = json('arcade.v1.sessions', []);
-const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const dayLabel = t => new Date(t).toLocaleDateString(undefined,{month:'numeric',day:'numeric'});
-const fullDate = t => new Date(t).toLocaleDateString(undefined,{month:'short',day:'numeric'});
-const avg = a => a.length ? a.reduce((x,y)=>x+y,0)/a.length : null;
+async function renderKid(kid, character){
+  const sessions = await listSessions(kid.id, 100).catch(() => []);
 
-/* ---- pretty-print a fact id ("7x8" -> "7 × 8", "15-6" -> "15 − 6") ---- */
-const KIND_NAMES = {
-  mul:'Multiplying', div:'Dividing', add:'Adding big numbers', sub:'Subtracting big numbers',
-  skip2:'Counting by 2s', skip5:'Counting by 5s', skip10:'Counting by 10s',
-  after:'What comes after', before:'What comes before',
-  biggest:'Which is biggest', smallest:'Which is smallest'
-};
-function prettyFact(id){
-  if (KIND_NAMES[id]) return KIND_NAMES[id];
-  if (id.includes('x')) return id.replace('x',' × ');
-  if (id.includes('+')) return id.replace('+',' + ');
-  if (/^\d+-\d+$/.test(id)) return id.replace('-',' − ');
-  return id;
-}
+  // ---- lifetime XP/coins by game, split practice vs fun ----
+  const byGame = character?.lifetime?.byGame || {};
+  const rows = Object.entries(byGame)
+    .map(([id, v]) => ({ id, name: gameName(id), kind: gameKind(id), ...v }))
+    .sort((a, b) => (b.xp || 0) - (a.xp || 0));
+  const tally = { learn: { xp:0, coins:0 }, fun: { xp:0, coins:0 } };
+  rows.forEach((r) => { tally[r.kind].xp += r.xp || 0; tally[r.kind].coins += r.coins || 0; });
 
-/* ---- build one kid's numbers ---------------------------------------- */
-function summarise(kid){
-  const mine  = sessions.filter(s => s.who === kid.who).sort((a,b)=>a.t-b.t);
-  const facts = json(kid.slug + '.v1.facts', {});
-  const practice = Object.entries(facts)
-    .filter(([,r]) => r && r.w > 0)
-    .sort((a,b) => b[1].w - a[1].w || b[1].m - a[1].m)
-    .slice(0,6)
-    .map(([id,r]) => ({ id, misses:r.m||0, seen:r.n||0 }));
-  const tracked  = Object.keys(facts).length;
-  const mastered = Object.values(facts).filter(r => r && r.w === 0 && r.n >= 2).length;
+  const weekAgo = Date.now() - 7 * 86400000;
+  const week = sessions.filter((s) => (s.playedAt || 0) >= weekAgo);
+  const weekMin = Math.round(week.reduce((a, s) => a + (s.seconds || 0), 0) / 60);
+  const weekLearnXp = week.filter((s) => s.kind === 'learn').reduce((a, s) => a + (s.xpEarned || 0), 0);
+  const weekFunXp   = week.filter((s) => s.kind === 'fun').reduce((a, s) => a + (s.xpEarned || 0), 0);
 
-  const recent = mine.slice(-RECENT_N);
-  const prior  = mine.slice(-RECENT_N*2, -RECENT_N);
-  const recentAcc = avg(recent.map(s=>s.acc));
-  const priorAcc  = avg(prior.map(s=>s.acc));
+  const gameTable = rows.length ? `
+    <table>
+      <tr><th>Game</th><th></th><th class="num">Runs</th><th class="num">XP</th><th class="num">Coins</th></tr>
+      ${rows.map((r) => `<tr>
+        <td>${esc(r.name)}</td>
+        <td><span class="tag ${r.kind}">${r.kind === 'learn' ? 'practice' : 'fun'}</span></td>
+        <td class="num">${fmt(r.runs)}</td><td class="num">${fmt(r.xp)}</td><td class="num">${fmt(r.coins)}</td>
+      </tr>`).join('')}
+      <tr class="total"><td>Practice total</td><td></td><td></td>
+        <td class="num">${fmt(tally.learn.xp)}</td><td class="num">${fmt(tally.learn.coins)}</td></tr>
+      <tr class="total"><td>Just-for-fun total</td><td></td><td></td>
+        <td class="num">${fmt(tally.fun.xp)}</td><td class="num">${fmt(tally.fun.coins)}</td></tr>
+    </table>
+    <p class="ratio">${ratioLine(tally)}</p>`
+    : '<p class="muted">No games finished yet — this fills in as soon as a run is played to the end.</p>';
 
-  const records = [];
-  for (const [tk,tn] of Object.entries(kid.topics))
-    for (const [mk,mn] of Object.entries(kid.modes)){
-      const raw = store.get(`${kid.slug}.v1.${tk}.${mk}`);
-      if (raw !== null) records.push({ label:`${tn} · ${mn}`, value:parseFloat(raw)+kid.unit[mk] });
-    }
+  const sessionTable = sessions.length ? `
+    <details>
+      <summary>Recent sessions (${sessions.length}${sessions.length === 100 ? ', newest 100' : ''})</summary>
+      <table style="margin-top:8px">
+        <tr><th>Date</th><th>Game</th><th class="num">Correct</th><th class="num">Min</th><th class="num">XP</th><th class="num">Coins</th></tr>
+        ${sessions.map((s) => `<tr>
+          <td>${dateOf(s.playedAt)}</td>
+          <td>${esc(gameName(s.gameId))} <span class="tag ${s.kind === 'fun' ? 'fun' : 'learn'}">${s.kind === 'fun' ? 'fun' : 'practice'}</span></td>
+          <td class="num">${s.asked ? `${s.correct}/${s.asked} (${Math.round((s.accuracy || 0) * 100)}%)` : '—'}</td>
+          <td class="num">${Math.round((s.seconds || 0) / 60)}</td>
+          <td class="num">${fmt(s.xpEarned)}</td><td class="num">${fmt(s.coinsEarned)}</td>
+        </tr>`).join('')}
+      </table>
+    </details>` : '';
 
-  return {
-    kid, sessions:mine, facts, practice, tracked, mastered, records,
-    recentAcc, priorAcc,
-    totalQ: mine.reduce((n,s)=>n+(s.correct||0)+(s.wrong||0), 0),
-    comebacks: mine.reduce((n,s)=>n+(s.comebacks||0), 0),
-    last: mine.length ? mine[mine.length-1].t : null,
-  };
-}
-
-/* ---- render ---------------------------------------------------------- */
-function bars(d){
-  const shown = d.sessions.slice(-CHART_N);
-  if (!shown.length) return '';
-  // label the first, last, best and worst only — a number on every bar is noise
-  const accs = shown.map(s=>s.acc);
-  const keep = new Set([0, shown.length-1, accs.indexOf(Math.max(...accs)), accs.indexOf(Math.min(...accs))]);
-  const rows = shown.map((s,i) => {
-    const h = Math.max(2, s.acc);                       // 0–100% maps straight to height
-    const label = keep.has(i) ? `<span class="lab">${s.acc}%</span>` : '';
-    const tip = `${fullDate(s.t)} · ${esc(s.topic)} ${esc(d.kid.modes[s.mode]||s.mode)}\n`
-              + `${s.correct} right, ${s.wrong} wrong (${s.acc}%)`;
-    return `<div class="bar ${d.kid.cls}" data-tip="${esc(tip)}">
-              ${label}<div class="fill" style="height:${h}%"></div>
-            </div>`;
-  }).join('');
-  const axis = shown.map(s=>`<span>${dayLabel(s.t)}</span>`).join('');
-  return `
-    <p class="chartTitle">Accuracy per session — last ${shown.length}
-      <span style="font-weight:400;color:var(--text-muted)">· hover a bar for detail</span></p>
-    <div class="chart">
-      <div class="gridline" style="bottom:100%"><span>100%</span></div>
-      ${rows}
+  return `<div class="card">
+    <div class="kid-head">
+      <h2>${esc(kid.nickname)}</h2>
+      <span class="kid-meta">Level ${character?.level || 1}
+        · ${fmt(character?.xp)} XP · ${fmt(character?.coins)} coins
+        · ${character?.dayStreak ? character.dayStreak + '-day streak' : 'no streak yet'}
+        · ${character?.uniqueSprites || 0}/60 sprites</span>
     </div>
-    <div class="axis">${axis}</div>`;
-}
-
-function deltaHtml(d){
-  if (d.recentAcc === null) return '';
-  if (d.priorAcc === null) return `<span class="delta flat">no earlier sessions to compare yet</span>`;
-  const diff = Math.round(d.recentAcc - d.priorAcc);
-  if (diff > 1)  return `<span class="delta up">▲ ${diff} pts vs the ${RECENT_N} before</span>`;
-  if (diff < -1) return `<span class="delta down">▼ ${Math.abs(diff)} pts vs the ${RECENT_N} before</span>`;
-  return `<span class="delta flat">about the same as the ${RECENT_N} before</span>`;
-}
-
-function card(d){
-  const k = d.kid;
-  const colour = k.cls === 'miles' ? 'var(--series-2)' : 'var(--series-1)';
-  const head = `<div class="kidHead"><span class="swatch" style="background:${colour}"></span>
-                  <h2>${k.who}</h2><span class="game">${k.game}</span></div>`;
-
-  if (!d.sessions.length){
-    return `<div class="card">${head}
-      <p class="empty">No finished games yet. Scores appear here once <b>${k.who}</b> plays a
-      round all the way to the end on this computer.</p></div>`;
-  }
-
-  const stats = [
-    ['Sessions', d.sessions.length],
-    ['Questions', d.totalQ],
-    ['Mastered', d.mastered],
-    ['Comebacks', d.comebacks],
-    ['Last played', fullDate(d.last)],
-  ].map(([kk,v]) => `<div class="stat"><div class="v">${v}</div><div class="k">${kk}</div></div>`).join('');
-
-  const recs = d.records.length
-    ? `<h3>Personal bests</h3><div class="facts">` +
-      d.records.map(r=>`<span class="fact">${esc(r.label)} <b>${esc(r.value)}</b></span>`).join('') +
-      `</div>`
-    : '';
-
-  const prac = d.practice.length
-    ? `<h3>Working on these</h3><div class="facts">` +
-      d.practice.map(p=>`<span class="fact"><b>${esc(prettyFact(p.id))}</b><i>${p.misses} miss${p.misses===1?'':'es'}</i></span>`).join('') +
-      `</div><p class="note">The game shows these more often than the rest — but only about
-       a third of questions, so a round never turns into all hard stuff.</p>`
-    : `<h3>Working on these</h3><p class="empty">Nothing on the practice list — everything
-       missed recently has been answered correctly since.</p>`;
-
-  const table = `<details><summary>All ${d.sessions.length} sessions</summary>
-    <table><thead><tr><th>Date</th><th>What</th><th>Right</th><th>Wrong</th><th>Accuracy</th></tr></thead>
-    <tbody>${d.sessions.slice().reverse().map(s=>`<tr>
-      <td>${fullDate(s.t)}</td><td>${esc(s.topic)} · ${esc(k.modes[s.mode]||s.mode)}</td>
-      <td>${s.correct}</td><td>${s.wrong}</td><td>${s.acc}%</td></tr>`).join('')}
-    </tbody></table></details>`;
-
-  return `<div class="card">${head}
-    <div class="hero"><span class="big">${Math.round(d.recentAcc)}%</span>${deltaHtml(d)}</div>
-    <div class="heroLabel">accuracy across his last ${Math.min(RECENT_N,d.sessions.length)} session${d.sessions.length===1?'':'s'}</div>
-    <div class="stats">${stats}</div>
-    ${bars(d)}
-    <div class="practice">${recs}${prac}</div>
-    ${table}
+    <div class="split">
+      <div class="box"><b>${weekMin} min</b><span>played in the last 7 days</span></div>
+      <div class="box"><b>${fmt(weekLearnXp)} XP</b><span>from practice games this week</span></div>
+      <div class="box"><b>${fmt(weekFunXp)} XP</b><span>from fun games this week</span></div>
+    </div>
+    ${gameTable}
+    ${sessionTable}
   </div>`;
 }
 
-/* ---- plain-text version for email / clipboard ------------------------ */
-function textReport(all){
-  const lines = ['ARCADE PROGRESS — ' + new Date().toLocaleDateString(), ''];
-  for (const d of all){
-    lines.push(`${d.kid.who.toUpperCase()} (${d.kid.game})`);
-    if (!d.sessions.length){ lines.push('  No finished games yet.', ''); continue; }
-    lines.push(`  Accuracy, last ${Math.min(RECENT_N,d.sessions.length)}: ${Math.round(d.recentAcc)}%`
-      + (d.priorAcc !== null ? ` (was ${Math.round(d.priorAcc)}%)` : ''));
-    lines.push(`  Sessions: ${d.sessions.length}   Questions: ${d.totalQ}   Last played: ${fullDate(d.last)}`);
-    lines.push(`  Facts mastered: ${d.mastered}   Comebacks: ${d.comebacks}`);
-    if (d.records.length) lines.push('  Bests: ' + d.records.map(r=>`${r.label} ${r.value}`).join(' | '));
-    lines.push('  Working on: ' + (d.practice.length
-      ? d.practice.map(p=>`${prettyFact(p.id)} (${p.misses})`).join(', ')
-      : 'nothing — practice list is clear'));
-    lines.push('');
-  }
-  lines.push('Sent from the Arcade parent report.');
-  return lines.join('\n');
+function ratioLine(tally){
+  if (!tally.fun.xp && !tally.learn.xp) return '';
+  if (!tally.fun.xp) return 'All earnings so far are from practice games.';
+  if (!tally.learn.xp) return 'All earnings so far are from fun games — the 4× practice bonus hasn’t kicked in yet.';
+  const r = (tally.learn.xp / tally.fun.xp).toFixed(1);
+  return `Practice games have paid ${r}× the XP of fun games — the 4× weighting ${r >= 2 ? 'is doing its job' : 'hasn’t tipped the balance yet'}.`;
 }
 
-/* ---- go -------------------------------------------------------------- */
-const all = KIDS.map(summarise);
-const played = all.filter(d => d.sessions.length);
-document.getElementById('report').innerHTML = all.map(card).join('');
-document.getElementById('sub').textContent = played.length
-  ? `${played.length === 2 ? 'Both boys' : played[0].kid.who} have played ${sessions.length} recorded session${sessions.length===1?'':'s'} on this browser.`
-  : 'Nothing recorded yet on this browser.';
-
-const text = textReport(all);
-document.getElementById('emailBtn').onclick = () => {
-  const subject = 'Arcade progress — ' + new Date().toLocaleDateString();
-  window.location.href = `mailto:${PARENT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`;
-};
-document.getElementById('copyBtn').onclick = async (e) => {
-  try { await navigator.clipboard.writeText(text); }
-  catch(err){
-    const ta = document.createElement('textarea');
-    ta.value = text; document.body.appendChild(ta); ta.select();
-    try { document.execCommand('copy'); } catch(e2){}
-    ta.remove();
+async function renderFamily(){
+  const kidsEl = $('kids');
+  kidsEl.innerHTML = '<div class="card muted">Loading the family’s progress…</div>';
+  const [children, characters] = await Promise.all([
+    listChildren().catch(() => []),
+    listFamilyCharacters().catch(() => []),
+  ]);
+  if (!children.length){
+    kidsEl.innerHTML = '<div class="card muted">No child profiles yet — add the kids on the arcade sign-in screen.</div>';
+    return;
   }
-  e.target.textContent = 'Copied!';
-  setTimeout(()=>{ e.target.textContent = 'Copy as text'; }, 1600);
-};
-document.getElementById('printBtn').onclick = () => window.print();
-document.getElementById('note').innerHTML =
-  `Everything here is stored in this browser only — nothing is uploaded anywhere. ` +
-  `<b>Email this to me</b> opens your mail app with the report already written out, ` +
-  `ready to address and send. If the boys play in different browsers or ` +
-  `profiles, each one keeps its own separate history.`;
+  const blocks = await Promise.all(children.map((kid) =>
+    renderKid(kid, characters.find((c) => c.childId === kid.id))));
+  kidsEl.innerHTML = blocks.join('');
+  renderLegacyOffer(children);
+}
 
-/* ---- hover tooltips on the bars -------------------------------------- */
-const tip = document.getElementById('tip');
-document.addEventListener('mouseover', e => {
-  const bar = e.target.closest('.bar');
-  if (!bar) return;
-  tip.textContent = bar.dataset.tip;
-  tip.style.whiteSpace = 'pre-line';
-  tip.style.opacity = '1';
+/* ---------------- the one-time legacy import ----------------
+   arcade.v1.sessions predates profiles: no child attribution, no XP.
+   Never guess how to split it — the parent assigns the WHOLE log to one
+   child, or discards it. Either answer is final for this browser. */
+const LEGACY_KEY = 'arcade.v1.sessions';
+const LEGACY_GAME_IDS = { 'Math Defender': 'math-defender', 'Coin Climb': 'coin-climb' };
+
+function readLegacy(){
+  try {
+    const list = JSON.parse(localStorage.getItem(LEGACY_KEY) || '[]');
+    return Array.isArray(list) && list.length ? list : null;
+  } catch(e){ return null; }
+}
+
+function renderLegacyOffer(children){
+  const legacy = readLegacy();
+  if (!legacy){ $('legacyCard').classList.add('hidden'); return; }
+  $('legacyCard').classList.remove('hidden');
+  const games = [...new Set(legacy.map((e) => e.game))].join(', ');
+  $('legacyDesc').textContent = ` ${legacy.length} finished game${legacy.length === 1 ? '' : 's'} (${games}). `;
+  const btns = $('legacyBtns');
+  btns.innerHTML = '';
+  for (const kid of children){
+    const b = document.createElement('button');
+    b.className = 'plain';
+    b.textContent = `This was ${kid.nickname}`;
+    b.onclick = () => importLegacy(kid, legacy);
+    btns.appendChild(b);
+  }
+  const d = document.createElement('button');
+  d.className = 'plain';
+  d.textContent = 'Discard it';
+  d.onclick = () => {
+    if (!confirm('Delete the old un-attributed play log from this computer? This can’t be undone.')) return;
+    localStorage.removeItem(LEGACY_KEY);
+    $('legacyStatus').textContent = 'Old log discarded.';
+    $('legacyBtns').innerHTML = '';
+  };
+  btns.appendChild(d);
+}
+
+async function importLegacy(kid, legacy){
+  if (!confirm(`Assign all ${legacy.length} old sessions to ${kid.nickname}? The other child’s report will not include them.`)) return;
+  $('legacyBtns').innerHTML = '';
+  $('legacyStatus').textContent = 'Importing…';
+  try {
+    const uid = auth.currentUser.uid;
+    const ref = collection(db, 'families', uid, 'children', kid.id, 'sessions');
+    // Firestore batches cap at 500 writes; the log caps itself at 80.
+    const batch = writeBatch(db);
+    for (const e of legacy){
+      const asked = (e.correct || 0) + (e.wrong || 0);
+      batch.set(doc(ref), {
+        gameId: LEGACY_GAME_IDS[e.game] || String(e.game || 'unknown').toLowerCase().replace(/\s+/g, '-'),
+        kind: 'learn',
+        asked, correct: e.correct || 0,
+        accuracy: asked ? Math.round((e.correct / asked) * 100) / 100 : 0,
+        seconds: 0,                       // the old log never recorded time
+        score: Number(e.score) || 0,
+        xpEarned: 0, coinsEarned: 0,      // predates the economy — history only
+        playedAt: Timestamp.fromMillis(e.t || Date.now()),
+        importedFromLegacyLog: true,
+      });
+    }
+    await batch.commit();
+    localStorage.removeItem(LEGACY_KEY);
+    $('legacyStatus').textContent = `Done — ${legacy.length} sessions now in ${kid.nickname}'s history.`;
+    renderFamily();
+  } catch (err) {
+    $('legacyStatus').textContent = 'Import failed — check the internet and try again.';
+    renderLegacyOffer(await listChildren().catch(() => []));
+  }
+}
+
+/* ---------------- auth flow ---------------- */
+onParentChange(async (user) => {
+  $('loading').classList.add('hidden');
+  if (!user){
+    $('gate').classList.remove('hidden');
+    $('report').classList.add('hidden');
+    return;
+  }
+  $('gate').classList.add('hidden');
+  $('report').classList.remove('hidden');
+  $('who').textContent = user.email || 'your family account';
+  renderFamily();
 });
-document.addEventListener('mousemove', e => {
-  if (tip.style.opacity !== '1') return;
-  const pad = 14;
-  tip.style.left = Math.min(e.clientX + pad, window.innerWidth - tip.offsetWidth - 8) + 'px';
-  tip.style.top  = Math.max(8, e.clientY - tip.offsetHeight - pad) + 'px';
-});
-document.addEventListener('mouseout', e => {
-  if (e.target.closest('.bar')) tip.style.opacity = '0';
-});
+
+$('refreshBtn').addEventListener('click', renderFamily);
 </script>
 </body>
 </html>

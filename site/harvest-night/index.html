@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Harvest Night</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/arcade.css">
 <style>
   html, body { margin:0; padding:0; overflow:hidden; background:#05050a; height:100%; }
   canvas#game { display:block; width:100vw; height:100vh; outline:none; }
@@ -18,6 +22,59 @@
   }
 }
 </script>
-<script type="module" src="src/main.js"></script>
+<script type="module">
+/* The game only boots once two gates pass:
+   1. requireKid — a profile is picked, so the run can save to a character.
+   2. canPointerLock — a REAL capability check, not a screen-size guess.
+      Harvest Night needs the mouse captured to look around; no mobile
+      browser supports Pointer Lock, so on a tablet the game literally
+      cannot take input. Better to say so kindly than load it anyway.  */
+import { requireKid, mountBar, canPointerLock, finishRun, celebrateLevelUp, describeAward }
+  from '../assets/arcade-shell.js';
+
+const kid = await requireKid({ gameName: 'Harvest Night' });
+if (kid) {
+  if (!canPointerLock()) {
+    document.body.innerHTML = '';
+    document.body.className = 'ac-page';
+    const gate = document.createElement('div');
+    gate.className = 'ac-gate';
+    gate.innerHTML = `
+      <span class="ac-gate__emoji">\u{1F47B}</span>
+      <h2>This one needs a computer</h2>
+      <p>Harvest Night uses the mouse to look around, and this screen doesn't have one —
+         try it on the laptop!</p>
+      <a class="ac-btn ac-btn--inline" href="../index.html">Back to the arcade</a>`;
+    document.body.appendChild(gate);
+  } else {
+    // The bar floats over the 3D view but only while the mouse is free —
+    // it hides itself the moment pointer lock starts (Esc brings it back).
+    const { bar } = await mountBar({ title: 'Harvest Night' });
+    Object.assign(bar.style, { position: 'fixed', top: '10px', left: '10px', right: '10px', zIndex: 60, margin: '0' });
+    document.addEventListener('pointerlockchange', () => {
+      bar.style.display = document.pointerLockElement ? 'none' : '';
+    });
+
+    // Winning fires this event from objectives.js. 10 units per key found
+    // plus 20 for escaping; the fun-game daily cap does the clamping.
+    document.addEventListener('harvest:won', async (e) => {
+      const { keys, seconds } = e.detail;
+      const outcome = await finishRun('harvest-night', {
+        units: keys * 10 + 20, seconds: Math.round(seconds), score: keys,
+      });
+      const win = document.getElementById('winScreen');
+      if (win) {
+        const award = document.createElement('div');
+        award.style.cssText = 'color:#ffd23f;font-weight:800;font-size:18px;';
+        award.textContent = describeAward(outcome);
+        win.insertBefore(award, win.querySelector('button'));
+      }
+      celebrateLevelUp(outcome);
+    });
+
+    await import('./src/main.js');
+  }
+}
+</script>
 </body>
 </html>

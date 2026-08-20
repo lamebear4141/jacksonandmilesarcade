@@ -1,15 +1,19 @@
 /* =====================================================================
    LOOT DROP — screens, navigation, boot
    ===================================================================== */
-import { CONFIG, RARITY, RARITY_ORDER, SPRITES, SKINS, PETS, GRADES, levelFromXp } from './config.js';
+import { CONFIG, RARITY, RARITY_ORDER, SPRITES, SKINS, PETS, levelFromXp } from './config.js';
 import * as S from './state.js';
 import * as G from './game.js';
 import * as Speech from './speech.js';
 import { playMinigame, randomMinigame } from './minigames.js';
+import { requireKid, mountBar, celebrateLevelUp } from '../../assets/arcade-shell.js';
+import { clearCurrentKid } from '../../firebase-config.js';
 
 const $ = id => document.getElementById(id);
-let ALL = S.loadAll();
-let WHO = null;
+let ALL = null;      // { profiles: { [childId]: sessionProfile } }
+let WHO = null;      // the signed-in child's id
+let KID = null;      // { id, nickname }
+let ROUND_SNAP = null;   // character snapshot from the start of the round
 const P = () => ALL.profiles[WHO];
 const save = () => S.saveAll(ALL);
 
@@ -18,31 +22,47 @@ function show(id){
   $(id).classList.add('on');
 }
 
-/* ============================ PROFILE ============================ */
-function renderProfilePick(){
+/* ==================== ONE-TIME MIGRATION OFFER ====================
+   The old lootdrop.v1 blob kept two profiles, miles and jackson. If it
+   exists, this child's character is still blank, and a profile hasn't
+   been claimed yet, ask WHICH old profile belongs to this kid. Never
+   guess — merge the wrong boy's collection and they both notice
+   immediately. */
+function renderMigration(offers){
+  $('profileTitle').textContent = 'BRING OVER YOUR OLD LOOT?';
+  $('incomingNote').textContent = `${KID.nickname}, your old Loot Drop stuff is still here. Which one was yours?`;
   const box = $('profileCards');
   box.innerHTML = '';
-  ['miles','jackson'].forEach(who => {
-    const p = ALL.profiles[who], g = GRADES[who], li = S.levelInfo(p);
+  offers.forEach((o) => {
     const c = document.createElement('button');
     c.className = 'pcard';
-    c.style.borderColor = g.color;
-    c.innerHTML = `<div class="pglyph">${skinGlyph(p)}</div>
-      <div class="pname" style="color:${g.color}">${g.name}</div>
-      <div class="pmeta">Grade ${g.grade} · Level ${li.level}</div>
-      <div class="pmeta">${S.uniqueSprites(p)}/${SPRITES.length} sprites · 🔥 ${S.dayStreak(p)}</div>`;
-    c.onclick = () => { WHO = who; renderLobby(); show('scrLobby'); };
+    c.innerHTML = `<div class="pglyph">🎒</div>
+      <div class="pname">${o.name}'s loot</div>
+      <div class="pmeta">Level ${o.level} · 🪙 ${o.coins}</div>
+      <div class="pmeta">${o.sprites} sprites collected</div>`;
+    c.onclick = async () => {
+      box.innerHTML = '<div class="tiny">Bringing it all over…</div>';
+      const res = await S.migrateLegacy(KID, P(), o.who);
+      if (res.ok){ renderLobby(); show('scrLobby'); }
+      else { renderLobby(); show('scrLobby'); }
+    };
     box.appendChild(c);
   });
+  const fresh = document.createElement('button');
+  fresh.className = 'pcard';
+  fresh.innerHTML = `<div class="pglyph">✨</div>
+    <div class="pname">Start fresh</div>
+    <div class="pmeta">None of these are mine</div>`;
+  fresh.onclick = () => { S.declineMigration(KID); renderLobby(); show('scrLobby'); };
+  box.appendChild(fresh);
 }
 function skinGlyph(p){ return (SKINS.find(s => s.id === p.skin) || SKINS[0]).g; }
 function petGlyph(p){ return (PETS.find(s => s.id === p.pet) || PETS[0]).g; }
 
 /* ============================= LOBBY ============================= */
 function renderLobby(){
-  const p = P(), g = GRADES[WHO], li = S.levelInfo(p);
-  $('lobbyName').textContent = g.name;
-  $('lobbyName').style.color = g.color;
+  const p = P(), li = S.levelInfo(p);
+  $('lobbyName').textContent = p.name;
   $('lobbyAvatar').textContent = skinGlyph(p);
   $('lobbyPet').textContent = petGlyph(p);
   $('lobbyLevel').textContent = 'LEVEL ' + li.level;
@@ -104,6 +124,7 @@ function luckHint(p){
 
 /* ============================== PLAY ============================= */
 function beginRound(mode){
+  ROUND_SNAP = S.takeSnapshot(P());
   show('scrPlay');
   $('playPet').textContent = petGlyph(P());
   $('playAvatar').textContent = skinGlyph(P());
@@ -121,6 +142,16 @@ function handleFinish(res){
   }
   save();
   renderResult(res);
+  // Push the round's exact delta to the shared character in the
+  // background — the end screen never waits on the network.
+  if (ROUND_SNAP){
+    const snap = ROUND_SNAP; ROUND_SNAP = null;
+    S.syncRoundToCharacter(KID, P(), snap, {
+      asked: res.round.attempted, correct: res.round.correct,
+      seconds: res.seconds, score: Math.round(res.accuracy * 100),
+    }).then((outcome) => { celebrateLevelUp(outcome); })
+      .catch(() => { /* offline round still played; character catches up next run */ });
+  }
 }
 
 function renderResult(res){
@@ -169,7 +200,9 @@ function renderResult(res){
   $('resMiniBtn').style.display = extracted ? '' : 'none';
   $('resRetryBtn').textContent = extracted ? 'Drop again' : 'Try again';
   show('scrResult');
-  S.downloadReport(ALL);
+  // (No auto-download here any more — it dropped a lootdrop-YYYY-MM-DD.json
+  // into the Downloads folder after every single round. The grown-up
+  // dashboard's "Save progress file" button still does it on demand.)
   Speech.speak(extracted ? 'Victory! You brought it all home.' : 'So close. Try again!', 1);
 }
 
@@ -177,7 +210,7 @@ function renderResult(res){
 function runMinigame(){
   show('scrMini');
   playMinigame(randomMinigame(), $('miniHost'), coins => {
-    P().coins += coins; save();
+    S.minigameCoins(KID, P(), coins); save();
     $('miniHost').innerHTML = `<div class="mg-title">+${coins} COINS</div>
       <div class="mg-sub">Spend them in the Item Shop.</div>`;
     setTimeout(() => { renderLobby(); show('scrLobby'); }, 1500);
@@ -187,7 +220,7 @@ function runMinigame(){
 /* ========================== COLLECTION =========================== */
 function renderCollection(){
   const p = P();
-  $('colTitle').textContent = `${GRADES[WHO].name}'s Collection`;
+  $('colTitle').textContent = `${p.name}'s Collection`;
   $('colScore').textContent = `Score ${S.collectionScore(p)} · ${S.uniqueSprites(p)}/${SPRITES.length} unique · ${S.totalSprites(p)} total`;
   const tally = S.rarityTally(p);
   $('colTally').innerHTML = RARITY_ORDER.map(r =>
@@ -210,38 +243,20 @@ function renderCollection(){
 
 /* ============================= SHOP ============================== */
 function renderShop(){
+  // The shop and locker live on Character Home now — one wallet, one
+  // place to buy and equip, shared by every game. This screen just
+  // points the way instead of duplicating it.
   const p = P();
   $('shopCoins').textContent = '🪙 ' + p.coins;
-  const un = S.unlockablesFor(p);
-  const build = (list, type) => list.map(i => {
-    const state = i.owned ? 'owned' : i.locked ? 'locked' : (p.coins >= i.cost ? 'buy' : 'poor');
-    const equipped = (type === 'skin' ? p.skin : p.pet) === i.id;
-    return `<button class="shop-item ${state}${equipped?' equipped':''}" data-type="${type}" data-id="${i.id}">
-      <div class="si-glyph">${i.g || '🚫'}</div>
-      <div class="si-name">${i.n}</div>
-      <div class="si-tag">${equipped ? 'EQUIPPED' : i.owned ? 'Tap to wear' : i.locked ? 'Level ' + i.level : '🪙 ' + i.cost}</div>
-    </button>`;
-  }).join('');
-  $('shopSkins').innerHTML = build(un.skins, 'skin');
-  $('shopPets').innerHTML  = build(un.pets, 'pet');
-
-  [...document.querySelectorAll('.shop-item')].forEach(btn => {
-    btn.onclick = () => {
-      const { type, id } = btn.dataset;
-      const owned = type === 'skin' ? p.ownedSkins.includes(id) : p.ownedPets.includes(id);
-      if (owned){ if (type === 'skin') p.skin = id; else p.pet = id; }
-      else {
-        const res = S.buy(p, type, id);
-        if (!res.ok){
-          $('shopMsg').textContent = res.why === 'coins' ? 'Not enough coins yet!'
-            : res.why === 'level' ? 'Level up to unlock this one.' : '';
-          setTimeout(()=>{ $('shopMsg').textContent=''; }, 1800);
-          return;
-        }
-      }
-      save(); renderShop();
-    };
-  });
+  $('shopMsg').textContent = '';
+  $('shopSkins').innerHTML = `
+    <a class="pcard" href="../index.html" style="text-decoration:none;display:block;text-align:center">
+      <div class="pglyph">🛒</div>
+      <div class="pname" style="font-size:18px">Skins &amp; pets moved to your Character!</div>
+      <div class="pmeta">Your coins work everywhere now. Buy and equip on your
+      Character page — tap here, then open SHOP or LOCKER.</div>
+    </a>`;
+  $('shopPets').innerHTML = '';
 }
 
 /* ============================ COMPARE ============================ */
@@ -250,13 +265,12 @@ function renderCompare(){
   const code = S.makeSquadCode(p);
   $('myCode').value = code;
   $('myLink').value = location.origin + location.pathname + '?squad=' + code;
-  const other = ALL.profiles[WHO === 'miles' ? 'jackson' : 'miles'];
-  // if the other brother plays on this same browser, compare directly
-  if (S.totalSprites(other) > 0) showCompare(summaryOf(p), summaryOf(other));
-  else $('cmpResult').innerHTML = '<div class="tiny">Paste your brother\'s squad code below to compare.</div>';
+  // Brothers now compare automatically on the family leaderboard back on
+  // Character Home; codes are for cousins and friends in OTHER families.
+  $('cmpResult').innerHTML = '<div class="tiny">Brothers: check the 🏆 tab on your Character page!<br>Got a cousin\'s squad code? Paste it below.</div>';
 }
 function summaryOf(p){
-  return { who:p.who, name:GRADES[p.who].name, level:S.levelInfo(p).level, streak:S.dayStreak(p),
+  return { who:p.who, name:p.name, level:S.levelInfo(p).level, streak:S.dayStreak(p),
            counts:p.counts, total:S.totalSprites(p), unique:S.uniqueSprites(p),
            score:S.collectionScore(p), rounds:p.lifetime.rounds };
 }
@@ -297,34 +311,37 @@ function exclusive(mine, theirs){
 
 /* ============================ PARENT ============================= */
 function renderParent(){
-  const rep = S.buildReport(ALL);
-  const rows = who => {
-    const d = rep.players[who];
+  const rep = S.buildReport(P());
+  const rows = () => {
+    const d = rep.player;
     const hist = d.history.map(h => `<tr><td>${h.date}</td><td>${Math.round(h.seconds/60)}m</td>
       <td>${h.correct}/${h.attempted}${h.attempted?` (${Math.round(h.correct/h.attempted*100)}%)`:''}</td>
       <td>${h.extracted}/${h.rounds}</td><td>${(h.missed||[]).slice(0,6).join(', ')||'—'}</td></tr>`).join('');
     return `<div class="par-block">
-      <h3>${d.name} — grade ${d.grade}</h3>
+      <h3>${d.name}</h3>
       <p class="tiny">Level ${d.level} · 🔥 ${d.dayStreak} day streak · ${d.collection.unique}/${d.collection.outOf} sprites ·
         lifetime accuracy ${d.lifetime.accuracyPct}% (reading ${d.lifetime.readingAccuracyPct ?? '—'}%, math ${d.lifetime.mathAccuracyPct ?? '—'}%)</p>
       <table class="par-table"><tr><th>Date</th><th>Time</th><th>Correct</th><th>Extracted</th><th>Missed</th></tr>${hist || '<tr><td colspan=5>No sessions yet</td></tr>'}</table>
     </div>`;
   };
-  $('parentBody').innerHTML = rows('miles') + rows('jackson');
+  $('parentBody').innerHTML = rows();
 }
 
 /* ============================= BOOT ============================== */
-export function boot(){
-  renderProfilePick();
+export async function boot(){
+  KID = await requireKid({ gameName: 'Loot Drop' });
+  if (!KID) return;
+  await mountBar({ title: 'Loot Drop' });
+
+  const profile = await S.initFor(KID);
+  ALL = { profiles: { [KID.id]: profile } };
+  WHO = KID.id;
 
   // deep-link compare: ?squad=CODE
   const q = new URLSearchParams(location.search).get('squad');
   if (q){
     const them = S.readSquadCode(q);
-    if (them){
-      $('incomingNote').textContent = `${them.name} shared a squad code — pick your player to compare.`;
-      window.__incoming = them;
-    }
+    if (them) window.__incoming = them;
   }
 
   $('btnDrop').onclick    = () => show('scrDrop');
@@ -348,7 +365,9 @@ export function boot(){
   $('btnCollection').onclick = () => { renderCollection(); show('scrCollection'); };
   $('btnShop').onclick       = () => { renderShop(); show('scrShop'); };
   $('btnCompare').onclick    = () => { renderCompare(); if (window.__incoming) showCompare(summaryOf(P()), window.__incoming); show('scrCompare'); };
-  $('btnSwitch').onclick     = () => { renderProfilePick(); show('scrProfile'); };
+  // Switching always routes back through the arcade's picker — a real
+  // kid re-enters their own PIN there.
+  $('btnSwitch').onclick     = () => { clearCurrentKid(); window.location.href = '../index.html'; };
 
   document.querySelectorAll('[data-home]').forEach(b => b.onclick = () => { renderLobby(); show('scrLobby'); });
 
@@ -361,10 +380,14 @@ export function boot(){
   $('copyLink').onclick = () => copy($('myLink'));
 
   $('grownup').onclick   = () => { renderParent(); show('scrParent'); };
-  $('parentSave').onclick= () => S.downloadReport(ALL);
+  $('parentSave').onclick= () => S.downloadReport(P());
 
   if (!Speech.hasMic) $('micNote').textContent = 'Tip: open in Chrome for read-aloud mode. Tap mode works everywhere.';
-  show('scrProfile');
+
+  const offers = S.migrationOffer(KID, P());
+  if (offers){ renderMigration(offers); show('scrProfile'); }
+  else if (window.__incoming){ renderCompare(); showCompare(summaryOf(P()), window.__incoming); show('scrCompare'); }
+  else { renderLobby(); show('scrLobby'); }
 }
 
 function confirmQuit(){ return true; }
