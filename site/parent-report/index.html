@@ -155,7 +155,7 @@
    Reads what the two games saved in this browser. No server, no account,
    nothing leaves the machine unless you press the email button.
    ===================================================================== */
-const PARENT_EMAIL = 'ajl5102@gmail.com';   // change this to send the report elsewhere
+const PARENT_EMAIL = '';   // left blank on purpose — fill in the To: field yourself when the mail app opens
 const RECENT_N     = 5;                     // sessions averaged for the headline number
 const CHART_N      = 10;                    // sessions shown in the bar chart
 
@@ -364,8 +364,8 @@ document.getElementById('copyBtn').onclick = async (e) => {
 document.getElementById('printBtn').onclick = () => window.print();
 document.getElementById('note').innerHTML =
   `Everything here is stored in this browser only — nothing is uploaded anywhere. ` +
-  `<b>Email this to me</b> opens your mail app with the report already written out to ` +
-  `${PARENT_EMAIL}; you still press send. If the boys play in different browsers or ` +
+  `<b>Email this to me</b> opens your mail app with the report already written out, ` +
+  `ready to address and send. If the boys play in different browsers or ` +
   `profiles, each one keeps its own separate history.`;
 
 /* ---- hover tooltips on the bars -------------------------------------- */
