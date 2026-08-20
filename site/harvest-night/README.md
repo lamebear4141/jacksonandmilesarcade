@@ -38,7 +38,7 @@ Being built phase by phase per `HARVEST_NIGHT_spec.md`, §10:
 
 - [x] Phase 1 — The farm (world, lighting, fog, player movement, footsteps)
 - [x] Phase 2 — The job (keys, ladders, gate hold-to-unlock, win screen)
-- [ ] Phase 3 — The scarecrow (model, AI, stalking rule)
+- [x] Phase 3 — The scarecrow (model, dormant/awakened/stalking states, only-moves-when-unseen rule)
 - [ ] Phase 4 — The scare (jump scare, GOTCHA screen)
 - [ ] Phase 5 — The tension (flashlight, lanterns, hiding, heartbeat)
 - [ ] Phase 6 — The juice (ambience, particles, polish)

@@ -363,13 +363,19 @@ export function buildWorld(scene) {
     const colorA = new THREE.Color('#6b5a2a');
     const colorB = new THREE.Color('#4a3f1d');
     const cx = 0, cz = 26, cw = 34, cd = 22;
-    const spacing2 = 1.1;
+    // Spacing/jitter/width are tuned so there's no straight-line gap all the way through
+    // the field: worst case, two adjacent grid columns' stalks can still jitter into each
+    // other's territory, so no exact x (or z) value can thread the whole field unobstructed.
+    // (A too-tidy grid with modest jitter leaves lanes a dead-straight raycast can sneak
+    // through — including x=0, which is exactly the driveway/spawn approach into the corn.)
+    const spacing2 = 1.0;
+    const jitter = 0.5; // +/- range per axis
     const cells = [];
     for (let x = cx - cw / 2; x <= cx + cw / 2; x += spacing2) {
       for (let z = cz - cd / 2; z <= cz + cd / 2; z += spacing2) {
         const dx = x, dz = z - 30; // small clearing around the scarecrow post
         if (Math.sqrt(dx * dx + dz * dz) < 3) continue;
-        cells.push([x + (Math.random() - 0.5) * 0.5, z + (Math.random() - 0.5) * 0.5]);
+        cells.push([x + (Math.random() - 0.5) * jitter * 2, z + (Math.random() - 0.5) * jitter * 2]);
       }
     }
     const corn = new THREE.InstancedMesh(stalkGeo, stalkMat, cells.length);

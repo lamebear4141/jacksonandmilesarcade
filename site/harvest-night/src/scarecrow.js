@@ -220,6 +220,11 @@ export class Scarecrow {
   }
 
   update(dt, camera, player) {
+    // player.object is the yaw rig the camera is nested inside (yaw -> pitch -> camera).
+    // camera.matrixWorld is normally only refreshed by renderer.render(), which runs
+    // *after* this update in the game loop — without this, every frustum/occlusion
+    // check below would be reading last frame's camera orientation.
+    player.object.updateMatrixWorld(true);
     this.head.getWorldPosition(this._headWorldPos);
 
     if (this.state === STATE.DORMANT) {

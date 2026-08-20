@@ -39,7 +39,6 @@ const objectives = new Objectives({
   scene, keySpots, gate, colliders, hud, audio,
   onFirstKey: (p) => scarecrow.awaken(p),
 });
-window.__debug = { player, scene, camera, objectives, keySpots, scarecrow, renderer };
 
 // ---- Click-to-play overlay (pointer lock requires a user gesture) ----
 const overlay = document.createElement('div');
