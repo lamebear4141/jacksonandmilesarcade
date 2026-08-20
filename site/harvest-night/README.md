@@ -20,9 +20,12 @@ Then open `http://localhost:8000` in your browser.
 ## Controls
 
 - **Mouse** — look around (click the screen first to lock the pointer)
-- **WASD / Arrow keys** — move
+- **WASD** — move, strafe with A/D
+- **← / →** — turn (use this if your browser/environment refuses to grant pointer lock — some do, silently, even with a real mouse plugged in; you'll know it's happening if the cursor never disappears after you click)
+- **↑ / ↓** — same as W/S
 - **Shift** — sprint (drains stamina)
 - **C** — crouch
+- **E** — interact (take a key, hold at the gate)
 - **Esc** — release the mouse
 
 ## Tweaking the game

@@ -54,6 +54,7 @@ export const CONFIG = {
   // --- Look controls ---
   mouse: {
     sensitivity: 0.0022,
+    keyTurnSpeed: 2.4,  // radians/sec when turning with the ← → arrow keys instead of the mouse
   },
 
   // --- Head bob / camera feel while moving ---

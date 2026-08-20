@@ -25,7 +25,10 @@ export class Player {
     // into the farm, matching the spec.
     this.yawObject.rotation.y = Math.PI;
 
-    this.input = { forward: false, back: false, left: false, right: false, sprint: false, interact: false };
+    this.input = {
+      forward: false, back: false, left: false, right: false, sprint: false, interact: false,
+      turnLeft: false, turnRight: false,
+    };
     this.locked = false;
     this.crouching = false;
     this.frozen = false; // set true to stop taking input (e.g. once the player has won)
@@ -72,8 +75,13 @@ export class Player {
     switch (code) {
       case 'KeyW': case 'ArrowUp': this.input.forward = down; break;
       case 'KeyS': case 'ArrowDown': this.input.back = down; break;
-      case 'KeyA': case 'ArrowLeft': this.input.left = down; break;
-      case 'KeyD': case 'ArrowRight': this.input.right = down; break;
+      case 'KeyA': this.input.left = down; break;
+      case 'KeyD': this.input.right = down; break;
+      // Arrow left/right turn the camera instead of strafing — a keyboard-only
+      // fallback for browsers/environments that refuse the Pointer Lock API
+      // (some do, silently, even with a real mouse plugged in).
+      case 'ArrowLeft': this.input.turnLeft = down; break;
+      case 'ArrowRight': this.input.turnRight = down; break;
       case 'ShiftLeft': case 'ShiftRight': this.input.sprint = down; break;
       case 'KeyE': this.input.interact = down; break;
       case 'KeyC': if (down) this.crouching = !this.crouching; break;
@@ -147,6 +155,10 @@ export class Player {
 
   update(dt) {
     if (this.frozen) return;
+
+    // Keyboard turning (see _setKey) — works whether or not the mouse is pointer-locked.
+    if (this.input.turnLeft) this.yawObject.rotation.y += CONFIG.mouse.keyTurnSpeed * dt;
+    if (this.input.turnRight) this.yawObject.rotation.y -= CONFIG.mouse.keyTurnSpeed * dt;
 
     this._updateLadder(dt);
 

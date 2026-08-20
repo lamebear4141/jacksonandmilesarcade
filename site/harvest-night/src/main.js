@@ -46,7 +46,7 @@ Object.assign(overlay.style, {
   fontSize: '22px', letterSpacing: '1px', cursor: 'pointer', zIndex: 100, textAlign: 'center',
 });
 overlay.innerHTML = 'CLICK TO ENTER THE FARM' +
-  '<span style="font-size:13px;opacity:0.7;letter-spacing:0.5px">WASD move &middot; Shift sprint &middot; C crouch &middot; mouse to look</span>';
+  '<span style="font-size:13px;opacity:0.7;letter-spacing:0.5px">WASD move &middot; Shift sprint &middot; C crouch &middot; mouse to look (or &larr; &rarr; to turn if your browser blocks mouse look)</span>';
 document.body.appendChild(overlay);
 
 // Hide the overlay on click regardless of whether the browser actually grants
