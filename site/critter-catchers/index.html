@@ -1,777 +1,1412 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/arcade.css">
-<title>Critter Catchers — Reading Quest</title>
+<title>Critter Catchers — Bedtime Stories</title>
 <style>
   :root{
-    --sky1:#3d5afe; --sky2:#7c4dff; --grass:#2fb872;
-    --ink:#0d1b3e; --paper:#ffffff;
-    --gold:#ffc53d; --good:#22c55e; --bad:#f97362;
-    --shadow:0 8px 0 rgba(0,0,0,.18);
+    /* the room at bedtime: indigo night outside, lamplight inside */
+    --night-top:#191734;
+    --night-mid:#241f47;
+    --night-bottom:#2e2557;
+    --lamp:#ffd9a0;
+    /* paper */
+    --cream:#fdf3dc;
+    --cream-edge:#e6d7b8;
+    --ink:#3a3020;
+    --ink-soft:#6b5a3c;
+    --panel:#2b2358;
+    --panel-edge:#171240;
+    --accent:#ffcf7d;
+    --accent-edge:#a97a30;
+    --sleep:#4f66b8;
+    --good:#2f7d4f;
+    --gold:#c9a227;
+    --serif:'Literata',Georgia,'Times New Roman',serif;
+    /* quilt scraps for the bedside vignettes */
+    --quilt-rose:#c98a8a; --quilt-sage:#8aa98a; --quilt-slate:#8a9ac9; --quilt-clay:#c9a98a;
   }
-  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
-  html,body{margin:0;padding:0;height:100%;}
-  body{
-    font-family:"Baloo 2","Trebuchet MS","Comic Sans MS",system-ui,sans-serif;
-    background:linear-gradient(180deg,var(--sky1),var(--sky2));
-    color:var(--ink);
-    display:flex;align-items:center;justify-content:center;
-    overflow:hidden;
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html{ margin:0; min-height:100%; background:var(--night-top); }
+  /* .ac-page is a class, so plain "body" loses to it — scope ours to match */
+  body, body.ac-page{
+    margin:0; min-height:100%;
+    background:linear-gradient(180deg,var(--night-top) 0%,var(--night-mid) 55%,var(--night-bottom) 100%);
+    background-attachment:fixed;
+    font-family:'Baloo 2','Trebuchet MS',sans-serif;
+    color:#f4f0ff; touch-action:manipulation; user-select:none;
   }
-  #app{
-    width:min(760px,100vw); height:min(900px,100vh);
-    background:linear-gradient(180deg,#8ed7ff 0%,#bde9ff 46%,var(--grass) 46%,#249b5c 100%);
-    position:relative; overflow:hidden;
-    display:flex; flex-direction:column;
-    box-shadow:0 20px 60px rgba(0,0,0,.35);
-  }
-  .screen{position:absolute;inset:0;display:none;flex-direction:column;padding:14px;}
-  .screen.on{display:flex;}
+  .wrap{ max-width:680px; margin:0 auto; padding:12px 14px 60px; }
+  .hidden{ display:none !important; }
 
-  /* ---------- shared bits ---------- */
+  h1.title{ text-align:center; font-family:var(--serif); font-weight:700;
+            font-size:clamp(23px,5.6vw,33px); margin:8px 0 4px; letter-spacing:0.2px;
+            color:#fff4d6; text-shadow:0 2px 6px rgba(0,0,0,0.6), 0 0 30px rgba(255,214,140,0.28); }
+  /* a soft gold flourish under the title, like a chapter rule */
+  h1.title::after{ content:''; display:block; width:min(190px,52%); height:2px; margin:9px auto 0;
+    background:linear-gradient(90deg, transparent, var(--gold) 18%, #ffe9b0 50%, var(--gold) 82%, transparent);
+    border-radius:2px; opacity:0.9; }
+  /* the intro line sits on the open sky, so it gets a soft ink panel to sit on
+     instead of trying to out-shout the stars behind it */
+  p.sub{ text-align:center; color:#fdf3dc; margin:0 auto 18px; font-size:15px;
+         font-weight:700; line-height:1.5; max-width:34em;
+         background:rgba(16,13,40,0.62); border-radius:14px; padding:9px 16px;
+         box-shadow:inset 0 0 0 1px rgba(255,232,180,0.16); }
+
+  /* ---------- the night outside the window ---------- */
+  .stars{ position:fixed; inset:0; pointer-events:none; z-index:0; }
+  .stars i{ position:absolute; width:3px; height:3px; border-radius:50%;
+            background:#fff; opacity:0.5; animation:twinkle 3s infinite; }
+  .stars i:nth-child(3n){ width:2px; height:2px; }
+  .stars i:nth-child(5n){ width:4px; height:4px; box-shadow:0 0 6px rgba(255,255,255,0.6); }
+  @keyframes twinkle{ 0%,100%{opacity:0.2} 50%{opacity:0.85} }
+  /* a real crescent: a disc with a bite taken out by a mask, so the glow
+     follows the curve instead of ringing a full circle */
+  .moonWrap{ position:fixed; top:22px; right:6%; width:88px; height:88px; z-index:0; pointer-events:none;
+             filter:drop-shadow(0 0 22px rgba(255,232,168,0.45)) drop-shadow(0 0 60px rgba(255,232,168,0.18)); }
+  .moonDecor{ width:100%; height:100%; border-radius:50%;
+    background:radial-gradient(circle at 34% 34%, #fff9e6, #ffeab4 58%, #f0d288);
+    -webkit-mask-image:radial-gradient(circle at 74% 28%, transparent 45%, #000 46%);
+            mask-image:radial-gradient(circle at 74% 28%, transparent 45%, #000 46%); }
+  /* warm lamplight spilling down behind the header */
+  .lamplight{ position:fixed; top:-70px; left:50%; transform:translateX(-50%);
+    width:min(760px,116%); height:360px; z-index:0; pointer-events:none;
+    background:radial-gradient(ellipse 58% 52% at 50% 34%,
+      rgba(255,217,160,0.20), rgba(255,217,160,0.06) 46%, transparent 72%); }
+  .hills{ position:fixed; left:0; right:0; bottom:0; height:110px; z-index:0; pointer-events:none;
+    background:
+      radial-gradient(130% 95px at 12% 100%, #191344 60%, transparent 61%),
+      radial-gradient(140% 115px at 68% 100%, #150f3a 60%, transparent 61%),
+      radial-gradient(120% 80px at 102% 100%, #1c1548 60%, transparent 61%); }
+  .wrap, .screen{ position:relative; z-index:1; }
+
+  /* ---------- generic buttons ---------- */
   .btn{
-    border:none; border-radius:18px; padding:14px 22px;
-    font:inherit; font-weight:800; font-size:20px; color:#fff;
-    background:#2563eb; box-shadow:var(--shadow); cursor:pointer;
-    transition:transform .08s ease;
+    background:linear-gradient(180deg,#ffe1a8,var(--accent)); color:#4a3208;
+    border:none; padding:14px 28px; border-radius:999px;
+    font-family:inherit; font-weight:800; font-size:17px;
+    box-shadow:0 5px 0 var(--accent-edge); cursor:pointer; margin:5px;
   }
-  .btn:active{transform:translateY(4px); box-shadow:0 4px 0 rgba(0,0,0,.18);}
-  .btn.big{font-size:26px; padding:18px 34px; border-radius:24px;}
-  .btn.green{background:var(--good);}
-  .btn.gold{background:var(--gold); color:#4a3200;}
-  .btn.ghost{background:rgba(255,255,255,.9); color:var(--ink); box-shadow:0 6px 0 rgba(0,0,0,.12);}
-  .btn:disabled{opacity:.45; cursor:default;}
-  .card{background:var(--paper); border-radius:22px; padding:16px; box-shadow:0 10px 0 rgba(0,0,0,.12);}
+  .btn:active{ box-shadow:0 2px 0 var(--accent-edge); transform:translateY(3px); }
+  .btn.soft{ background:var(--panel); color:var(--cream); box-shadow:0 5px 0 var(--panel-edge); }
+  .btn.soft:active{ box-shadow:0 2px 0 var(--panel-edge); }
+  .btn.mini{ font-size:13px; padding:9px 18px; }
 
-  /* ---------- title ---------- */
-  #title{align-items:center; justify-content:center; text-align:center; gap:6px;}
-  #title h1{font-size:46px; margin:0; color:#fff; text-shadow:0 5px 0 rgba(0,0,0,.25); line-height:1;}
-  #title .sub{color:#fff; font-size:20px; font-weight:700; opacity:.95; margin-bottom:6px;}
-  .parade{font-size:44px; letter-spacing:4px;}
-  #streakBadge{
-    background:rgba(255,255,255,.95); border-radius:999px; padding:8px 18px;
-    font-weight:800; font-size:18px; box-shadow:0 5px 0 rgba(0,0,0,.15);
+  /* ---------- den (critter select) ---------- */
+  .denGrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:14px; }
+  .critterCard{
+    position:relative; overflow:hidden;
+    background:linear-gradient(168deg,#fffaea 0%, var(--cream) 62%, #f6e9c9 100%);
+    border-radius:16px; padding:0 0 12px; text-align:center; cursor:pointer;
+    box-shadow:0 5px 0 var(--cream-edge), 0 10px 22px rgba(0,0,0,0.38);
+    border:none; color:var(--ink); font-family:inherit;
+    transition:transform 0.18s ease;
+  }
+  .critterCard:active{ transform:translateY(3px); box-shadow:0 2px 0 var(--cream-edge), 0 6px 14px rgba(0,0,0,0.35); }
+  /* the corner ribbon carries the arcade's rarity color */
+  .critterCard .ribbon{
+    position:absolute; top:11px; right:-32px; width:116px; transform:rotate(34deg);
+    background:var(--rc); color:#241a10; font-size:9.5px; font-weight:800;
+    letter-spacing:0.8px; text-transform:uppercase; padding:3px 0; z-index:2;
+    box-shadow:0 1px 4px rgba(0,0,0,0.35);
+  }
+  /* the bedside scene: lamplit wall, critter, quilt pulled across the bottom */
+  .critterCard .vignette{
+    position:relative; display:block; height:92px; overflow:hidden;
+    background:radial-gradient(ellipse 70% 90% at 50% 8%, #fff6dd, #f3e4bf 70%, #e9d7ac);
+    border-bottom:1px solid rgba(58,48,32,0.10);
+  }
+  .critterCard .vignette .face{
+    position:absolute; left:50%; bottom:20px; transform:translateX(-50%);
+    font-size:44px; line-height:1; transition:transform 0.4s ease, filter 0.4s ease;
+  }
+  .critterCard .vignette .quilt{
+    position:absolute; left:-4px; right:-4px; bottom:0; height:26px;
+    background:var(--quilt);
+    border-top:3px solid rgba(255,255,255,0.45);
+    box-shadow:inset 0 4px 8px rgba(0,0,0,0.12);
+    transition:height 0.4s ease;
+  }
+  /* hand-stitching along the top of the quilt */
+  .critterCard .vignette .quilt::before{
+    content:''; position:absolute; left:0; right:0; top:5px; height:2px;
+    background:repeating-linear-gradient(90deg, rgba(255,255,255,0.75) 0 6px, transparent 6px 12px);
+  }
+  .critterCard .vignette .zz{
+    position:absolute; right:20px; top:12px; font-family:var(--serif); font-weight:700;
+    font-size:15px; color:var(--sleep); opacity:0; transition:opacity 0.4s ease;
+  }
+  .critterCard .nm{ display:block; margin:9px 9px 0; font-family:var(--serif);
+                    font-weight:700; font-size:15.5px; line-height:1.2; color:var(--ink); }
+  .critterCard .pl{ display:block; margin:4px 10px 0; font-size:11.5px; color:var(--ink-soft);
+                    min-height:28px; line-height:1.35; font-weight:600; }
+  .critterCard .caught{ display:inline-block; margin-top:7px; font-size:11.5px; font-weight:800;
+                        background:rgba(79,102,184,0.14); color:var(--sleep);
+                        border-radius:999px; padding:2px 11px; }
+  .critterCard .prog{ display:block; margin:9px 12px 0; }
+  .critterCard .prog .track{ height:9px; border-radius:999px; overflow:hidden;
+                             background:#e3d3ad;
+                             box-shadow:inset 0 1px 2px rgba(58,48,32,0.35); }
+  .critterCard .prog .fill{ display:block; height:100%; border-radius:999px;
+                            box-shadow:inset 0 -2px 3px rgba(0,0,0,0.18); transition:width 0.5s ease; }
+  .critterCard .prog .lbl{ display:block; margin-top:5px; font-size:12px; font-weight:800;
+                           color:#6b4f1d; letter-spacing:0.1px; min-height:16px; white-space:nowrap; }
+  /* collected: the quilt comes up, the critter tips over, the Zz appear */
+  .critterCard.collected .vignette .quilt{ height:44px; }
+  .critterCard.collected .vignette .face{ transform:translateX(-50%) rotate(-72deg) translateY(6px); filter:saturate(0.85); }
+  .critterCard.collected .vignette .zz{ opacity:0.85; }
+  .critterCard.collected .prog .lbl{ color:var(--sleep); }
+  .critterCard.collected .nm{ color:#4a4030; }
+  .starBanner{ position:relative; max-width:560px; margin:0 auto 16px; text-align:center;
+               font-weight:800; font-size:14px; line-height:1.45;
+               background:linear-gradient(180deg,#ffdf9c,#f0bd5c); color:#4a3208;
+               border-radius:10px 10px 0 0; padding:11px 20px 26px;
+               clip-path:polygon(0 0, 100% 0, 100% 100%, 50% 84%, 0 100%);
+               filter:drop-shadow(0 4px 8px rgba(0,0,0,0.35)); }
+  .confetti{ position:absolute; top:-12px; font-size:17px; pointer-events:none; z-index:5;
+             animation:confFall 2s linear forwards; }
+  @keyframes confFall{ from{ transform:translateY(-16px) rotate(0); opacity:1; }
+                       to{ transform:translateY(330px) rotate(540deg); opacity:0; } }
+  .denFoot{ text-align:center; margin-top:20px; color:#cfc4ee; font-size:13px; }
+
+  /* ---------- bookshelf (story pick) ---------- */
+  .shelf{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; }
+  .bookCard{
+    border:none; font-family:inherit; cursor:pointer; text-align:center;
+    border-radius:12px 18px 18px 12px; padding:18px 12px;
+    color:#fff8e8; box-shadow:0 5px 0 rgba(0,0,0,0.35), inset 6px 0 0 rgba(0,0,0,0.25);
+    min-height:130px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
+  }
+  .bookCard:active{ transform:translateY(3px); }
+  .bookCard .be{ font-size:34px; }
+  .bookCard .bt{ font-weight:800; font-size:14.5px; line-height:1.25; }
+  .bookCard .bp{ font-size:11.5px; opacity:0.85; }
+  .bookCard.done .bp::after{ content:' · ⭐ read it!'; }
+  /* a book that stars the critter the child picked */
+  .bookCard.starring{ box-shadow:0 5px 0 rgba(0,0,0,0.35), inset 6px 0 0 rgba(0,0,0,0.25),
+                                0 0 0 2px #ffd76a; }
+  .bookCard .bstar{ font-size:10.5px; font-weight:800; line-height:1.3;
+                    background:#ffd76a; color:#3a2a12;
+                    border-radius:999px; padding:2px 9px; margin-bottom:2px; }
+
+  /* ---------- the reading screen ---------- */
+  /* bedside scene */
+  .scene{
+    position:relative; height:120px; border-radius:18px; overflow:hidden;
+    background:linear-gradient(180deg,#161235,#332a63);
+    box-shadow:inset 0 0 0 3px rgba(255,255,255,0.06);
+    margin-bottom:12px;
+  }
+  .scene .moonMeter{ position:absolute; top:10px; right:12px; text-align:center; }
+  .scene .moonMeter .m{ font-size:30px; display:block; filter:drop-shadow(0 0 6px rgba(255,240,180,0.5)); }
+  .scene .moonMeter .t{ font-size:10px; color:#cfc6ec; letter-spacing:1px; font-weight:700; }
+  .scene .bed{ position:absolute; left:24px; bottom:8px; font-size:40px; }
+  .scene .critter{
+    position:absolute; left:38px; bottom:18px; font-size:44px;
+    transition:transform 0.5s;
+    transform-origin:50% 90%;
+  }
+  .scene .zzz{ position:absolute; left:96px; bottom:66px; font-size:16px; color:var(--sleep);
+               font-weight:800; letter-spacing:2px; }
+  .scene .lamp{ position:absolute; right:70px; bottom:8px; font-size:28px;
+                filter:drop-shadow(0 0 16px rgba(255,217,160,0.65)); }
+  .scene .sceneMsg{ position:absolute; left:0; right:0; bottom:4px; text-align:center;
+                    font-size:13px; font-weight:700; color:#ffe9b0; text-shadow:0 2px 3px rgba(0,0,0,0.6); }
+
+  .critter.wiggle{ animation:wiggle 0.7s; }
+  @keyframes wiggle{ 0%,100%{transform:rotate(0)} 25%{transform:rotate(-14deg)} 75%{transform:rotate(14deg)} }
+  .critter.sleepy1{ transform:rotate(-8deg) translateY(3px); }
+  .critter.sleepy2{ transform:rotate(-16deg) translateY(6px); }
+  .critter.sleepy3{ transform:rotate(-24deg) translateY(9px) scale(0.96); }
+  .critter.asleep{ transform:rotate(-86deg) translateY(14px) translateX(-4px); }
+
+  /* ---------- the open book: cream paper, stacked page edges, a ribbon ---------- */
+  .book{
+    background:linear-gradient(160deg,#fffdf4 0%, #fbf3dc 70%, #f3e6c4 100%);
+    color:var(--ink);
+    border-radius:6px 16px 16px 6px;
+    border-left:10px solid #7a4b2a;                       /* leather spine */
+    box-shadow:
+      -13px 3px 0 -1px #e6d9ba, -16px 6px 0 -2px #d9cba8, -19px 9px 0 -3px #ccbd97,  /* the pages beneath */
+      0 18px 40px rgba(0,0,0,0.5);
+    padding:20px 22px 14px; position:relative; min-height:250px;
+    perspective:900px;
+  }
+  .book::before{ content:''; position:absolute; inset:0 auto 0 0; width:26px; pointer-events:none;
+    background:linear-gradient(90deg, rgba(122,75,42,0.16), transparent); border-radius:6px 0 0 6px; }
+  .book::after{ content:''; position:absolute; top:-6px; right:26px; width:15px; height:50px; pointer-events:none;
+    background:linear-gradient(180deg,#e0525e,#b23440);
+    clip-path:polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%); }
+
+  .storyText{
+    font-family:var(--serif); text-align:center;
+    line-height:1.75; font-weight:500; color:var(--ink); padding:8px 2px 2px;
+  }
+  .storyText.lv1{ font-size:clamp(21px,5.6vw,27px); }
+  .storyText.lv2{ font-size:clamp(17px,4.5vw,21.5px); }
+  .storyText .w{ border-radius:6px; padding:0 3px; cursor:pointer; transition:background 0.25s,color 0.25s; }
+  .storyText .w:active{ background:#efe2bd; }
+  .storyText .w.hit{ background:#ffe9a8; color:#7a5200; }
+  .storyText .w.helping{ outline:2px dashed #d9a520; outline-offset:2px; background:#fff3c9; }
+  .tapHint{ text-align:center; font-size:11.5px; color:var(--ink-soft); margin-top:10px; font-style:italic; }
+  .pageNum{ text-align:center; font-family:var(--serif); font-style:italic;
+            font-size:12.5px; color:var(--ink-soft); margin-top:6px; }
+
+  /* the sound-it-out bubble */
+  .wordHelp{ margin:10px auto 0; text-align:center; background:#fff8e2;
+    border:2px solid var(--gold); border-radius:14px; padding:8px 16px;
+    width:max-content; max-width:100%; box-shadow:0 3px 0 #d8b64e; }
+  .wordHelp .chunk{ font-family:var(--serif); font-weight:700; font-size:23px; color:#8a6a20;
+                    padding:0 2px; opacity:0.4; display:inline-block; transition:all 0.2s; }
+  .wordHelp .chunk.lit{ opacity:1; color:#c07f00; transform:scale(1.12); }
+  .wordHelp .cdot{ color:#d0b060; margin:0 4px; font-size:20px; }
+  .wordHelp .whole{ display:block; margin-top:2px; font-family:var(--serif); font-weight:700;
+                    font-size:16px; color:#6b5a2e; opacity:0.4; transition:opacity 0.2s; }
+  .wordHelp .whole.lit{ opacity:1; color:var(--ink); }
+
+  /* ---------- the cover: a proper little storybook ---------- */
+  .bookCover{ text-align:center; padding:2px 0 8px; }
+  .coverFrame{ border-radius:10px; padding:20px 16px 18px; position:relative; color:#fff6df;
+    box-shadow:inset 0 0 0 3px rgba(255,224,130,0.9), inset 0 0 0 6px rgba(0,0,0,0.18),
+               inset 0 0 0 9px rgba(255,224,130,0.4), 0 4px 0 rgba(0,0,0,0.2); }
+  .cover-dragon .coverFrame{ background:linear-gradient(165deg,#93362a,#5c1e17 80%); }
+  .cover-royal  .coverFrame{ background:linear-gradient(165deg,#6a3d99,#3a2057 80%); }
+  .cover-night  .coverFrame{ background:linear-gradient(165deg,#2e3f86,#19224e 80%); }
+  .cover-silly  .coverFrame{ background:linear-gradient(165deg,#1f7d72,#113f38 80%); }
+  .coverFrame .fl{ position:absolute; font-size:13px; color:#ffe082; opacity:0.9; pointer-events:none; }
+  .coverFrame .fl.tl{ top:12px; left:14px; } .coverFrame .fl.tr{ top:12px; right:14px; }
+  .coverFrame .fl.bl{ bottom:12px; left:14px; } .coverFrame .fl.br{ bottom:12px; right:14px; }
+  .coverArt{ position:relative; height:112px; margin:6px auto 12px; width:min(250px,82%);
+    background:radial-gradient(circle at 50% 62%, #fff8e0, #f0e2b8 78%);
+    border-radius:125px 125px 14px 14px;                  /* arched picture plate */
+    box-shadow:inset 0 0 0 3px #caa64e, 0 3px 0 rgba(0,0,0,0.25); overflow:hidden; }
+  .coverArt .a{ position:absolute; }
+  .coverArt .a0{ font-size:52px; left:50%; top:54%; transform:translate(-50%,-50%); animation:bobC 3.4s ease-in-out infinite; }
+  .coverArt .a1{ font-size:26px; left:16%; top:26%; animation:bob 3.4s 0.7s ease-in-out infinite; }
+  .coverArt .a2{ font-size:26px; right:15%; top:52%; animation:bob 3.4s 1.4s ease-in-out infinite; }
+  @keyframes bobC{ 0%,100%{ transform:translate(-50%,-50%);} 50%{ transform:translate(-50%,calc(-50% - 6px));} }
+  @keyframes bob{ 0%,100%{ transform:translateY(0);} 50%{ transform:translateY(-7px);} }
+  .bookCover .tt{ font-family:var(--serif); font-weight:700; font-size:clamp(20px,5vw,26px);
+                  line-height:1.25; margin:4px 10px; color:#fff3c4; text-shadow:0 2px 0 rgba(0,0,0,0.35); }
+  .bookCover .ts{ font-family:var(--serif); font-style:italic; font-size:14px; color:#e9d9a8; }
+  .coverBtns{ margin-top:14px; }
+
+  .pageFx{ animation:turnIn 0.45s ease; }
+  @keyframes turnIn{ from{ transform:rotateY(-70deg); opacity:0; } to{ transform:rotateY(0); opacity:1; } }
+
+  .dots{ text-align:center; margin-top:10px; font-size:13px; letter-spacing:4px; color:#b9a97f; }
+  .dots b{ color:#e0a010; }
+
+  /* ---------- under the book: kudos, turn-page, questions ---------- */
+  .readControls{ text-align:center; margin-top:14px; min-height:96px; }
+  .kudos{ display:flex; align-items:center; justify-content:center; gap:10px;
+    width:max-content; max-width:100%; margin:4px auto 0;
+    background:linear-gradient(180deg,#fff2c0,#ffd970); color:#6b4a00;
+    border-radius:999px; padding:10px 24px; font-weight:800; font-size:17px;
+    box-shadow:0 4px 0 #d8a520, 0 0 24px rgba(255,220,120,0.35);
+    animation:kudosIn 0.5s cubic-bezier(.2,1.6,.4,1); }
+  .kudos .kStar{ font-size:24px; animation:starSpin 0.8s ease; }
+  @keyframes kudosIn{ from{ transform:scale(0.4); opacity:0; } to{ transform:scale(1); opacity:1; } }
+  @keyframes starSpin{ from{ transform:rotate(-170deg) scale(0.3); } to{ transform:rotate(0) scale(1); } }
+  .turnBtn{ display:block; margin:12px auto 0; font-size:19px; padding:15px 36px;
+            animation:kudosIn 0.4s 0.1s backwards; }
+
+  .feedback{ min-height:24px; text-align:center; font-weight:800; font-size:15.5px; margin-top:8px; }
+  .feedback.good{ color:var(--good); }
+  .feedback.soft{ color:#ffce7a; }
+  .micState{ font-size:13px; color:#b7abdd; margin-top:4px; min-height:18px; }
+  .micState .dot{ display:inline-block; width:9px; height:9px; border-radius:50%;
+                  background:#ff6b6b; margin-right:6px; animation:pulse 1s infinite; }
+  @keyframes pulse{ 0%,100%{opacity:0.4} 50%{opacity:1} }
+
+  .qBox{ margin-top:4px; }
+  .qBox .q{ font-weight:800; font-size:17px; margin-bottom:10px; }
+  .qChoices{ display:grid; gap:9px; max-width:440px; margin:0 auto; }
+  .qc{
+    border:none; font-family:inherit; cursor:pointer;
+    background:var(--panel); color:#efe9ff; font-weight:700; font-size:15.5px;
+    padding:12px 14px; border-radius:13px; box-shadow:0 4px 0 var(--panel-edge);
+  }
+  .qc:active{ transform:translateY(3px); box-shadow:0 1px 0 var(--panel-edge); }
+  .qc.right{ background:linear-gradient(180deg,#9cf07f,#3fb96f); color:#08331a; box-shadow:0 4px 0 #1c7a45; }
+  .qc.wrong{ background:linear-gradient(180deg,#ffa896,#e35a5a); color:#4a0d0d; box-shadow:0 4px 0 #9c1f1f; }
+
+  /* ---------- results ---------- */
+  .resultCard{
+    background:linear-gradient(168deg,#fffaea 0%, var(--cream) 60%, #f6e9c9 100%);
+    color:var(--ink); border-radius:20px; padding:26px 20px; text-align:center;
+    box-shadow:0 6px 0 var(--cream-edge), 0 14px 30px rgba(0,0,0,0.42);
+    margin-top:10px; position:relative; overflow:hidden;
+  }
+  .resultCard h2{ margin:4px 0 6px; font-family:var(--serif); font-weight:700; font-size:24px; color:var(--ink); }
+  .resultCard .bigFace{ font-size:74px; display:inline-block; position:relative; }
+  .resultCard .line{ color:var(--ink-soft); font-size:15px; margin:5px 0; font-weight:600; }
+  .awardLine{ margin-top:10px; font-weight:800; color:#8a5a00; font-size:16px; min-height:22px; }
+  .newFriend{ display:inline-block; margin-top:9px; font-weight:800; color:#1e5c39;
+              background:rgba(47,125,79,0.14); border-radius:999px; padding:5px 16px; }
+  .favLine{ color:#8a5a00; font-weight:700; font-size:14px; margin-top:6px; }
+  .starLine{ margin-top:8px; font-weight:800; color:#6b4f1d; font-size:14.5px; }
+
+  /* sleeping */
+  .asleepFace{ transform:rotate(-88deg); }
+  .floatZ{ position:absolute; font-family:var(--serif); font-weight:700; color:var(--sleep);
+             animation:zfloat 2.4s infinite; opacity:0; }
+  @keyframes zfloat{
+    0%{ transform:translate(0,0) scale(0.7); opacity:0; }
+    25%{ opacity:0.9; }
+    100%{ transform:translate(26px,-56px) scale(1.35); opacity:0; }
   }
 
-  /* ---------- HUD ---------- */
-  #hud{display:flex; gap:8px; align-items:center; justify-content:space-between; flex:0 0 auto;}
-  .chip{
-    background:rgba(255,255,255,.94); border-radius:999px; padding:6px 14px;
-    font-weight:800; font-size:16px; box-shadow:0 4px 0 rgba(0,0,0,.12); white-space:nowrap;
-  }
-  #bar{height:12px; background:rgba(255,255,255,.5); border-radius:999px; overflow:hidden; margin-top:8px; flex:0 0 auto;}
-  #barFill{height:100%; width:0%; background:var(--gold); transition:width .35s ease;}
+  /* ---------- silly antics ---------- */
+  .anticStage{ position:relative; height:120px; margin:6px auto 2px; width:220px; }
+  .anticStage .aFace{ position:absolute; left:50%; bottom:6px; transform:translateX(-50%); font-size:64px; }
+  .anticStage .prop{ position:absolute; font-size:26px; }
 
-  /* ---------- play area ---------- */
-  #stage{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; margin:10px 0; min-height:0;}
-  #critter{font-size:96px; line-height:1; filter:drop-shadow(0 10px 6px rgba(0,0,0,.25)); transition:transform .3s ease, opacity .3s ease;}
-  #critter.catch{transform:scale(.1) rotate(360deg); opacity:0;}
-  #critterName{color:#fff; font-weight:900; font-size:20px; text-shadow:0 3px 0 rgba(0,0,0,.25);}
-  #prompt{
-    width:100%; background:var(--paper); border-radius:22px; padding:14px 16px;
-    box-shadow:0 8px 0 rgba(0,0,0,.14); text-align:center; overflow-y:auto; min-height:0;
-  }
-  #taskLabel{font-size:15px; font-weight:800; color:#6b7ba8; text-transform:uppercase; letter-spacing:1px;}
-  #word{font-size:56px; font-weight:900; letter-spacing:2px; margin:6px 0 2px; word-break:break-word;}
-  #word .seg{display:inline-block; padding:0 2px;}
-  #word .seg.v{color:#e2413a;}
-  #sentence{font-size:30px; font-weight:800; line-height:1.35; margin:6px 0;}
-  #story{font-size:22px; font-weight:700; line-height:1.5; text-align:left; margin:4px 0 10px;}
-  #question{font-size:26px; font-weight:900; margin:4px 0 8px;}
-  #choices{display:flex; flex-direction:column; gap:10px; margin-top:8px;}
-  .choice{
-    border:none; border-radius:16px; padding:14px; font:inherit; font-weight:800; font-size:26px;
-    background:#eef2ff; color:var(--ink); box-shadow:0 6px 0 #c7d2fe; cursor:pointer;
-  }
-  .choice:active{transform:translateY(3px); box-shadow:0 3px 0 #c7d2fe;}
-  .choice.right{background:#bbf7d0; box-shadow:0 6px 0 #4ade80;}
-  .choice.wrong{background:#fecdd3; box-shadow:0 6px 0 #fb7185;}
-  #controls{display:flex; gap:10px; align-items:center; justify-content:center; flex-wrap:wrap; flex:0 0 auto; padding-bottom:6px;}
-  #micBtn{background:#e11d48; font-size:24px; padding:16px 30px; border-radius:999px;}
-  #micBtn.live{animation:pulse .9s infinite;}
-  @keyframes pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.07);}}
-  #heard{color:#fff; font-weight:800; min-height:24px; text-align:center; text-shadow:0 2px 0 rgba(0,0,0,.25);}
-  #feedback{
-    position:absolute; inset:0; display:none; align-items:center; justify-content:center;
-    flex-direction:column; gap:6px; pointer-events:none; z-index:5;
-  }
-  #feedback.on{display:flex;}
-  #fbIcon{font-size:120px; animation:pop .4s ease;}
-  #fbText{font-size:34px; font-weight:900; color:#fff; text-shadow:0 4px 0 rgba(0,0,0,.3);}
-  @keyframes pop{0%{transform:scale(.3);}70%{transform:scale(1.15);}100%{transform:scale(1);}}
+  .antic-bounce .aFace{ animation:aBounce 0.55s infinite alternate cubic-bezier(.5,0,.5,1); }
+  @keyframes aBounce{ from{ bottom:4px; } to{ bottom:52px; } }
+  .antic-bounce .bedProp{ left:50%; transform:translateX(-50%); bottom:-6px; font-size:44px; }
 
-  /* ---------- report ---------- */
-  #report{overflow-y:auto; gap:10px; justify-content:center;}
-  #report h2{margin:4px 0; text-align:center; color:#fff; font-size:34px; text-shadow:0 4px 0 rgba(0,0,0,.25);}
-  .stats{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
-  .stat{background:#fff; border-radius:18px; padding:10px; text-align:center; box-shadow:0 6px 0 rgba(0,0,0,.12);}
-  .stat b{display:block; font-size:30px;}
-  .stat span{font-size:13px; font-weight:800; color:#6b7ba8;}
-  .dexgrid{display:flex; flex-wrap:wrap; gap:6px; justify-content:center; font-size:32px;}
-  .dexgrid .locked{opacity:.18; filter:grayscale(1);}
-  #saveNote{font-size:14px; color:#fff; text-align:center; font-weight:700; opacity:.9;}
-  .pill{display:inline-block; background:#fff3cd; border-radius:999px; padding:4px 12px; margin:3px; font-weight:800;}
-  .tiny{font-size:13px; color:#6b7ba8; font-weight:700;}
-  #grownup{position:absolute; bottom:8px; left:8px; z-index:9; background:rgba(255,255,255,.35);
-    border:none; border-radius:999px; width:30px; height:30px; font-size:14px; cursor:pointer; opacity:.6;}
-  #grownup:hover{opacity:1;}
-  #parent{overflow-y:auto; background:#f6f8ff;}
-  #parent table{width:100%; border-collapse:collapse; font-size:14px;}
-  #parent th,#parent td{padding:6px; border-bottom:1px solid #e2e8f0; text-align:left;}
+  .antic-socks .aFace{ animation:aSway 1.2s infinite alternate ease-in-out; }
+  @keyframes aSway{ from{ transform:translateX(-50%) rotate(-7deg);} to{ transform:translateX(-50%) rotate(7deg);} }
+  .antic-socks .s1{ animation:orbit1 1.2s infinite linear; left:40%; top:10px; }
+  .antic-socks .s2{ animation:orbit2 1.2s infinite linear; left:55%; top:2px; }
+  .antic-socks .s3{ animation:orbit3 1.2s infinite linear; left:48%; top:18px; }
+  @keyframes orbit1{ 0%{transform:translate(-30px,30px)} 25%{transform:translate(0,-12px)} 50%{transform:translate(30px,30px)} 75%{transform:translate(0,54px)} 100%{transform:translate(-30px,30px)} }
+  @keyframes orbit2{ 0%{transform:translate(30px,26px)} 25%{transform:translate(0,58px)} 50%{transform:translate(-30px,26px)} 75%{transform:translate(0,-14px)} 100%{transform:translate(30px,26px)} }
+  @keyframes orbit3{ 0%{transform:translate(0,-16px)} 25%{transform:translate(32px,28px)} 50%{transform:translate(0,60px)} 75%{transform:translate(-32px,28px)} 100%{transform:translate(0,-16px)} }
+
+  .antic-disco .aFace{ animation:aDisco 0.4s infinite alternate; }
+  @keyframes aDisco{ from{ transform:translateX(-58%) rotate(-10deg);} to{ transform:translateX(-42%) rotate(10deg);} }
+  .antic-disco .ball{ left:50%; transform:translateX(-50%); top:-6px; font-size:34px; animation:spin 2.2s infinite linear; }
+  @keyframes spin{ to{ transform:translateX(-50%) rotate(360deg);} }
+  .antic-disco .n1{ left:16%; top:38px; animation:zfloat 1.6s infinite; }
+  .antic-disco .n2{ left:76%; top:52px; animation:zfloat 1.9s 0.5s infinite; }
+
+  .antic-snack .aFace{ animation:aMunch 0.5s infinite alternate; }
+  @keyframes aMunch{ from{ transform:translateX(-50%) scale(1);} to{ transform:translateX(-50%) scale(1.06) rotate(-3deg);} }
+  .antic-snack .c1{ left:24%; top:66px; }
+  .antic-snack .c2{ left:66%; top:78px; font-size:18px; }
+  .antic-snack .c3{ left:52%; top:92px; font-size:13px; }
+
+  /* ---------- collection ---------- */
+  .dexGrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:10px; margin-top:10px; }
+  .dexCard{ background:linear-gradient(168deg,#fffaea,var(--cream)); color:var(--ink);
+            border-radius:13px; text-align:center; padding:12px 6px;
+            box-shadow:0 4px 0 var(--cream-edge), 0 7px 14px rgba(0,0,0,0.3); }
+  .dexCard .f{ font-size:36px; display:block; }
+  .dexCard .n{ font-family:var(--serif); font-size:12px; font-weight:700; margin-top:4px; display:block; }
+  .dexCard .c{ font-size:11px; color:var(--sleep); font-weight:800; }
+  .dexCard.mystery{ background:linear-gradient(168deg,#efe3c6,#e4d5b2); }
+  .dexCard.mystery .f{ filter:grayscale(0.75) brightness(0.92); opacity:0.8; }
+  .dexCard.mystery .n{ color:var(--ink-soft); }
+
+  .topStats{ display:flex; justify-content:center; gap:14px; margin:2px 0 14px; flex-wrap:wrap; }
+  .topStats .st{ background:var(--cream); color:var(--ink); border-radius:10px; padding:7px 15px;
+                 font-size:13.5px; font-weight:800;
+                 box-shadow:0 3px 0 var(--cream-edge), 0 5px 12px rgba(0,0,0,0.28); }
+  .topStats .st b{ color:#8a5a00; }
+
 </style>
 </head>
-<body>
-<div id="app">
+<body class="ac-page">
+<div class="stars" id="stars"></div>
+<div class="moonWrap"><div class="moonDecor"></div></div>
+<div class="lamplight"></div>
+<div class="hills"></div>
+<div class="wrap" id="app">
 
-  <!-- ============ TITLE ============ -->
-  <section id="title" class="screen on">
-    <div class="parade">🦊 🐲 🦉 🐢 🦋</div>
-    <h1>Critter Catchers</h1>
-    <div class="sub">Read the words → catch the critters!</div>
-    <div id="streakBadge">🔥 Day streak: 0</div>
-    <button class="btn big gold" id="startBtn">▶ Start Today's Quest</button>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
-      <button class="btn ghost" id="dexBtn">📖 My Critter Dex</button>
-      <button class="btn ghost" id="micTestBtn">🎤 Test my mic</button>
+  <!-- ================= DEN — pick a critter ================= -->
+  <section class="screen" id="denScreen">
+    <h1 class="title">🌙 Bedtime Stories</h1>
+    <p class="sub">Pick a sleepy friend and read them a story. If you read it well, they'll drift off to dreamland — and join your collection!</p>
+    <div class="topStats">
+      <span class="st">🌟 Collected: <b id="dexCount">0</b>/<span id="dexTotal">12</span></span>
+      <span class="st">📖 Stories read: <b id="storyCount">0</b></span>
     </div>
-    <div id="micStatus" style="color:#fff;font-weight:800;font-size:15px;min-height:22px"></div>
+    <div class="starBanner hidden" id="starBanner"></div>
+    <div class="denGrid" id="denGrid"></div>
+    <div class="denFoot">
+      <button class="btn soft mini" id="dexBtn">🏅 My collection</button>
+      <button class="btn soft mini" id="saveBtn">💾 Save progress file</button>
+    </div>
   </section>
 
-  <!-- ============ GAME ============ -->
-  <section id="game" class="screen">
-    <div id="hud">
-      <div class="chip" id="chipProgress">Critter 1 / 18</div>
-      <div class="chip" id="chipBalls">⭐ 0</div>
-      <div class="chip" id="chipStreak">🔥 0</div>
+  <!-- ================= BOOKSHELF — pick a story ================= -->
+  <section class="screen hidden" id="shelfScreen">
+    <h1 class="title" id="shelfTitle">Pick a story for Pip 🦊</h1>
+    <p class="sub" id="shelfSub">Which book should we read tonight?</p>
+    <div class="shelf" id="shelfGrid"></div>
+    <div style="text-align:center; margin-top:16px">
+      <button class="btn" id="surpriseBtn">✨ Surprise me!</button>
+      <br>
+      <button class="btn soft mini" id="shelfBack">← Different critter</button>
     </div>
-    <div id="bar"><div id="barFill"></div></div>
+  </section>
 
-    <div id="stage">
-      <div id="critter">🦊</div>
-      <div id="critterName">A wild Emberling appeared!</div>
-      <div id="prompt">
-        <div id="taskLabel">Read it out loud</div>
-        <div id="word"></div>
-        <div id="sentence"></div>
-        <div id="story"></div>
-        <div id="question"></div>
-        <div id="choices"></div>
+  <!-- ================= MODE — mic or quiet ================= -->
+  <section class="screen hidden" id="modeScreen">
+    <h1 class="title">How do you want to read?</h1>
+    <p class="sub">Both ways work great. Reading out loud uses the microphone.</p>
+    <div style="text-align:center; margin-top:20px">
+      <button class="btn" id="modeMic" style="font-size:19px; padding:18px 30px">🎤 Read out loud</button>
+      <br>
+      <button class="btn soft" id="modeQuiet" style="font-size:17px">🤫 Read quietly &amp; answer questions</button>
+    </div>
+  </section>
+
+  <!-- ================= BOOK — cover + pages ================= -->
+  <section class="screen hidden" id="bookScreen">
+    <div class="scene" id="scene">
+      <span class="lamp">🕯️</span>
+      <span class="bed">🛏️</span>
+      <span class="critter" id="sceneCritter">🦊</span>
+      <span class="zzz" id="sceneZzz"></span>
+      <div class="moonMeter"><span class="m" id="moonIcon">🌑</span><span class="t">SLEEPY-METER</span></div>
+      <div class="sceneMsg" id="sceneMsg"></div>
+    </div>
+
+    <div class="book">
+      <!-- cover: genre-tinted, gold-framed, with the story's own little scene -->
+      <div id="coverPage" class="bookCover cover-night">
+        <div class="coverFrame">
+          <span class="fl tl">✦</span><span class="fl tr">✦</span>
+          <span class="fl bl">✦</span><span class="fl br">✦</span>
+          <div class="coverArt" id="coverArt"></div>
+          <div class="tt" id="coverTitle">The Dragon Who Lost His Roar</div>
+          <div class="ts" id="coverSub">A bedtime story for Pip</div>
+          <div class="coverBtns">
+            <button class="btn" id="openBook">📖 Open the book</button>
+            <br>
+            <button class="btn soft mini" id="modeSwap">Change how you read</button>
+          </div>
+        </div>
+      </div>
+      <!-- a story page -->
+      <div id="storyPage" class="hidden">
+        <div class="storyText lv1" id="storyText"></div>
+        <div class="wordHelp hidden" id="wordHelp"></div>
+        <div class="tapHint">🔊 Tap any tricky word to hear it sounded out</div>
+        <div class="pageNum" id="pageNum">Page 1 of 4</div>
+      </div>
+      <div class="dots" id="pageDots"></div>
+    </div>
+
+    <div class="readControls" id="readControls">
+      <!-- mic: already listening — no start button to forget -->
+      <div id="micControls" class="hidden">
+        <div class="micState" id="micState"></div>
+        <button class="btn soft" id="micDone">✅ I read the whole page!</button>
+      </div>
+      <!-- quiet controls -->
+      <div id="quietControls" class="hidden">
+        <button class="btn" id="quietDone">📖 I read it!</button>
+      </div>
+      <!-- question -->
+      <div class="qBox hidden" id="qBox">
+        <div class="q" id="qText"></div>
+        <div class="qChoices" id="qChoices"></div>
+      </div>
+      <div class="feedback" id="feedback"></div>
+      <!-- the kudos stamp + the child turns the page themselves -->
+      <div class="kudos hidden" id="kudos"><span class="kStar">⭐</span><span id="kudosText"></span></div>
+      <button class="btn turnBtn hidden" id="nextBtn">Turn the page ➜</button>
+    </div>
+    <div style="text-align:center; margin-top:8px">
+      <button class="btn soft mini" id="closeBook">✕ Close the book</button>
+    </div>
+  </section>
+
+  <!-- ================= RESULT — asleep ================= -->
+  <section class="screen hidden" id="sleepScreen">
+    <div class="resultCard" id="sleepCard">
+      <span class="bigFace asleepFace" id="sleepFace">🦊</span>
+      <h2 id="sleepTitle">Pip fell asleep! 🌙</h2>
+      <div class="line" id="sleepLine">You read the whole story. Sweet dreams, Pip.</div>
+      <div class="favLine hidden" id="favLine">⭐ That's their favorite kind of story!</div>
+      <div class="starLine" id="starLine"></div>
+      <span class="newFriend hidden" id="newFriend">🎉 NEW FRIEND joined your collection!</span>
+      <div class="awardLine" id="awardLine"></div>
+      <div style="margin-top:16px">
+        <button class="btn" id="sleepAgain">📚 Read another story</button>
+        <button class="btn soft" id="sleepDex">🏅 My collection</button>
       </div>
     </div>
-
-    <div id="heard"></div>
-    <div id="controls">
-      <button class="btn" id="hearBtn">🔊 Hear it</button>
-      <button class="btn" id="micBtn">🎤 Read it!</button>
-      <button class="btn ghost" id="skipBtn">Skip ▸</button>
-    </div>
-
-    <div id="feedback"><div id="fbIcon">⭐</div><div id="fbText">Caught it!</div></div>
   </section>
 
-  <!-- ============ REPORT ============ -->
-  <section id="report" class="screen">
-    <h2>🏅 Great job!</h2>
-    <div class="stats">
-      <div class="stat"><b id="rAcc">0%</b><span>ACCURACY</span></div>
-      <div class="stat"><b id="rCaught">0</b><span>CAUGHT TODAY</span></div>
-      <div class="stat"><b id="rStreak">0</b><span>DAY STREAK</span></div>
-    </div>
-    <div class="card">
-      <div style="font-weight:900;font-size:18px">Today's critters</div>
-      <div class="dexgrid" id="rNewDex"></div>
-    </div>
-    <div class="card" id="practiceCard">
-      <div style="font-weight:900;font-size:18px">Words to practice 💪</div>
-      <div id="rMissed"></div>
-    </div>
-    <p id="awardLine" style="text-align:center;font-weight:900;color:#b8860b;min-height:1.3em"></p>
-    <div id="saveNote"></div>
-    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
-      <button class="btn gold" id="saveBtn">💾 Save my report</button>
-      <button class="btn ghost" id="homeBtn">🏠 Home</button>
+  <!-- ================= RESULT — still awake ================= -->
+  <section class="screen hidden" id="awakeScreen">
+    <div class="resultCard">
+      <h2 id="awakeTitle">Pip is NOT sleepy yet! 😆</h2>
+      <div class="anticStage" id="anticStage"></div>
+      <div class="line" id="awakeLine">Pip is juggling socks instead of going to bed!</div>
+      <div class="line" style="color:#9a8fc2" id="awakeHint">Some critters need two stories. That's okay — practice makes sleepy.</div>
+      <div class="awardLine" id="awakeAward"></div>
+      <div style="margin-top:14px">
+        <button class="btn" id="awakeRetry">📖 Read them another story</button>
+        <button class="btn soft" id="awakeBack">🐾 Pick a different critter</button>
+      </div>
     </div>
   </section>
 
-  <!-- ============ DEX ============ -->
-  <section id="dex" class="screen">
-    <h2 style="color:#fff;text-align:center;text-shadow:0 4px 0 rgba(0,0,0,.25)">📖 Critter Dex</h2>
-    <div class="card" style="flex:1;overflow-y:auto">
-      <div class="dexgrid" id="dexGrid"></div>
-    </div>
-    <div style="text-align:center;margin-top:10px"><button class="btn ghost" id="dexBack">🏠 Home</button></div>
-  </section>
-
-  <!-- ============ PARENT ============ -->
-  <section id="parent" class="screen">
-    <h2 style="text-align:center;margin:4px">Grown-up dashboard</h2>
-    <div class="card" style="flex:1;overflow:auto">
-      <div id="parentSummary"></div>
-      <table id="parentTable"></table>
-    </div>
-    <div style="text-align:center;margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
-      <button class="btn gold" id="pSave">💾 Save progress file</button>
-      <button class="btn ghost" id="pBack">Back</button>
+  <!-- ================= COLLECTION ================= -->
+  <section class="screen hidden" id="dexScreen">
+    <h1 class="title">🏅 My Sleepy Collection</h1>
+    <p class="sub" id="dexSub">Every friend you've tucked in, snoozing happily.</p>
+    <div class="dexGrid" id="dexGrid"></div>
+    <div style="text-align:center; margin-top:18px">
+      <button class="btn soft mini" id="dexBack">← Back to the den</button>
     </div>
   </section>
 
-  <button id="grownup" title="Grown-up dashboard">⚙️</button>
 </div>
 
 <script type="module">
-import { requireKid, mountBar, finishRun, celebrateLevelUp, describeAward }
-  from '../assets/arcade-shell.js';
+import { onParentChange, getCurrentKid, isGuestKid, getChild, ageFromBirthday, tierForAge } from '../firebase-config.js';
+import { requireKid, mountBar, finishRun, celebrateLevelUp, describeAward, sfx } from '../assets/arcade-shell.js';
+import { STORIES, storiesFor } from './stories.js';
+import { RARITY } from '../assets/catalog.js';
 
+/* =====================================================================
+   CRITTER CATCHERS — BEDTIME STORIES
+   Read a story to a critter. Read it well and the critter falls asleep
+   and joins your collection. Stumble, and it stays up doing something
+   deeply silly instead. Either way, you read — so you always earn.
+   ===================================================================== */
+const CONFIG = {
+  wigglyAllowed: 1,      // pages that can go wrong and still earn the tuck-in
+  micPassRatio: 0.60,    // fraction of the page's words the mic must hear
+  micGreatRatio: 0.85,   // hearing this much auto-finishes the page
+  micTries: 2,           // low mic scores before we offer a question instead
+  starsPerDay: 1,                   // bedtime stars earnable per calendar day
+  starsByRarity: { common:1, rare:3, epic:8, legendary:12, mythic:15 },
+  progressFileAuto: false,          // AJ 2026-08-21: never auto-download during play — the den has a manual save button
+};
+
+/* ---------------- the critters ---------------- */
+const CRITTERS = [
+  /* common — one star each */
+  { id:'pip',     name:'Pip the Fox', short:'Pip',          emoji:'🦊', rarity:'common',    fav:'silly',  antic:'socks',  line:'Loves a giggle before bed.' },
+  { id:'mo',      name:'Mo the Mouse', short:'Mo',         emoji:'🐭', rarity:'common',    fav:'royal',  antic:'bounce', line:'Small ears. Best listener.' },
+  { id:'wren',    name:'Wren the Bunny', short:'Wren',       emoji:'🐰', rarity:'common',    fav:'silly',  antic:'disco',  line:'Hops now… sleeps eventually.' },
+  { id:'sprout',  name:'Sprout the Hedgehog', short:'Sprout',  emoji:'🦔', rarity:'common',    fav:'night',  antic:'snack',  line:'Rolls into bed. Literally.' },
+  /* rare — three nights */
+  { id:'luna',    name:'Luna the Owl', short:'Luna',         emoji:'🦉', rarity:'rare',      fav:'night',  antic:'disco',  line:'Wide awake — until the right story.' },
+  { id:'bram',    name:'Bram the Bear', short:'Bram',        emoji:'🐻', rarity:'rare',      fav:'royal',  antic:'snack',  line:'Big yawns. Bigger heart.' },
+  { id:'puddle',  name:'Puddle the Frog', short:'Puddle',      emoji:'🐸', rarity:'rare',      fav:'royal',  antic:'bounce', line:'Hops in puddles, dreams of castles.' },
+  /* epic — eight nights */
+  { id:'ziggy',   name:'Ziggy the Dragon', short:'Ziggy',     emoji:'🐲', rarity:'epic',      fav:'dragon', antic:'socks',  line:'Small dragon. Very big feelings.' },
+  { id:'nova',    name:'Nova the Unicorn', short:'Nova',     emoji:'🦄', rarity:'epic',      fav:'night',  antic:'disco',  line:'Only visits great readers.' },
+  /* legendary — twelve nights */
+  { id:'willow',  name:'Willow the Dream Wolf', short:'Willow',emoji:'🐺', rarity:'legendary', fav:'night',  antic:'disco',  line:'Guards every good dream in the forest.' },
+  { id:'biscuit', name:'Sir Biscuit the Pup', short:'Sir Biscuit',  emoji:'🐶', rarity:'legendary', fav:'royal',  antic:'bounce', line:'Left knight school. Kept the courage.' },
+  /* mythic — fifteen nights */
+  { id:'twinkle', name:'Twinkle the Star Sprite', short:'Twinkle', emoji:'🌟', rarity:'mythic', fav:'night', antic:'snack',  line:'Fell out of the sky. Wants to earn the way home.' },
+];
+const ANTIC_LINES = {
+  bounce: name => `${name} is bouncing on the bed instead of sleeping in it!`,
+  socks:  name => `${name} is juggling socks instead of going to bed!`,
+  disco:  name => `${name} turned bedtime into a dance party!`,
+  snack:  name => `${name} is having a midnight cookie feast!`,
+};
+
+/* ---------------- the stories ----------------
+   The library lives in ./stories.js — shared books plus books that star
+   each critter. storiesFor(critter, level) returns the shelf for whoever
+   the child picked. Adding stories is a pure content edit over there. */
+
+/* Exposed for the Playwright test harness (and curious kids who open
+   the console — hi, future Jackson). Nothing secret lives here. */
+window.__CC = { STORIES, CRITTERS, CONFIG, storiesFor };
+/* the test harness counts award submissions to prove one story pays exactly once */
+window.__CC.finishRunCalls = 0;
+
+/* =====================================================================
+   BOOT — profile gate first. requireKid() replaces the page with a
+   friendly picker when no profile is active, so none of the game's DOM
+   wiring below may run in that case: it all lives inside main().
+   ===================================================================== */
 const kid = await requireKid({ gameName: 'Critter Catchers' });
 if (kid) {
   await mountBar({ title: 'Critter Catchers' });
-  main(kid);
+  main();
 }
 
-function main(kid){
+function main(){
 
-/* =======================================================================
-   CRITTER CATCHERS — a daily reading quest for a 1st grader
-   Content: 1st-grade sight words, phonics patterns, decodable sentences,
-            and short passages with comprehension questions.
-   Checking: reads aloud into the mic (Web Speech API). If the mic isn't
-            available it silently switches to a tap-to-answer mode.
-   ======================================================================= */
-
-/* ---------------- storage (safe wrapper) ---------------- */
-const MEM = {};
+/* ---------------- per-kid save ---------------- */
 const store = {
-  get(k){ try { const v = localStorage.getItem(k); return v==null?MEM[k]??null:v; } catch(e){ return MEM[k]??null; } },
-  set(k,v){ MEM[k]=v; try { localStorage.setItem(k,v); } catch(e){} }
+  get(k){ try { return localStorage.getItem(k); } catch(e){ return null; } },
+  set(k,v){ try { localStorage.setItem(k,v); } catch(e){} },
 };
-const KEY = "critterCatchers.v1";
-function loadData(){
-  try { return JSON.parse(store.get(KEY)) || blank(); } catch(e){ return blank(); }
+const SAVE_KEY = () => 'critters.v2.' + kid.id;
+function loadSave(){
+  try { return JSON.parse(store.get(SAVE_KEY()) || 'null') || {}; }
+  catch(e){ return {}; }
 }
-function blank(){ return { player:"Miles", days:{}, dex:[], totalCaught:0 }; }
-function saveData(d){ store.set(KEY, JSON.stringify(d)); }
-let DATA = loadData();
+function patchSave(patch){
+  const s = { nickname:kid.nickname, dex:{}, stars:{}, starDay:null, starCritter:null,
+              storiesRead:0, days:{}, prefs:{}, ...loadSave(), ...patch };
+  store.set(SAVE_KEY(), JSON.stringify(s));
+  return s;
+}
+/* a legacy save (old first-sleep rules) has a dex but no stars field — snapshot
+   that fact BEFORE the first patchSave writes the new defaults in */
+const LEGACY_SAVE = (() => { const r = loadSave(); return !!(r && r.dex && Object.keys(r.dex).length && r.stars === undefined); })();
+let SAVE = patchSave({});
 
-function todayStr(){
+const todayStr = () => {
   const d = new Date();
-  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
-}
-function dayStreak(){
-  const days = Object.keys(DATA.days).sort();
-  if(!days.length) return 0;
-  let streak = 0;
-  let cur = new Date(todayStr()+"T12:00:00");
-  // if today not played yet, start counting from yesterday
-  if(!DATA.days[todayStr()]) cur.setDate(cur.getDate()-1);
-  for(;;){
-    const s = cur.getFullYear()+"-"+String(cur.getMonth()+1).padStart(2,"0")+"-"+String(cur.getDate()).padStart(2,"0");
-    if(DATA.days[s]){ streak++; cur.setDate(cur.getDate()-1); } else break;
-  }
-  return streak;
-}
-
-/* ---------------- critters ---------------- */
-const CRITTERS = [
-  ["🦊","Emberling"],["🐲","Scaldrake"],["🦉","Hootwise"],["🐢","Shellby"],["🦋","Flitterbee"],
-  ["🐙","Inkydoo"],["🦄","Sparklehoof"],["🐝","Buzzbolt"],["🦎","Geckozap"],["🐧","Chillpip"],
-  ["🐳","Bloopwhale"],["🦖","Chompsaur"],["🐿️","Nutnab"],["🦇","Flapshadow"],["🐸","Ribbitz"],
-  ["🐬","Splashdart"],["🦅","Skytalon"],["🐺","Howlfang"],["🐌","Slowmo"],["🦩","Pinkstilt"],
-  ["🐨","Snoozle"],["🦔","Prickles"],["🦥","Slothie"],["🐼","Bamboo"],["🦜","Squawkers"],
-  ["🐊","Snapjaw"],["🦦","Otterly"],["🦡","Diggle"],["🐡","Puffup"],["🦚","Fanfeather"]
-];
-
-/* ---------------- word banks (1st grade) ---------------- */
-const SIGHT = ["after","again","any","ask","because","before","could","every","from","give",
-  "going","have","here","how","just","know","live","many","must","never","of","once","only",
-  "open","other","over","people","pretty","put","round","some","stop","take","thank","them",
-  "then","there","think","those","under","very","walk","want","were","what","when","where",
-  "which","would","your"];
-
-const PHONICS = [
-  {set:"short vowels", words:["cat","bed","pig","hop","bug","map","ten","win","dog","sun","hat","net","fish","box","cup"]},
-  {set:"blends",       words:["stop","flag","clap","drum","frog","sled","spin","trap","grin","swim","plum","crab","skip","stamp","brush"]},
-  {set:"digraphs",     words:["ship","chin","that","when","chop","bath","with","shell","chick","thick","whale","much","wish","path","shed"]},
-  {set:"silent e",     words:["cake","bike","home","cute","name","ride","note","tube","game","five","late","kite","rope","mule","smile"]},
-  {set:"vowel teams",  words:["rain","boat","tree","seed","play","coat","feet","day","meat","road","green","train","soap","clean","stay"]}
-];
-
-const SENTENCES = [
-  "The big frog can hop.","I see a red bug.","My dog ran to the pond.","We play in the sun.",
-  "She has a green hat.","The cat sat on my lap.","Can you help me find it?","He put the book away.",
-  "They went up the hill.","A fish swims in the lake.","My mom made a cake.","The bird flew over the tree.",
-  "We ride bikes after school.","Please open the blue box.","The little pig is very fast."
-];
-
-const STORIES = [
-  {text:"Sam has a pet fish. The fish is red and very fast. Sam feeds him every day after school.",
-   q:"What color is Sam's fish?", a:"Red", w:["Blue","Green"]},
-  {text:"Mia lost her hat at the park. She looked under the slide. Her dog found it in the grass!",
-   q:"Who found the hat?", a:"Her dog", w:["Her mom","A bird"]},
-  {text:"It was rainy, so Ben could not play outside. He built a big fort with his blocks. Then he read a book inside the fort.",
-   q:"Why did Ben stay inside?", a:"It was rainy", w:["He was sick","It was dark"]},
-  {text:"Ana planted a seed in a cup. She gave it water every morning. In two weeks a small green plant came up.",
-   q:"What did Ana do every morning?", a:"Gave it water", w:["Ate a snack","Dug a hole"]},
-  {text:"Leo went to the lake with Dad. They saw six ducks by the boat. Leo fed them bits of bread.",
-   q:"How many ducks did they see?", a:"Six", w:["Two","Ten"]},
-  {text:"The class made a big paper dragon. Each kid painted one part. They hung it up by the door.",
-   q:"Where did they hang the dragon?", a:"By the door", w:["On the floor","In a box"]},
-  {text:"Jo could not find her shoe. She looked in the closet and under the bed. It was in the toy box the whole time!",
-   q:"Where was the shoe?", a:"In the toy box", w:["Under the bed","In the closet"]},
-  {text:"Max helped Grandma bake bread. He stirred the dough with a big spoon. The kitchen smelled warm and sweet.",
-   q:"What did Max stir the dough with?", a:"A big spoon", w:["His hands","A fork"]}
-];
-
-/* homophones & common speech-to-text swaps we should forgive */
-const FORGIVE = {
-  "of":["off","uv"], "were":["where","wear"], "there":["their","they're"], "your":["you're"],
-  "know":["no"], "here":["hear"], "some":["sum"], "would":["wood"], "for":["four"],
-  "to":["too","two"], "ate":["eight"], "see":["sea"], "by":["buy","bye"], "one":["won"],
-  "read":["red"], "meat":["meet"], "road":["rode"], "way":["weigh"], "eye":["i"],
-  "flour":["flower"], "tail":["tale"], "sun":["son"], "mule":["mul"], "whale":["wail"]
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 };
+/* ---------------- bedtime stars (rarity ladder) ---------------- */
+const starsNeeded = c => CONFIG.starsByRarity[c.rarity] || 1;
+const starsFor = id => (SAVE.stars || {})[id] || 0;
+const isCollected = c => starsFor(c.id) >= starsNeeded(c);
+const collectedCount = () => CRITTERS.filter(isCollected).length;
+const starEarnedToday = () => SAVE.starDay === todayStr();
+const critterById = id => CRITTERS.find(c => c.id === id) || null;
+const shortName = c => (c && (c.short || c.name.split(' ')[0])) || '';
 
-/* ---------------- session build ---------------- */
-const PLAN = [
-  {t:"sight",n:6},{t:"phonics",n:5},{t:"sentence",n:4},{t:"story",n:3}
-];
-function pick(arr,n,seedSet){
-  const pool = arr.slice(); const out=[];
-  while(out.length<n && pool.length){
-    const i = Math.floor(Math.random()*pool.length);
-    out.push(pool.splice(i,1)[0]);
-  }
-  return out;
-}
-function buildSession(){
-  const items=[];
-  pick(SIGHT,6).forEach(w=>items.push({type:"sight",target:w,label:"Read this word out loud"}));
-  const phon=[];
-  PHONICS.forEach(g=>phon.push({w:pick(g.words,1)[0],set:g.set}));
-  pick(phon,5).forEach(p=>items.push({type:"phonics",target:p.w,set:p.set,label:"Sound it out, then read it"}));
-  pick(SENTENCES,4).forEach(s=>items.push({type:"sentence",target:s,label:"Read the whole sentence"}));
-  pick(STORIES,3).forEach(s=>items.push({type:"story",story:s,label:"Read the story, then answer"}));
-  // interleave so it isn't 6 of the same in a row
-  const order=[];
-  const buckets={sight:[],phonics:[],sentence:[],story:[]};
-  items.forEach(i=>buckets[i.type].push(i));
-  const pattern=["sight","phonics","sight","sentence","phonics","story","sight","phonics",
-                 "sentence","sight","phonics","story","sentence","sight","phonics","sentence","sight","story"];
-  pattern.forEach(t=>{ if(buckets[t].length) order.push(buckets[t].shift()); });
-  Object.values(buckets).forEach(b=>b.forEach(i=>order.push(i)));
-  return order;
+/* migration: anyone caught under the old first-sleep rule stays collected —
+   grandfather them in at full stars. Nobody loses Pip. Runs exactly once,
+   on a save from before the star system existed; under the new rules a dex
+   entry is just a tuck-in count and must NOT imply collection. */
+if (LEGACY_SAVE){
+  const stars = { ...(SAVE.stars || {}) };
+  CRITTERS.forEach(c => { if ((SAVE.dex || {})[c.id]) stars[c.id] = starsNeeded(c); });
+  SAVE = patchSave({ stars });
 }
 
-/* ---------------- speech ---------------- */
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let micOK = !!SR, recog = null, listening = false;
+/* NOTE: no local session log here. finishRun() already records every run
+   to the child's account (that's what the parent report reads), and the
+   old arcade.v1.sessions key is legacy — writing to it would muddy the
+   report's one-time migration flow. */
 
-function speak(text, rate){
+/* ---------------- sound (soft — it's bedtime) ---------------- */
+let actx = null;
+function tone(freq, dur, type='triangle', vol=0.08, when=0){
   try{
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.rate = rate || .82; u.pitch = 1.1; u.lang="en-US";
-    speechSynthesis.speak(u);
+    if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)();
+    const t = actx.currentTime + when;
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(actx.destination);
+    o.start(t); o.stop(t + dur + 0.05);
   }catch(e){}
 }
+const snd = {
+  page(){ tone(520,0.1); tone(660,0.12,'triangle',0.06,0.07); },
+  pass(){ tone(660,0.12); tone(880,0.18,'triangle',0.09,0.09); },
+  soft(){ tone(320,0.18,'sine',0.07); },
+  lullaby(){ [523,494,440,392,330].forEach((f,i)=>tone(f,0.5,'triangle',0.07,i*0.45)); },
+  snore(){ [0,1.1].forEach(w=>{ tone(90,0.5,'sine',0.09,w); tone(70,0.4,'sine',0.07,w+0.55); }); },
+  boing(){ tone(160,0.16,'square',0.09); tone(240,0.14,'square',0.08,0.12); tone(120,0.2,'square',0.08,0.26); },
+  giggle(){ tone(700,0.07,'square',0.05); tone(900,0.07,'square',0.05,0.09); tone(760,0.08,'square',0.05,0.18); },
+};
 
-function normalize(s){
-  return (s||"").toLowerCase().replace(/[^a-z' ]/g," ").replace(/\s+/g," ").trim();
-}
-function lev(a,b){
-  const m=a.length,n=b.length; if(!m)return n; if(!n)return m;
-  let prev=Array.from({length:n+1},(_,i)=>i), cur=new Array(n+1);
-  for(let i=1;i<=m;i++){ cur[0]=i;
-    for(let j=1;j<=n;j++){ cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1)); }
-    [prev,cur]=[cur,prev];
-  }
-  return prev[n];
-}
-function wordMatches(target,spokenWords){
-  const t = normalize(target);
-  const alts = [t].concat(FORGIVE[t]||[]);
-  return spokenWords.some(w => alts.some(a => w===a || (a.length>3 && lev(w,a)<=1)));
-}
-/* returns 0..1 how much of the target was read */
-function scoreSpeech(target, transcript){
-  const spoken = normalize(transcript).split(" ").filter(Boolean);
-  const targets = normalize(target).split(" ").filter(Boolean);
-  if(!spoken.length) return 0;
-  // A kid sounding out "be-cause" often comes back as two words. Glue
-  // adjacent chunks together and treat a match as a win.
-  if(targets.length===1){
-    const glued = [spoken.join("")];
-    for(let i=0;i<spoken.length-1;i++) glued.push(spoken[i]+spoken[i+1]);
-    for(let i=0;i<spoken.length-2;i++) glued.push(spoken[i]+spoken[i+1]+spoken[i+2]);
-    if(wordMatches(targets[0], spoken.concat(glued))) return 1;
-    return 0;
-  }
-  let hit = 0;
-  targets.forEach(t=>{ if(wordMatches(t,spoken)) hit++; });
-  return hit/targets.length;
-}
+/* =====================================================================
+   READING CHECK — mic scoring with a generous heart
+   ===================================================================== */
+const SRClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+const HOMOPHONES = {
+  were:'where', where:'were', no:'know', know:'no', to:'two', two:'to',
+  their:'there', there:'their', one:'won', won:'one', four:'for', for:'four',
+  night:'knight', knight:'night', sea:'see', see:'sea', red:'read', read:'red',
+};
+const normWords = s => s.toLowerCase().replace(/[^a-z0-9' ]+/g,' ').split(/\s+/).filter(Boolean);
 
-/* ---------------- game state ---------------- */
-let S = null;
-const $ = id => document.getElementById(id);
-function show(id){ document.querySelectorAll(".screen").forEach(s=>s.classList.remove("on")); $(id).classList.add("on"); }
-
-function startSession(){
-  S = {
-    items: buildSession(), idx: 0, tries: 0,
-    correctFirst: 0, correctAny: 0, attempted: 0,
-    missed: [], caught: [], streak: 0, bestStreak: 0,
-    compCorrect: 0, compTotal: 0,
-    startedAt: Date.now(), mode: micOK ? "voice" : "tap"
-  };
-  show("game");
-  renderItem();
-}
-
-function currentCritter(){
-  const seed = (S.idx + Object.keys(DATA.days).length*3) % CRITTERS.length;
-  return CRITTERS[seed];
-}
-
-function renderItem(){
-  if(S.idx >= S.items.length) return finishSession();
-  S.tries = 0;
-  const it = S.items[S.idx];
-  const [emo,name] = currentCritter();
-  $("critter").textContent = emo;
-  $("critter").classList.remove("catch");
-  $("critterName").textContent = "A wild " + name + " appeared!";
-  $("chipProgress").textContent = "Critter " + (S.idx+1) + " / " + S.items.length;
-  $("chipBalls").textContent = "⭐ " + S.caught.length;
-  $("chipStreak").textContent = "🔥 " + S.streak;
-  $("barFill").style.width = (S.idx / S.items.length * 100) + "%";
-  $("heard").textContent = "";
-
-  ["word","sentence","story","question","choices"].forEach(id=>{ $(id).innerHTML=""; $(id).style.display="none"; });
-  $("taskLabel").textContent = it.label;
-
-  if(it.type==="sight"){
-    $("word").style.display="block"; $("word").textContent = it.target;
-  } else if(it.type==="phonics"){
-    $("word").style.display="block";
-    $("word").innerHTML = it.target.split("").map(ch =>
-      '<span class="seg'+("aeiou".includes(ch)?" v":"")+'">'+ch+'</span>').join("");
-    $("taskLabel").textContent = "Sound it out — " + it.set;
-  } else if(it.type==="sentence"){
-    $("sentence").style.display="block"; $("sentence").textContent = it.target;
-  } else if(it.type==="story"){
-    $("story").style.display="block"; $("story").textContent = it.story.text;
-    $("question").style.display="none";
-  }
-
-  // controls
-  const voiceItem = it.type!=="story";
-  $("micBtn").style.display = (voiceItem && S.mode==="voice") ? "" : "none";
-  $("hearBtn").style.display = voiceItem ? "" : "none";
-  $("skipBtn").style.display = voiceItem ? "" : "none";
-
-  if(it.type==="story"){
-    // read the story aloud first, then ask
-    $("hearBtn").style.display="";
-    $("micBtn").style.display = S.mode==="voice" ? "" : "none";
-    $("micBtn").textContent = "🎤 Read it!";
-    showStoryQuestion(it, false);
-  } else if(S.mode==="tap"){
-    buildTapChoices(it);
-  }
-}
-
-function showStoryQuestion(it, afterRead){
-  $("question").style.display="block";
-  $("question").textContent = it.story.q;
-  const opts = pick([it.story.a].concat(it.story.w), 3);
-  const box = $("choices"); box.style.display="flex"; box.innerHTML="";
-  opts.forEach(o=>{
-    const b=document.createElement("button");
-    b.className="choice"; b.textContent=o;
-    b.onclick=()=>{
-      if(box.dataset.done) return;
-      box.dataset.done="1";
-      const right = o===it.story.a;
-      S.compTotal++; if(right) S.compCorrect++;
-      [...box.children].forEach(c=>{
-        if(c.textContent===it.story.a) c.classList.add("right");
-        else if(c===b) c.classList.add("wrong");
-      });
-      setTimeout(()=>{ box.dataset.done=""; judge(right, right?1:0, it, true); }, 700);
-    };
-    box.appendChild(b);
+function scoreReading(pageTokens, heardStr){
+  const bag = new Map();
+  normWords(heardStr).forEach(w => bag.set(w, (bag.get(w)||0)+1));
+  let hit = 0, total = 0;
+  const matched = pageTokens.map(tok => {
+    const n = normWords(tok)[0];
+    if (!n) return true;                     // punctuation-only token
+    total++;
+    if (bag.get(n) > 0){ bag.set(n, bag.get(n)-1); hit++; return true; }
+    const h = HOMOPHONES[n];
+    if (h && bag.get(h) > 0){ bag.set(h, bag.get(h)-1); hit++; return true; }
+    return false;
   });
+  return { ratio: total ? hit/total : 1, matched };
 }
 
-function buildTapChoices(it){
-  // no mic: hear the word/sentence, tap the matching text
-  const box=$("choices"); box.style.display="flex"; box.innerHTML="";
-  $("taskLabel").textContent = "Tap 🔊 then tap the words you heard";
-  let options;
-  if(it.type==="sentence"){
-    const others = pick(SENTENCES.filter(s=>s!==it.target),2);
-    options = pick([it.target].concat(others),3);
-    $("sentence").style.display="none";
-  } else {
-    const pool = it.type==="sight" ? SIGHT : PHONICS.flatMap(p=>p.words);
-    const others = pick(pool.filter(w=>w!==it.target),2);
-    options = pick([it.target].concat(others),3);
-    $("word").style.display="none";
-  }
-  options.forEach(o=>{
-    const b=document.createElement("button"); b.className="choice"; b.textContent=o;
-    b.onclick=()=>{
-      if(box.dataset.done) return; box.dataset.done="1";
-      const right = o===it.target;
-      [...box.children].forEach(c=>{
-        if(c.textContent===it.target) c.classList.add("right");
-        else if(c===b) c.classList.add("wrong");
-      });
-      setTimeout(()=>{ box.dataset.done=""; judge(right, right?1:0, it, true); },700);
-    };
-    box.appendChild(b);
-  });
-  speak(it.target);
-}
-
-/* ---------------- mic ---------------- */
-function listen(){
-  const it = S.items[S.idx];
-  const target = it.type==="story" ? it.story.text : it.target;
-  if(listening || !micOK) return;
+let rec = null, listening = false, heard = '';
+function startListening(onUpdate, onBlocked){
+  heard = '';
   try{
-    recog = new SR();
-    recog.lang="en-US"; recog.interimResults=true; recog.maxAlternatives=3; recog.continuous=false;
-    let best="";
-    recog.onstart = ()=>{ listening=true; $("micBtn").classList.add("live"); $("micBtn").textContent="🎤 Listening…"; };
-    recog.onresult = e=>{
-      let txt="";
-      for(let i=0;i<e.results.length;i++){
-        for(let j=0;j<e.results[i].length;j++) txt += " " + e.results[i][j].transcript;
-      }
-      best = txt;
-      $("heard").textContent = "I heard: " + normalize(txt);
+    rec = new SRClass();
+    rec.continuous = true; rec.interimResults = true; rec.lang = 'en-US';
+    rec.onresult = e => {
+      heard = '';
+      for (let i = 0; i < e.results.length; i++) heard += e.results[i][0].transcript + ' ';
+      onUpdate(heard);
     };
-    recog.onerror = e=>{
-      listening=false; $("micBtn").classList.remove("live"); $("micBtn").textContent="🎤 Read it!";
-      if(e.error==="not-allowed" || e.error==="service-not-allowed"){
-        micOK=false; S.mode="tap";
-        $("heard").textContent="Mic is off — tapping mode instead!";
-        renderItem();
-      } else {
-        $("heard").textContent="Didn't catch that — try again!";
-      }
+    rec.onerror = e => {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed' || e.error === 'network') onBlocked(e.error);
     };
-    recog.onend = ()=>{
-      listening=false; $("micBtn").classList.remove("live"); $("micBtn").textContent="🎤 Read it!";
-      if(!best.trim()) return;
-      const sc = scoreSpeech(target, best);
-      if(it.type==="story"){
-        // THE GATE (same rule Loot Drop enforces): reading the passage
-        // aloud is practice, never the answer. Before this, a good read
-        // called judge(pass) directly and caught the critter with the
-        // comprehension question still unanswered — which would have made
-        // story items the fastest coin farm in the arcade. The critter is
-        // only ever caught by answering the question below.
-        if(sc>=0.7) flash("👍","Great reading! Now answer the question!");
-        else flash("🤔","Read it once more — or just answer the question!");
-        return;
-      }
-      const pass = it.type==="sentence" ? sc>=0.7 : sc>=0.99;
-      judge(pass, sc, it, false);
-    };
-    recog.start();
-  }catch(e){ micOK=false; S.mode="tap"; renderItem(); }
+    rec.onend = () => { if (listening){ try{ rec.start(); }catch(e){} } };
+    listening = true;
+    rec.start();
+  }catch(e){ onBlocked('start-failed'); }
+}
+function stopListening(){
+  listening = false;
+  try{ rec && rec.stop(); }catch(e){}
 }
 
-/* ---------------- judging ---------------- */
-function judge(pass, score, it, isTap){
-  const target = it.type==="story" ? it.story.q : it.target;
-  if(pass){
-    S.attempted++;
-    S.correctAny++;
-    if(S.tries===0) S.correctFirst++;
-    S.streak++; S.bestStreak=Math.max(S.bestStreak,S.streak);
-    const [emo,name]=currentCritter();
-    S.caught.push(name);
-    if(!DATA.dex.includes(name)) DATA.dex.push(name);
-    $("critter").classList.add("catch");
-    flash("⭐","Caught "+name+"!");
-    setTimeout(()=>{ S.idx++; renderItem(); }, 1150);
+/* =====================================================================
+   GAME STATE + SCREENS
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const show = id => {
+  document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+  $(id).classList.remove('hidden');
+  window.scrollTo(0,0);
+};
+
+let level = 1;                 // story level (1 = little, 2 = bigger kid) — set from profile age
+let levelReady = Promise.resolve(1);   // resolves once the profile's age is known
+let mode = null;               // 'mic' | 'quiet'
+let critter = null, story = null;
+let pageIx = 0, passed = 0, wiggly = 0, micTries = 0, runStart = 0;
+let qRight = 0, qTotal = 0, pageStreak = 0, bestPageStreak = 0;
+let awaitingAnswer = false;
+
+/* ---------------- stars background ---------------- */
+(function stars(){
+  const holder = $('stars');
+  for (let i=0;i<36;i++){
+    const s = document.createElement('i');
+    s.style.left = (i*137)%100 + '%';
+    s.style.top = (i*61)%92 + '%';
+    s.style.animationDelay = (i%7)*0.4 + 's';
+    holder.appendChild(s);
+  }
+})();
+
+/* ---------------- reading level: the profile decides, silently ----------------
+   Miles gets Miles-sized stories and Jackson gets Jackson-sized ones; neither
+   ever sees a level. tierForAge 'hard' → level 2 (3rd-grade text); everything
+   else — younger kids, guests, a missing birthday — → level 1. There is no
+   toggle and no saved preference: age is the only input. */
+function resolveLevel(){
+  return new Promise(resolve => {
+    if (!getCurrentKid() || isGuestKid(kid.id)) return resolve(1);   // guests read little
+    let settled = false;
+    const done = l => { if (!settled){ settled = true; resolve(l); } };
+    setTimeout(() => done(1), 4000);          // never hang the shelf on a slow account
+    (async () => {
+      try{
+        await new Promise(res => { const un = onParentChange(() => { un(); res(); }); });
+        const child = await getChild(kid.id).catch(() => null);
+        const age = ageFromBirthday(child?.birthday);
+        done(age != null && tierForAge(age) === 'hard' ? 2 : 1);
+      }catch(e){ done(1); }
+    })();
+  });
+}
+function init(){
+  SAVE = patchSave({});
+  levelReady = resolveLevel().then(l => { level = l; return l; });
+  renderDen();
+  show('denScreen');
+}
+
+/* ---------------- den ---------------- */
+/* Muted quilt scraps for the blanket on each bedside vignette. */
+const QUILTS = ['var(--quilt-rose)','var(--quilt-sage)','var(--quilt-slate)','var(--quilt-clay)'];
+
+/* One bar, one line of words — legible from across the room, and it reads the
+   same whether a critter needs 1 night or 15. */
+function progressBar(c){
+  const need = starsNeeded(c), got = Math.min(starsFor(c.id), need);
+  const r = RARITY[c.rarity] || RARITY.common;
+  const pct = Math.round(got / need * 100);
+  const label = `⭐ ${got} of ${need} ${need === 1 ? 'night' : 'nights'}`;
+  return `<span class="track"><span class="fill" style="width:${pct}%; background:${r.color}"></span></span>
+          <span class="lbl">${label}</span>`;
+}
+function renderDen(){
+  $('dexCount').textContent = collectedCount();
+  $('dexTotal').textContent = CRITTERS.length;
+  $('storyCount').textContent = SAVE.storiesRead || 0;
+  const banner = $('starBanner');
+  if (starEarnedToday()){
+    const sc = critterById(SAVE.starCritter);
+    banner.textContent = `⭐ Tonight's star is tucked in with ${sc ? shortName(sc) : 'a friend'}! More stories are just for fun — a new star rises tomorrow.`;
+    banner.classList.remove('hidden');
+  } else banner.classList.add('hidden');
+  const grid = $('denGrid');
+  grid.innerHTML = '';
+  CRITTERS.forEach((c, i) => {
+    const r = RARITY[c.rarity] || RARITY.common;
+    const done = isCollected(c);
+    const caught = SAVE.dex && SAVE.dex[c.id];
+    const btn = document.createElement('button');
+    btn.className = 'critterCard' + (done ? ' collected' : '');
+    btn.style.setProperty('--rc', r.color);
+    btn.style.setProperty('--quilt', QUILTS[i % QUILTS.length]);
+    btn.innerHTML = `<span class="ribbon">${r.name}</span>
+      <span class="vignette">
+        <span class="zz">z z</span>
+        <span class="face">${c.emoji}</span>
+        <span class="quilt"></span>
+      </span>
+      <span class="nm">${c.name}</span>
+      <span class="pl">${c.line}</span>
+      <span class="prog">${done ? '<span class="lbl">💤 Fast asleep</span>' : progressBar(c)}</span>
+      ${done && caught ? `<span class="caught">tucked in ×${caught.n}</span>` : ''}`;
+    btn.onclick = () => openShelf(c);
+    grid.appendChild(btn);
+  });
+}
+/* ---------------- bookshelf ---------------- */
+const BOOK_COLORS = ['#7a4b8f','#3f6fb0','#3f9a6e','#b0653f'];
+const FAV_LINE = {
+  dragon: 'loves dragon stories',
+  royal:  'loves castles and crowns',
+  night:  'loves stories about the night sky',
+  silly:  'loves the silly ones',
+};
+let shelf = [];                     // the books on offer for THIS critter
+async function openShelf(c){
+  await levelReady;                 // a fast first tap must not get level-1 books
+  critter = c;
+  const first = shortName(c);
+  shelf = storiesFor(c, level);     // this critter's own bookshelf
+  $('shelfTitle').textContent = `${first}'s bookshelf ${c.emoji}`;
+  $('shelfSub').textContent = `Every book here is about ${first}'s world. ${first} ${FAV_LINE[c.fav]} best.`;
+  const grid = $('shelfGrid');
+  grid.innerHTML = '';
+  const readIt = id => !!(SAVE.days && Object.values(SAVE.days).some(d => (d.done||[]).includes(id)));
+  const allFav = shelf.every(st => st.genre === c.fav);
+  shelf.forEach((st, i) => {
+    const fav = !allFav && st.genre === c.fav;
+    const b = document.createElement('button');
+    b.className = 'bookCard' + (readIt(st.id) ? ' done' : '') + (fav ? ' starring' : '');
+    b.style.background = `linear-gradient(180deg, ${BOOK_COLORS[i%4]}, ${BOOK_COLORS[i%4]}cc)`;
+    b.innerHTML = `${fav ? `<span class="bstar">⭐ ${first}'s favorite!</span>` : ''}
+      <span class="be">${st.emoji}</span><span class="bt">${st.title}</span>
+      <span class="bp">${st.pages.length} pages</span>`;
+    b.onclick = () => chooseStory(st);
+    grid.appendChild(b);
+  });
+  show('shelfScreen');
+}
+$('shelfBack').onclick = () => { renderDen(); show('denScreen'); };
+$('surpriseBtn').onclick = () => chooseStory(shelf[Math.floor(Math.random()*shelf.length)]);
+
+function chooseStory(st){
+  story = st;
+  const remembered = SAVE.prefs && SAVE.prefs.mode;
+  if (!SRClass){ mode = 'quiet'; startBook(); }
+  else if (remembered){ mode = remembered; startBook(); }
+  else show('modeScreen');
+}
+$('modeMic').onclick = () => { mode = 'mic'; SAVE = patchSave({ prefs:{ ...SAVE.prefs, mode } }); startBook(); };
+$('modeQuiet').onclick = () => { mode = 'quiet'; SAVE = patchSave({ prefs:{ ...SAVE.prefs, mode } }); startBook(); };
+
+/* ---------------- the book ---------------- */
+function startBook(){
+  pageIx = 0; passed = 0; wiggly = 0; qRight = 0; qTotal = 0;
+  pageStreak = 0; bestPageStreak = 0;
+  runStart = Date.now();
+  $('sceneCritter').textContent = critter.emoji;
+  $('sceneCritter').className = 'critter';
+  $('sceneZzz').textContent = '';
+  $('moonIcon').textContent = '🌑';
+  $('sceneMsg').textContent = `${shortName(critter)} is listening…`;
+  // dress the cover: genre tint + the story's own little emoji scene
+  const cover = $('coverPage');
+  cover.className = 'bookCover cover-' + (story.genre || 'night');
+  const art = story.art || [story.emoji];
+  $('coverArt').innerHTML = art.slice(0,3).map((e,i) => `<span class="a a${i}">${e}</span>`).join('');
+  $('coverTitle').textContent = story.title;
+  $('coverSub').textContent = `A bedtime story for ${shortName(critter)} ${critter.emoji}`;
+  $('storyPage').classList.add('hidden');
+  $('micControls').classList.add('hidden');
+  $('quietControls').classList.add('hidden');
+  $('qBox').classList.add('hidden');
+  $('kudos').classList.add('hidden');
+  $('nextBtn').classList.add('hidden');
+  $('wordHelp').classList.add('hidden');
+  $('feedback').textContent = '';
+  $('pageDots').textContent = '';
+  show('bookScreen');
+}
+$('openBook').onclick = () => { snd.page(); renderPage(); };
+$('modeSwap').onclick = () => {
+  if (!SRClass) { setFeedback('This device has no microphone reading — quiet mode it is!', 'soft'); return; }
+  SAVE = patchSave({ prefs:{ ...SAVE.prefs, mode:null } });
+  show('modeScreen');
+};
+$('closeBook').onclick = () => { stopListening(); stopSpeaking(); show('denScreen'); renderDen(); };
+
+const MOONS = ['🌑','🌒','🌓','🌔','🌕'];
+function moonFor(p, total){ return MOONS[Math.min(MOONS.length-1, Math.round(p/total*(MOONS.length-1)))]; }
+
+function renderPage(){
+  const page = story.pages[pageIx];
+  awaitingAnswer = false; micTries = 0; heardBank = '';
+  stopSpeaking();
+  $('coverPage').classList.add('hidden');
+  const sp = $('storyPage');
+  sp.classList.remove('hidden');
+  sp.classList.remove('pageFx'); void sp.offsetWidth; sp.classList.add('pageFx');
+  $('pageNum').textContent = `Page ${pageIx+1} of ${story.pages.length}`;
+  const st = $('storyText');
+  st.className = 'storyText lv' + level;
+  st.innerHTML = page.text.split(/\s+/).map(w => `<span class="w">${w}</span>`).join(' ');
+  st.querySelectorAll('.w').forEach(sp2 => { sp2.onclick = () => soundOut(sp2); });
+  pageTokens = page.text.split(/\s+/);
+  $('wordHelp').classList.add('hidden');
+  $('pageDots').innerHTML = story.pages.map((_,i) =>
+    i < pageIx ? '<b>●</b>' : i === pageIx ? '●' : '○').join('');
+  $('feedback').textContent = ''; $('feedback').className = 'feedback';
+  $('qBox').classList.add('hidden');
+  $('kudos').classList.add('hidden');
+  $('nextBtn').classList.add('hidden');
+  if (mode === 'mic'){
+    $('micControls').classList.remove('hidden');
+    $('quietControls').classList.add('hidden');
+    listenForPage();          // the mic starts itself — no button to forget
   } else {
-    S.tries++;
-    S.streak=0;
-    if(S.tries<2 && !isTap){
-      flash("🤔","So close — try again!");
-      $("heard").textContent = "Tap 🔊 to hear it, then read it again.";
-    } else {
-      S.attempted++;
-      const missTxt = it.type==="story" ? "understanding: "+it.story.q : it.target;
-      if(!S.missed.includes(missTxt)) S.missed.push(missTxt);
-      flash("💪","Let's practice this one!");
-      speak(it.type==="story" ? it.story.a : it.target, .7);
-      setTimeout(()=>{ S.idx++; renderItem(); }, 1900);
-    }
+    $('quietControls').classList.remove('hidden');
+    $('micControls').classList.add('hidden');
   }
 }
-function flash(icon,text){
-  $("fbIcon").textContent=icon; $("fbText").textContent=text;
-  $("feedback").classList.add("on");
-  setTimeout(()=>$("feedback").classList.remove("on"), 1050);
+
+/* ---------------- mic path ---------------- */
+let pageTokens = [];
+let heardBank = '';                       // words heard before a sound-out pause
+const allHeard = () => heardBank + ' ' + heard;
+function listenForPage(){
+  $('micState').innerHTML = '<span class="dot"></span>I’m listening — read the page out loud!';
+  startListening(onHeard, micBlocked);
+}
+function onHeard(){
+  const { ratio, matched } = scoreReading(pageTokens, allHeard());
+  const spans = document.querySelectorAll('#storyText .w');
+  matched.forEach((m,i) => { if (spans[i]) spans[i].classList.toggle('hit', m); });
+  if (ratio >= CONFIG.micGreatRatio) finishMicPage(ratio);
+}
+$('micDone').onclick = () => {
+  const { ratio } = scoreReading(pageTokens, allHeard());
+  finishMicPage(ratio);
+};
+function finishMicPage(ratio){
+  if (ratio >= CONFIG.micPassRatio){ stopListening(); return pagePassed(); }
+  micTries++;
+  if (micTries >= CONFIG.micTries){
+    stopListening();
+    setFeedback('Let’s try a question instead!', 'soft');
+    return askQuestion();
+  }
+  // keep the mic running — every word of the re-read still counts
+  setFeedback('Almost! Read it once more, nice and slow 🐢', 'soft');
+  snd.soft();
+}
+function micBlocked(reason){
+  stopListening();
+  mode = 'quiet';
+  SAVE = patchSave({ prefs:{ ...SAVE.prefs, mode:'quiet' } });
+  setFeedback('The microphone isn’t working, so let’s read quietly instead!', 'soft');
+  $('micControls').classList.add('hidden');
+  $('quietControls').classList.remove('hidden');
 }
 
-/* ---------------- finish + reporting ---------------- */
-function finishSession(){
-  const secs = Math.round((Date.now()-S.startedAt)/1000);
-  const acc = S.attempted ? Math.round(S.correctFirst/S.attempted*100) : 0;
-  const t = todayStr();
-  const prior = DATA.days[t];
-  const rec = {
-    date: t,
-    seconds: (prior?prior.seconds:0) + secs,
-    attempted: (prior?prior.attempted:0) + S.attempted,
-    correctFirstTry: (prior?prior.correctFirstTry:0) + S.correctFirst,
-    accuracyPct: 0,
-    bestStreak: Math.max(prior?prior.bestStreak:0, S.bestStreak),
-    comprehensionCorrect: (prior?prior.comprehensionCorrect:0) + S.compCorrect,
-    comprehensionTotal: (prior?prior.comprehensionTotal:0) + S.compTotal,
-    wordsToPractice: [...new Set([...(prior?prior.wordsToPractice:[]), ...S.missed])],
-    crittersCaught: (prior?prior.crittersCaught:0) + S.caught.length,
-    mode: S.mode,
-    sessions: (prior?prior.sessions:0) + 1
+/* ---------------- tap a tricky word to sound it out ---------------- */
+const synth = window.speechSynthesis;
+let speakingWord = false;
+function syllables(word){
+  const w = word.toLowerCase();
+  const toks = w.match(/[aeiouy]+|[^aeiouy]+/g) || [w];
+  // classic sounding-out split: each vowel group ends a syllable; a consonant
+  // cluster between vowels stays left except for a legal onset (digraph or
+  // l/r blend) that starts the next one — hun·dred, back·wards, to·ge·ther
+  const ONSET2 = /^(th|sh|ch|ph|wh|bl|cl|fl|gl|pl|sl|br|cr|dr|fr|gr|pr|tr)$/;
+  const sylls = []; let cur = '';
+  for (let i = 0; i < toks.length; i++){
+    const t = toks[i];
+    if (!/[aeiouy]/.test(t[0])){ cur += t; continue; }   // onset consonants
+    cur += t;
+    const next = toks[i+1];
+    if (next && toks[i+2] !== undefined){
+      const onset = (next.length >= 2 && ONSET2.test(next.slice(-2))) ? 2 : 1;
+      const keep = next.length > onset ? next.slice(0, next.length - onset) : (next.length === onset ? '' : next);
+      cur += keep;
+      toks[i+1] = next.slice(keep.length);
+    } else if (next){ cur += next; i++; }                // trailing consonants
+    sylls.push(cur); cur = '';
+  }
+  if (cur) sylls.length ? sylls[sylls.length-1] += cur : sylls.push(cur);
+  // glue a silent e back on (hor·se → horse) — but -le is a real syllable
+  if (sylls.length > 1 && /^[^aeiouy]*e$/.test(sylls[sylls.length-1]) && !/le$/.test(sylls[sylls.length-1]))
+    sylls[sylls.length-2] += sylls.pop();
+  return sylls;
+}
+function stopSpeaking(){
+  try{ synth && synth.cancel(); }catch(e){}
+  speakingWord = false;
+}
+function soundOut(span){
+  if (speakingWord || awaitingAnswer) return;
+  const raw = span.textContent.replace(/[^a-zA-Z']/g,'');
+  if (!raw) return;
+  snd.page();
+  document.querySelectorAll('#storyText .w.helping').forEach(x => x.classList.remove('helping'));
+  span.classList.add('helping');
+  const parts = syllables(raw);
+  const help = $('wordHelp');
+  help.innerHTML = parts.map((p,i) => `<span class="chunk" id="chunk${i}">${p}</span>`)
+                        .join('<span class="cdot">·</span>')
+                 + `<span class="whole" id="chunkWhole">${raw}</span>`;
+  help.classList.remove('hidden');
+  const done = () => {
+    speakingWord = false;
+    setTimeout(() => { help.classList.add('hidden'); span.classList.remove('helping'); }, 900);
   };
-  rec.accuracyPct = rec.attempted ? Math.round(rec.correctFirstTry/rec.attempted*100) : 0;
-  DATA.days[t]=rec;
-  DATA.totalCaught = (DATA.totalCaught||0) + S.caught.length;
-  saveData(DATA);
-
-  $("rAcc").textContent = acc+"%";
-  $("rCaught").textContent = S.caught.length;
-  $("rStreak").textContent = dayStreak();
-  $("rNewDex").innerHTML = S.caught.map(n=>{
-    const c = CRITTERS.find(c=>c[1]===n); return "<span title='"+n+"'>"+(c?c[0]:"⭐")+"</span>";
-  }).join("");
-  $("rMissed").innerHTML = S.missed.length
-    ? S.missed.map(w=>'<span class="pill">'+w+'</span>').join("")
-    : '<span class="tiny">Nothing missed today — perfect run! 🎉</span>';
-
-  show("report");
-  speak("Amazing reading, "+kid.nickname+"! You caught "+S.caught.length+" critters today.", .95);
-
-  // The character award. Correct = first-try correct, matching the
-  // game's own accuracy number — and thanks to the story gate above, a
-  // story item only counts when the QUESTION was answered.
-  const award = $("awardLine");
-  award.textContent = "Saving…";
-  finishRun('critter-catchers', { asked: S.attempted, correct: S.correctFirst, seconds: secs })
-    .then((outcome) => {
-      award.textContent = describeAward(outcome);
-      celebrateLevelUp(outcome);
-    });
+  if (!synth){ setTimeout(done, 1600); return; }
+  // pause the mic so it doesn't hear the helper voice as the child's reading
+  const resume = (mode === 'mic') && listening;
+  if (resume){ heardBank = allHeard(); stopListening(); }
+  speakingWord = true;
+  const say = (text, rate, el) => new Promise(res => {
+    let settled = false;
+    const fin = () => { if (!settled){ settled = true; res(); } };
+    try{
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = rate; u.pitch = 1.05; u.lang = 'en-US';
+      u.onstart = () => { if (el) el.classList.add('lit'); };
+      u.onend = fin; u.onerror = fin;
+      synth.speak(u);
+      setTimeout(fin, 3000);              // never leave the page hung if TTS stalls
+    }catch(e){ fin(); }
+  });
+  (async () => {
+    if (parts.length > 1){
+      for (let i = 0; i < parts.length; i++) await say(parts[i], 0.5, $('chunk'+i));
+    } else {
+      await say(raw, 0.5, $('chunk0'));
+    }
+    await say(raw, 0.85, $('chunkWhole'));
+    done();
+    if (resume && mode === 'mic' && !awaitingAnswer &&
+        !$('bookScreen').classList.contains('hidden') &&
+        !$('storyPage').classList.contains('hidden')) listenForPage();
+  })();
 }
 
+/* ---------------- quiet path ---------------- */
+$('quietDone').onclick = () => askQuestion();
+
+function askQuestion(){
+  const page = story.pages[pageIx];
+  awaitingAnswer = true;
+  stopSpeaking();
+  $('micControls').classList.add('hidden');
+  $('quietControls').classList.add('hidden');
+  const box = $('qBox');
+  box.classList.remove('hidden');
+  $('qText').textContent = page.q;
+  const answers = page.c.map((text,i) => ({ text, right: i === 0 }));
+  for (let i = answers.length-1; i > 0; i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [answers[i], answers[j]] = [answers[j], answers[i]];
+  }
+  const holder = $('qChoices');
+  holder.innerHTML = '';
+  answers.forEach(a => {
+    const b = document.createElement('button');
+    b.className = 'qc';
+    b.textContent = a.text;
+    b.onclick = () => answerQuestion(a.right, b);
+    holder.appendChild(b);
+  });
+}
+function answerQuestion(right, btn){
+  if (!awaitingAnswer) return;
+  awaitingAnswer = false;
+  qTotal++;
+  document.querySelectorAll('.qc').forEach(b => b.disabled = true);
+  if (right){
+    qRight++;
+    btn.classList.add('right');
+    $('qBox').classList.add('hidden');       // clear the stage for the kudos
+    return pagePassed();
+  }
+  btn.classList.add('wrong');
+  document.querySelectorAll('.qc').forEach(b => {
+    if (b !== btn && story.pages[pageIx].c[0] === b.textContent) b.classList.add('right');
+  });
+  pageWiggly();                              // answer stays on screen to learn from
+}
+
+/* ---------------- page outcomes — the child turns the page ---------------- */
+function setFeedback(msg, cls){
+  const f = $('feedback');
+  f.textContent = msg; f.className = 'feedback ' + (cls||'');
+}
+const PAGE_PRAISE = ['Beautiful reading!','You read that perfectly!','Wonderful!','What a lovely page!','So cozy — keep going!'];
+function pagePassed(){
+  passed++; pageStreak++;
+  if (pageStreak > bestPageStreak) bestPageStreak = pageStreak;
+  snd.pass();
+  $('micControls').classList.add('hidden');
+  $('quietControls').classList.add('hidden');
+  setFeedback('', '');
+  $('kudosText').textContent = PAGE_PRAISE[Math.floor(Math.random()*PAGE_PRAISE.length)];
+  $('kudos').classList.remove('hidden');
+  const c = $('sceneCritter');
+  c.className = 'critter sleepy' + Math.min(3, passed);
+  $('sceneZzz').textContent = 'z'.repeat(Math.min(3, passed));
+  $('moonIcon').textContent = moonFor(passed, story.pages.length);
+  $('sceneMsg').textContent = `${shortName(critter)}’s eyes are getting heavy…`;
+  showTurnButton(false);
+}
+function pageWiggly(){
+  wiggly++; pageStreak = 0;
+  snd.giggle();
+  $('micControls').classList.add('hidden');
+  $('quietControls').classList.add('hidden');
+  setFeedback(`The answer was “${story.pages[pageIx].c[0]}” — now you know it! 💡`, 'soft');
+  const c = $('sceneCritter');
+  c.classList.remove('wiggle'); void c.offsetWidth; c.classList.add('wiggle');
+  $('sceneMsg').textContent = `${shortName(critter)} giggled and sat back up!`;
+  showTurnButton(true);
+}
+function showTurnButton(afterWiggle){
+  const last = pageIx === story.pages.length - 1;
+  const b = $('nextBtn');
+  b.textContent = last ? '🌙 The End' : (afterWiggle ? 'Keep reading ➜' : 'Turn the page ➜');
+  b.classList.remove('hidden');
+}
+$('nextBtn').onclick = () => {
+  $('nextBtn').classList.add('hidden');
+  stopSpeaking();
+  pageIx++;
+  if (pageIx < story.pages.length){ snd.page(); renderPage(); }
+  else endStory();
+};
+
+/* =====================================================================
+   END OF STORY — sleep or silliness (either way, the reading counts)
+   ===================================================================== */
+function endStory(){
+  stopListening();
+  const pages = story.pages.length;
+  const asleep = passed >= pages - CONFIG.wigglyAllowed;
+  const seconds = Math.round((Date.now() - runStart)/1000);
+
+  // ---- per-day tally (feeds the progress file + daily email) ----
+  const day = { pages:0, passed:0, stories:0, tuckIns:0, seconds:0, qRight:0, qTotal:0, done:[], ...( (SAVE.days||{})[todayStr()] || {} ) };
+  day.pages += pages; day.passed += passed; day.stories += 1;
+  day.seconds += seconds; day.qRight += qRight; day.qTotal += qTotal;
+  if (asleep){ day.tuckIns += 1; if (!day.done.includes(story.id)) day.done.push(story.id); }
+  const days = { ...(SAVE.days||{}) }; days[todayStr()] = day;
+
+  // ---- bedtime stars: one a day, toward whichever critter fell asleep first ----
+  const dex = { ...(SAVE.dex||{}) };
+  const stars = { ...(SAVE.stars||{}) };
+  let starEarned = false, nowCollected = false, justForFun = false;
+  if (asleep){
+    dex[critter.id] = { n: (dex[critter.id]?.n || 0) + 1, first: dex[critter.id]?.first || Date.now() };
+    if (!starEarnedToday() && CONFIG.starsPerDay > 0){
+      const wasCollected = isCollected(critter);
+      stars[critter.id] = (stars[critter.id] || 0) + 1;
+      starEarned = true;
+      nowCollected = !wasCollected && stars[critter.id] >= starsNeeded(critter);
+      SAVE = patchSave({ dex, days, stars, starDay: todayStr(), starCritter: critter.id,
+                         storiesRead: (SAVE.storiesRead||0) + 1 });
+    } else {
+      justForFun = true;   // still a full sleep ending — warm, never "limit reached"
+      SAVE = patchSave({ dex, days, storiesRead: (SAVE.storiesRead||0) + 1 });
+    }
+  } else {
+    SAVE = patchSave({ days, storiesRead: (SAVE.storiesRead||0) + 1 });
+  }
+
+  // ---- the shared character: XP + coins through the arcade shell ----
+  const awardEl = asleep ? $('awardLine') : $('awakeAward');
+  awardEl.textContent = 'Saving…';
+  window.__CC.finishRunCalls++;
+  finishRun('critter-catchers', {
+    asked: pages, correct: passed, seconds, score: passed,
+  }).then(outcome => {
+    awardEl.textContent = describeAward(outcome);
+    if (asleep) celebrateLevelUp(outcome);
+  });
+
+  if (CONFIG.progressFileAuto) downloadReport(true);
+
+  if (asleep) showSleep({ starEarned, nowCollected, justForFun });
+  else showAwake();
+}
+
+function confettiBurst(card){
+  const bits = ['🎉','⭐','🌟','💫','✨','🎊'];
+  for (let i = 0; i < 26; i++){
+    const b = document.createElement('span');
+    b.className = 'confetti';
+    b.textContent = bits[i % bits.length];
+    b.style.left = (4 + (i * 37) % 92) + '%';
+    b.style.animationDuration = (1.6 + (i % 5) * 0.35) + 's';
+    b.style.animationDelay = ((i % 7) * 0.18) + 's';
+    card.appendChild(b);
+    setTimeout(() => b.remove(), 4200);
+  }
+}
+function showSleep({ starEarned, nowCollected, justForFun }){
+  const first = shortName(critter);
+  $('sleepFace').textContent = critter.emoji;
+  $('sleepTitle').textContent = `${first} fell asleep! 🌙`;
+  $('sleepLine').textContent = passed === story.pages.length
+    ? 'You read every single page beautifully. Sweet dreams!'
+    : 'What a lovely story. Sweet dreams!';
+  $('favLine').classList.toggle('hidden', story.genre !== critter.fav);
+  const sl = $('starLine');
+  if (nowCollected){
+    sl.textContent = '⭐ Bedtime star earned!';
+  } else if (starEarned){
+    sl.textContent = `⭐ Bedtime star earned! ${first} has ${Math.min(starsFor(critter.id), starsNeeded(critter))} of ${starsNeeded(critter)}.`;
+  } else if (justForFun){
+    sl.textContent = `✨ A just-for-fun story — tonight's star is already tucked in. What a cozy reader!`;
+  } else sl.textContent = '';
+  const nf = $('newFriend');
+  nf.textContent = `🎉 ${first} joined your collection!`;
+  nf.classList.toggle('hidden', !nowCollected);
+  const card = $('sleepCard');
+  card.querySelectorAll('.floatZ').forEach(z => z.remove());
+  for (let i=0;i<3;i++){
+    const z = document.createElement('span');
+    z.className = 'floatZ'; z.textContent = 'z';
+    z.style.left = (46 + i*7) + '%'; z.style.top = '38%';
+    z.style.fontSize = (14 + i*6) + 'px';
+    z.style.animationDelay = (i*0.7) + 's';
+    card.appendChild(z);
+  }
+  snd.lullaby(); setTimeout(() => snd.snore(), 2400);
+  if (nowCollected) confettiBurst(card);
+  show('sleepScreen');
+}
+$('sleepAgain').onclick = () => { renderDen(); show('denScreen'); };
+$('sleepDex').onclick = () => openDex();
+
+function showAwake(){
+  $('awakeTitle').textContent = `${shortName(critter)} is NOT sleepy yet! 😆`;
+  $('awakeHint').textContent = starEarnedToday()
+    ? `Some critters need two stories. That's okay — practice makes sleepy.`
+    : `The star's still up there waiting — try another story!`;
+  $('awakeLine').textContent = ANTIC_LINES[critter.antic](shortName(critter));
+  const stage = $('anticStage');
+  stage.className = 'anticStage antic-' + critter.antic;
+  const props = {
+    bounce: `<span class="prop bedProp">🛏️</span>`,
+    socks:  `<span class="prop s1">🧦</span><span class="prop s2">🧦</span><span class="prop s3">🧦</span>`,
+    disco:  `<span class="prop ball">🪩</span><span class="prop n1">🎵</span><span class="prop n2">🎶</span>`,
+    snack:  `<span class="prop c1">🍪</span><span class="prop c2">🍪</span><span class="prop c3">🍪</span>`,
+  };
+  stage.innerHTML = `${props[critter.antic] || ''}<span class="aFace">${critter.emoji}</span>`;
+  snd.boing(); setTimeout(snd.boing, 500);
+  show('awakeScreen');
+}
+$('awakeRetry').onclick = () => openShelf(critter);
+$('awakeBack').onclick = () => { renderDen(); show('denScreen'); };
+
+/* ---------------- collection screen ---------------- */
+function openDex(){
+  const grid = $('dexGrid');
+  grid.innerHTML = '';
+  CRITTERS.forEach(c => {
+    const done = isCollected(c);
+    const caught = SAVE.dex && SAVE.dex[c.id];
+    const r = RARITY[c.rarity] || RARITY.common;
+    const d = document.createElement('div');
+    d.className = 'dexCard' + (done ? '' : ' mystery');
+    d.innerHTML = done
+      ? `<span class="f">${c.emoji}</span><span class="n">${shortName(c)} 💤</span><span class="c">tucked in ×${caught ? caught.n : 0}</span>`
+      : `<span class="f">${c.emoji}</span><span class="n">${shortName(c)}</span><span class="c" style="color:${r.color}">⭐ ${starsFor(c.id)}/${starsNeeded(c)}</span>`;
+    grid.appendChild(d);
+  });
+  $('dexSub').textContent = collectedCount() === CRITTERS.length
+    ? 'EVERY critter is asleep. You are a legendary storyteller! 🌟'
+    : 'Collect a critter by earning all its bedtime stars — one cozy story a night.';
+  show('dexScreen');
+}
+$('dexBtn').onclick = openDex;
+$('dexBack').onclick = () => { renderDen(); show('denScreen'); };
+
+/* =====================================================================
+   PROGRESS FILE — same contract the daily parent email reads
+   (miles-reading-YYYY-MM-DD.json in Downloads)
+   ===================================================================== */
 function buildReportPayload(){
-  const days = Object.values(DATA.days).sort((a,b)=>a.date<b.date?1:-1);
-  const totals = days.reduce((t,d)=>({
-    days:t.days+1, attempted:t.attempted+d.attempted, correct:t.correct+d.correctFirstTry,
-    minutes:t.minutes+d.seconds/60, comp:t.comp+d.comprehensionCorrect, compT:t.compT+d.comprehensionTotal
-  }),{days:0,attempted:0,correct:0,minutes:0,comp:0,compT:0});
+  const days = Object.entries(SAVE.days||{}).sort((a,b)=>b[0].localeCompare(a[0]));
+  const t = (SAVE.days||{})[todayStr()];
+  let streak = 0;
+  { const d = new Date();
+    for(;;){
+      const k = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+      if ((SAVE.days||{})[k]) { streak++; d.setDate(d.getDate()-1); } else break;
+    } }
+  const totals = days.reduce((a,[,d]) => ({
+    pages:a.pages+d.pages, passed:a.passed+d.passed, seconds:a.seconds+d.seconds,
+    stories:a.stories+d.stories, qR:a.qR+d.qRight, qT:a.qT+d.qTotal,
+  }), {pages:0,passed:0,seconds:0,stories:0,qR:0,qT:0});
   return {
-    generatedAt: new Date().toISOString(),
-    player: "Miles",
-    grade: 1,
-    game: "Critter Catchers — Reading Quest",
-    today: DATA.days[todayStr()] || null,
-    dayStreak: dayStreak(),
-    crittersCollected: DATA.dex.length,
+    game: 'Critter Catchers — Bedtime Stories',
+    child: kid.nickname,
+    today: t ? {
+      date: todayStr(), seconds: t.seconds,
+      attempted: t.pages, correctFirstTry: t.passed,
+      accuracyPct: t.pages ? Math.round(t.passed/t.pages*100) : 0,
+      comprehensionCorrect: t.qRight, comprehensionTotal: t.qTotal,
+      storiesRead: t.stories, crittersCaught: t.tuckIns,
+      storiesFinished: t.done, mode,
+      starEarned: starEarnedToday(),
+      starCritter: starEarnedToday() ? (critterById(SAVE.starCritter)?.name || null) : null,
+    } : null,
+    dayStreak: streak,
+    crittersCollected: collectedCount(),
     crittersTotal: CRITTERS.length,
+    collecting: CRITTERS.filter(c => starsFor(c.id) > 0 && !isCollected(c))
+      .map(c => ({ critter: c.name, rarity: c.rarity, stars: starsFor(c.id), needed: starsNeeded(c) })),
     lifetime: {
-      daysPlayed: totals.days,
-      itemsAttempted: totals.attempted,
-      correctFirstTry: totals.correct,
-      overallAccuracyPct: totals.attempted?Math.round(totals.correct/totals.attempted*100):0,
-      totalMinutes: Math.round(totals.minutes),
-      comprehensionPct: totals.compT?Math.round(totals.comp/totals.compT*100):0
+      daysPlayed: days.length,
+      itemsAttempted: totals.pages,
+      correctFirstTry: totals.passed,
+      overallAccuracyPct: totals.pages ? Math.round(totals.passed/totals.pages*100) : 0,
+      totalMinutes: Math.round(totals.seconds/60),
+      comprehensionPct: totals.qT ? Math.round(totals.qR/totals.qT*100) : 0,
+      storiesRead: totals.stories,
     },
-    history: days.slice(0,30)
+    history: days.slice(0,30).map(([date,d]) => ({ date, ...d })),
   };
 }
 function downloadReport(auto){
   try{
     const payload = buildReportPayload();
-    const blob = new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
-    const a=document.createElement("a");
-    a.href=URL.createObjectURL(blob);
-    a.download="miles-reading-"+todayStr()+".json";
-    document.body.appendChild(a); a.click();
-    setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},1500);
-    $("saveNote").textContent = auto
-      ? "✅ Progress file saved to Downloads (miles-reading-"+todayStr()+".json)"
-      : "✅ Saved!";
-  }catch(e){
-    $("saveNote").textContent = "Tap “Save my report” to save the progress file.";
-  }
+    const blob = new Blob([JSON.stringify(payload,null,2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const slug = (kid.nickname||'reader').toLowerCase().replace(/[^a-z0-9]+/g,'');
+    a.download = slug + '-reading-' + todayStr() + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+  }catch(e){}
 }
+$('saveBtn').onclick = () => downloadReport(false);
+window.__CC.buildReportPayload = buildReportPayload;   // for the test harness
 
-/* ---------------- dex + parent ---------------- */
-function renderDex(){
-  $("dexGrid").innerHTML = CRITTERS.map(([e,n])=>
-    '<span class="'+(DATA.dex.includes(n)?"":"locked")+'" title="'+n+'">'+e+'</span>').join("");
-}
-function renderParent(){
-  const p = buildReportPayload();
-  $("parentSummary").innerHTML =
-    "<p style='font-weight:800'>Day streak: "+p.dayStreak+" &nbsp;·&nbsp; Days played: "+p.lifetime.daysPlayed+
-    " &nbsp;·&nbsp; Overall accuracy: "+p.lifetime.overallAccuracyPct+"%"+
-    " &nbsp;·&nbsp; Comprehension: "+p.lifetime.comprehensionPct+"%</p>";
-  const rows = p.history.map(d=>"<tr><td>"+d.date+"</td><td>"+Math.round(d.seconds/60)+" min</td><td>"+
-    d.correctFirstTry+"/"+d.attempted+" ("+d.accuracyPct+"%)</td><td>"+
-    d.comprehensionCorrect+"/"+d.comprehensionTotal+"</td><td>"+(d.wordsToPractice.join(", ")||"—")+"</td></tr>").join("");
-  $("parentTable").innerHTML =
-    "<tr><th>Date</th><th>Time</th><th>Words right (1st try)</th><th>Comprehension</th><th>Practice list</th></tr>"+rows;
-}
-
-/* ---------------- wiring ---------------- */
-$("startBtn").onclick = startSession;
-$("hearBtn").onclick = ()=>{
-  const it=S.items[S.idx];
-  speak(it.type==="story"?it.story.text:it.target, it.type==="phonics"?.6:.8);
-};
-$("micBtn").onclick = ()=>{ if(listening){ try{recog.stop();}catch(e){} } else listen(); };
-$("skipBtn").onclick = ()=>{
-  const it=S.items[S.idx];
-  S.attempted++; S.streak=0;
-  const m = it.type==="story"?it.story.q:it.target;
-  if(!S.missed.includes(m)) S.missed.push(m);
-  S.idx++; renderItem();
-};
-$("saveBtn").onclick = ()=>downloadReport(false);
-$("homeBtn").onclick = ()=>{ $("streakBadge").textContent="🔥 Day streak: "+dayStreak(); show("title"); };
-$("dexBtn").onclick = ()=>{ renderDex(); show("dex"); };
-$("dexBack").onclick = ()=>show("title");
-$("grownup").onclick = ()=>{ renderParent(); show("parent"); };
-$("pBack").onclick = ()=>show("title");
-$("pSave").onclick = ()=>downloadReport(false);
-$("micTestBtn").onclick = ()=>{
-  if(!micOK){ $("micStatus").textContent="This browser has no speech recognition — use Chrome. Tapping mode still works!"; return; }
-  $("micStatus").textContent="Say: \"I can read!\"";
-  const r=new SR(); r.lang="en-US";
-  r.onresult=e=>{ $("micStatus").textContent="✅ Mic works! I heard: "+e.results[0][0].transcript; };
-  r.onerror=e=>{ $("micStatus").textContent="⚠️ Mic blocked ("+e.error+"). The game will use tapping mode."; micOK=false; };
-  try{ r.start(); }catch(e){ $("micStatus").textContent="⚠️ Could not start the mic."; }
-};
-
-$("streakBadge").textContent = "🔥 Day streak: " + dayStreak();
-if(!micOK) $("micStatus").textContent = "Tip: open in Chrome for read-aloud mode. Tapping mode works everywhere.";
-
-/* expose a tiny hook for automated testing */
-window.__cc = { buildSession, scoreSpeech, buildReportPayload, startSession, get S(){return S;}, DATA:()=>DATA };
+init();
 } // end main()
 </script>
 </body>

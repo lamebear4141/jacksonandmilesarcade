@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jackson &amp; Miles Arcade — Badge Banner &amp; Open Trades</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ac-sky-top:#79D2FF; --ac-sky-mid:#A8E4FF; --ac-sky-bot:#D6F3FF;
+  --ac-panel:#FFFFFF; --ac-panel-2:#FFF4DA;
+  --ac-edge:#1E2B63; --ac-line:#C8D6F5;
+  --ac-text:#1E2B63; --ac-text-dim:#5C6EA8; --ac-text-mute:#8E9BC4;
+  --ac-red:#FF5A5A; --ac-red-deep:#D62A2A;
+  --ac-yellow:#FFC93C; --ac-yellow-deep:#E39B00;
+  --ac-blue:#4C9BFF; --ac-blue-deep:#1F5FD6;
+  --ac-purple:#A971F5; --ac-purple-deep:#7433CE;
+  --ac-good:#2ECC71; --ac-bad:#FF4D4D;
+  --ac-radius:24px; --ac-radius-sm:14px; --ac-bd:4px; --ac-lift:7px;
+  --ac-font:'Baloo 2','Arial Rounded MT Bold','Trebuchet MS',system-ui,sans-serif;
+  --rar-common:#9BB1D4; --rar-rare:#4C9BFF; --rar-epic:#A971F5;
+  --rar-legend:#FFC93C; --rar-mythic:#FF5F4D;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{font-family:var(--ac-font);color:var(--ac-text);background:var(--ac-sky-bot);font-weight:700;overflow-x:hidden}
+button{font-family:inherit;font-weight:800;cursor:pointer}
+h1,h2,h3{margin:0}
+
+.ac-btn{display:inline-flex;align-items:center;justify-content:center;gap:.5em;padding:12px 22px;font-size:18px;color:#fff;background:linear-gradient(180deg,var(--ac-red),var(--ac-red-deep));border:var(--ac-bd) solid var(--ac-edge);border-radius:var(--ac-radius-sm);box-shadow:0 var(--ac-lift) 0 var(--ac-edge),0 13px 14px rgba(30,43,99,.25);text-shadow:0 2px 0 rgba(0,0,0,.22);transition:transform .06s,box-shadow .06s,filter .12s}
+.ac-btn:hover{filter:brightness(1.06)}
+.ac-btn:active{transform:translateY(var(--ac-lift));box-shadow:0 0 0 var(--ac-edge)}
+.ac-btn:disabled{filter:grayscale(.75) brightness(.93);cursor:not-allowed;transform:none}
+.ac-btn--yellow{background:linear-gradient(180deg,var(--ac-yellow),var(--ac-yellow-deep));color:var(--ac-edge);text-shadow:0 2px 0 rgba(255,255,255,.45)}
+.ac-btn--blue{background:linear-gradient(180deg,var(--ac-blue),var(--ac-blue-deep))}
+.ac-btn--purple{background:linear-gradient(180deg,var(--ac-purple),var(--ac-purple-deep))}
+.ac-btn--green{background:linear-gradient(180deg,#63E08A,#23A354)}
+.ac-btn--outline{background:var(--ac-panel);color:var(--ac-text);text-shadow:none}
+.ac-btn--sm{padding:7px 14px;font-size:14px;border-width:3px;--ac-lift:4px;border-radius:11px}
+
+.ac-badge{display:inline-block;padding:4px 11px;font-size:11.5px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--ac-edge);background:var(--ac-panel-2);border:3px solid var(--ac-edge);border-radius:999px;white-space:nowrap}
+.ac-card{background:var(--ac-panel);border:var(--ac-bd) solid var(--ac-edge);border-radius:var(--ac-radius);box-shadow:0 var(--ac-lift) 0 var(--ac-edge),0 16px 30px rgba(30,43,99,.16);padding:20px}
+.ac-page{position:relative;min-height:100vh;padding:18px 16px 120px;background:linear-gradient(180deg,var(--ac-sky-top),var(--ac-sky-mid) 45%,var(--ac-sky-bot))}
+.ac-wrap{width:min(940px,100%);margin:0 auto;position:relative;z-index:2}
+.ac-avatar{width:36px;height:36px;flex:none;border-radius:50%;display:grid;place-items:center;font-size:21px;border:3px solid var(--ac-edge)}
+
+/* ============================================================
+   BADGE BANNER — bunting pennants strung on a line
+   ============================================================ */
+.banner{position:relative;padding:16px 4px 8px;margin-top:6px}
+.banner::before{
+  content:'';position:absolute;left:0;right:0;top:14px;height:5px;border-radius:99px;
+  background:var(--ac-edge);opacity:.85;
+}
+.banner__row{position:relative;display:flex;gap:10px;flex-wrap:wrap;padding-top:4px}
+.pennant{
+  position:relative;width:90px;padding:11px 7px 30px;
+  display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;
+  clip-path:polygon(0 0,100% 0,100% 74%,50% 100%,0 74%);
+  border-top:5px solid transparent;
+  box-shadow:0 4px 8px rgba(30,43,99,.2);
+  animation:sway 4s ease-in-out infinite;transform-origin:50% 0;
+}
+@keyframes sway{0%,100%{transform:rotate(-1.4deg)}50%{transform:rotate(1.4deg)}}
+.pennant:nth-child(2n){animation-delay:.5s}
+.pennant:nth-child(3n){animation-delay:1s}
+.pennant__e{font-size:29px;line-height:1.1;filter:drop-shadow(0 2px 1px rgba(0,0,0,.22))}
+.pennant__n{font-size:9px;line-height:1.08;letter-spacing:.2px;max-width:100%}
+.pennant--p1{background:linear-gradient(180deg,#FFD666,#F0A800);color:#4A3000}
+.pennant--p2{background:linear-gradient(180deg,#7FB6FF,#2F6FD8);color:#fff}
+.pennant--p3{background:linear-gradient(180deg,#C79BFF,#8038DB);color:#fff}
+.pennant--p4{background:linear-gradient(180deg,#79E8A2,#22A159);color:#043019}
+.pennant--p5{background:linear-gradient(180deg,#FF9797,#DE3B3B);color:#fff}
+.pennant--empty{background:repeating-linear-gradient(45deg,#EEF3FC 0 7px,#E3EBF9 7px 14px);color:var(--ac-text-mute);box-shadow:none;animation:none}
+.pennant--empty .pennant__e{filter:grayscale(1);opacity:.42}
+.banner__count{font-size:12.5px;color:var(--ac-text-dim);margin-top:6px}
+
+/* character header */
+.hero{display:flex;gap:20px;align-items:center;flex-wrap:wrap;padding:20px 24px;background:linear-gradient(135deg,#E9F6FF,#FFFFFF 55%);border:var(--ac-bd) solid var(--ac-edge);border-radius:var(--ac-radius);box-shadow:0 var(--ac-lift) 0 var(--ac-edge)}
+.hero__stage{position:relative;width:120px;height:120px;flex:none;display:grid;place-items:center;background:radial-gradient(circle at 50% 35%,#FFF6D8,#FFE49A);border:5px solid var(--ac-edge);border-radius:50%}
+.hero__avatar{font-size:60px}
+.hero__lvl{position:absolute;left:-8px;top:-4px;padding:4px 11px;font-size:14px;background:var(--ac-yellow);border:3px solid var(--ac-edge);border-radius:999px;box-shadow:0 3px 0 var(--ac-edge)}
+
+/* ============================================================
+   TRADE BUILDER
+   ============================================================ */
+.trays{display:grid;grid-template-columns:1fr 48px 1fr;gap:10px;align-items:stretch}
+@media (max-width:640px){.trays{grid-template-columns:1fr;gap:8px}.swap{transform:rotate(90deg);margin:0 auto}}
+.tray{padding:13px;background:var(--ac-panel-2);border:4px dashed var(--ac-line);border-radius:var(--ac-radius-sm);min-height:132px}
+.tray.filled{border-style:solid;border-color:var(--ac-edge);background:#fff}
+.tray__t{font-size:11.5px;letter-spacing:1.1px;text-transform:uppercase;color:var(--ac-text-mute);margin-bottom:9px;display:flex;justify-content:space-between;align-items:center}
+.tray__items{display:flex;flex-wrap:wrap;gap:9px;min-height:62px}
+.tray__hint{font-size:13px;color:var(--ac-text-mute);align-self:center}
+.swap{display:grid;place-items:center;font-size:27px}
+
+.chip{
+  position:relative;width:56px;height:56px;display:grid;place-items:center;font-size:27px;
+  background:#fff;border:4px solid var(--rar-common);border-radius:12px;
+  box-shadow:0 4px 0 rgba(30,43,99,.3);cursor:pointer;
+  transition:transform .1s cubic-bezier(.34,1.6,.64,1);
+}
+.chip:hover{transform:translateY(-3px)}
+.chip:active{transform:translateY(3px);box-shadow:0 0 0 rgba(30,43,99,.3)}
+.chip.r-rare{border-color:var(--rar-rare)}
+.chip.r-epic{border-color:var(--rar-epic);background:linear-gradient(180deg,#fff,#F5EEFF)}
+.chip.r-legendary{border-color:var(--rar-legend);background:linear-gradient(180deg,#fff,#FFF4D2)}
+.chip.r-mythic{border-color:var(--rar-mythic);background:linear-gradient(180deg,#fff,#FFE7E3)}
+.chip.out{opacity:.34;cursor:not-allowed;filter:grayscale(.7)}
+.chip__c{position:absolute;right:-6px;top:-6px;min-width:22px;height:22px;display:grid;place-items:center;padding:0 5px;font-size:11px;color:#fff;background:var(--ac-blue-deep);border:3px solid var(--ac-edge);border-radius:999px}
+.chip__x{position:absolute;right:-6px;top:-6px;width:22px;height:22px;display:grid;place-items:center;font-size:12px;color:#fff;background:var(--ac-red);border:3px solid var(--ac-edge);border-radius:999px}
+@keyframes plop{0%{transform:scale(.4)}70%{transform:scale(1.16)}100%{transform:scale(1)}}
+.chip.new{animation:plop .26s cubic-bezier(.34,1.5,.64,1)}
+
+.shelf{margin-top:16px}
+.shelf__t{display:flex;align-items:center;gap:9px;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:var(--ac-text-mute);margin-bottom:10px}
+.shelf__grid{display:flex;flex-wrap:wrap;gap:11px}
+
+.tally{
+  display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;
+  margin-top:16px;padding:12px 18px;font-size:15px;
+  background:#EAF3FF;border:3px solid var(--ac-blue);border-radius:14px;
+}
+.tally b{font-size:19px}
+.dots{display:inline-flex;gap:3px;vertical-align:-1px}
+.dots i{width:10px;height:10px;border-radius:50%;display:inline-block;border:2px solid var(--ac-edge)}
+
+.offer-card{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:15px;background:var(--ac-panel);border:var(--ac-bd) solid var(--ac-edge);border-radius:var(--ac-radius);box-shadow:0 5px 0 var(--ac-edge)}
+.offer-side{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.mini{width:42px;height:42px;font-size:20px;display:grid;place-items:center;background:#fff;border:3px solid var(--rar-common);border-radius:10px}
+.mini.r-rare{border-color:var(--rar-rare)}.mini.r-epic{border-color:var(--rar-epic)}
+.mini.r-legendary{border-color:var(--rar-legend)}.mini.r-mythic{border-color:var(--rar-mythic)}
+
+#switcher{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:95;display:flex;gap:5px;align-items:center;padding:6px 6px 6px 14px;background:#0E1533;border:2px solid #37447D;border-radius:999px;box-shadow:0 10px 30px rgba(0,0,0,.4);max-width:calc(100vw - 24px);overflow-x:auto}
+#switcher b{color:#7F8EC4;font-size:10px;letter-spacing:1.6px;text-transform:uppercase;padding-right:6px;white-space:nowrap}
+#switcher button{padding:8px 13px;font-size:13px;white-space:nowrap;color:#C9D3F5;background:#1B2450;border:0;border-radius:999px}
+#switcher button.on{background:var(--ac-yellow);color:#0E1533}
+#fx{position:fixed;inset:0;pointer-events:none;z-index:88}
+.screen{display:none}.screen.on{display:block}
+.note{margin:22px auto 0;padding:13px 17px;max-width:730px;font-size:13.5px;font-weight:600;line-height:1.6;color:#2A3A73;background:rgba(255,255,255,.75);border:2px dashed #7E90C9;border-radius:14px}
+.note b{color:#1E2B63}
+.section-head{display:flex;align-items:center;gap:12px;margin:26px 0 13px}
+.section-head__ribbon{padding:7px 18px;font-size:14px;letter-spacing:1.4px;text-transform:uppercase;color:#fff;background:var(--ac-edge);border-radius:999px;box-shadow:0 4px 0 rgba(30,43,99,.35)}
+.section-head__rule{flex:1;height:5px;border-radius:99px;background:repeating-linear-gradient(90deg,var(--ac-edge) 0 12px,transparent 12px 24px);opacity:.35}
+#toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(18px);z-index:92;padding:12px 22px;font-size:16px;color:#fff;background:var(--ac-edge);border-radius:999px;box-shadow:0 8px 24px rgba(30,43,99,.4);opacity:0;pointer-events:none;transition:.24s;max-width:88vw;text-align:center}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ═══════════ 1. MY BADGE BANNER ═══════════ -->
+<section class="screen on ac-page" id="s-mine">
+  <div class="ac-wrap">
+    <div class="hero">
+      <div class="hero__stage"><div class="hero__lvl">LVL 7</div><div class="hero__avatar">🥷</div></div>
+      <div style="flex:1;min-width:230px">
+        <h2 style="font-size:29px">SuperMiles</h2>
+        <div style="color:var(--ac-text-dim);font-size:15px">Level 7 · 🪙 1,240 · 📦 37/81 collected</div>
+        <div class="banner">
+          <div class="banner__row" id="myBanner"></div>
+          <div class="banner__count" id="myCount"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      <b>The banner is the brag.</b> It hangs on your character header and travels with you —
+      siblings and approved friends see it when they peek your collection or visit your world.
+      All earned badges show at once (no "featured" pick), and the remaining slots hang faded
+      so you can always see how many are left to win. Pennants sway on a slight stagger so the
+      line feels alive. Halloween and Christmas sets will drop in here as new pennants with the
+      year on them — <b>🎃 Halloween 2026</b> reads as a genuine time-stamp you can't get later.
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 2. VISITING JAX ═══════════ -->
+<section class="screen ac-page" id="s-visit">
+  <div class="ac-wrap">
+    <div class="ac-card" style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
+      <div class="hero__stage" style="width:96px;height:96px"><div class="hero__avatar" style="font-size:48px">🦖</div></div>
+      <div style="flex:1;min-width:230px">
+        <div style="font-size:11.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--ac-text-mute)">Visiting</div>
+        <h2 style="font-size:27px">JAX3000</h2>
+        <div style="color:var(--ac-text-dim);font-size:14.5px">Level 9 · 📦 48/81 · 👀 look, don't touch</div>
+        <div class="banner">
+          <div class="banner__row" id="jaxBanner"></div>
+          <div class="banner__count" id="jaxCount"></div>
+        </div>
+      </div>
+      <button class="ac-btn ac-btn--purple" data-go="trade">🔁 Propose a trade</button>
+    </div>
+
+    <div class="note">
+      <b>Same component, someone else's shelf.</b> Jackson has five pennants to Miles's three —
+      that gap is the whole motivation engine, and it's visible in one glance without a
+      leaderboard or a score. Nothing here is rankable or comparable beyond "who has which
+      badges", which keeps it a brag rather than a competition a younger brother always loses.
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 3. OPEN TRADE BUILDER ═══════════ -->
+<section class="screen ac-page" id="s-trade">
+  <div class="ac-wrap">
+    <div class="ac-card">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:15px">
+        <div class="ac-avatar" style="background:#CBE4FF;width:44px;height:44px;font-size:24px">🦖</div>
+        <div><h2 style="font-size:23px">Trade with JAX3000</h2>
+          <div style="font-size:13.5px;color:var(--ac-text-dim)">Put anything on either side — it's up to Jackson to say yes.</div></div>
+        <button class="ac-btn ac-btn--sm ac-btn--outline" id="clearBtn" style="margin-left:auto">↺ Start over</button>
+      </div>
+
+      <div class="trays">
+        <div class="tray" id="giveTray">
+          <div class="tray__t"><span>You give</span><span id="giveN">0/6</span></div>
+          <div class="tray__items" id="giveItems"><span class="tray__hint">Tap your spares below ↓</span></div>
+        </div>
+        <div class="swap">⇄</div>
+        <div class="tray" id="wantTray">
+          <div class="tray__t"><span>You get</span><span id="wantN">0/6</span></div>
+          <div class="tray__items" id="wantItems"><span class="tray__hint">Tap Jackson's spares ↓</span></div>
+        </div>
+      </div>
+
+      <div class="tally" id="tally">Build your offer — any number on either side.</div>
+
+      <div style="text-align:center;margin-top:16px">
+        <button class="ac-btn ac-btn--green" id="sendBtn" disabled>📨 Send offer</button>
+      </div>
+
+      <div class="shelf">
+        <div class="shelf__t">🎒 Your spares <span style="text-transform:none;letter-spacing:0">— you always keep one of each</span></div>
+        <div class="shelf__grid" id="mineShelf"></div>
+      </div>
+
+      <div class="shelf">
+        <div class="shelf__t">🦖 Jackson's spares</div>
+        <div class="shelf__grid" id="jaxShelf"></div>
+      </div>
+    </div>
+
+    <div class="note">
+      <b>Open trades, one guardrail.</b> Any count on either side — 1-for-1, 5-for-1, 3-for-2 —
+      and Jackson simply accepts or rejects. The only hard rule the code keeps is
+      <b>you can never give away your last copy of anything</b>: the shelf shows spares only, and
+      each chip greys out when you've offered all of them. Six per side keeps the card readable.
+      Still zero text fields anywhere — the entire offer is built by tapping.
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 4. THE INCOMING OFFER ═══════════ -->
+<section class="screen ac-page" id="s-incoming">
+  <div class="ac-wrap">
+    <div class="section-head"><span class="section-head__ribbon" style="background:var(--ac-purple-deep)">📬 Offers for you</span><span class="section-head__rule"></span></div>
+
+    <div class="offer-card" id="offerCard">
+      <div class="ac-avatar" style="background:#CBE4FF;width:46px;height:46px;font-size:24px">🦖</div>
+      <div style="flex:1;min-width:250px">
+        <div style="font-size:16px;margin-bottom:8px"><b>JAX3000</b> wants to trade</div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:10.5px;letter-spacing:1px;text-transform:uppercase;color:var(--ac-text-mute);margin-bottom:4px">They give you</div>
+            <div class="offer-side">
+              <div class="mini r-legendary">🦄</div>
+            </div>
+          </div>
+          <div style="font-size:22px">⇄</div>
+          <div>
+            <div style="font-size:10.5px;letter-spacing:1px;text-transform:uppercase;color:var(--ac-text-mute);margin-bottom:4px">You give</div>
+            <div class="offer-side">
+              <div class="mini r-rare">🐙</div><div class="mini r-rare">🦋</div>
+              <div class="mini">🐝</div><div class="mini">🐞</div><div class="mini">🐜</div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:10px;font-size:13.5px;color:var(--ac-text-dim)">
+          That's <b>5 for 1</b> — you'd still have one of each. Your call! 🙂
+        </div>
+      </div>
+      <div style="display:flex;gap:9px;flex-wrap:wrap">
+        <button class="ac-btn ac-btn--sm ac-btn--green" id="acceptBtn">✓ Accept</button>
+        <button class="ac-btn ac-btn--sm ac-btn--outline" id="declineBtn">✗ No thanks</button>
+      </div>
+    </div>
+
+    <div class="note">
+      <b>The one thing "anything goes" needs.</b> A 3rd grader can absolutely talk a 1st grader
+      into 5-for-1, so the card states the shape of the deal in plain words — <i>"That's 5 for 1
+      — you'd still have one of each. Your call!"</i> — without blocking it or scolding anyone.
+      It's information, not a judgment. Pair it with a <b>trade log in the parent portal</b>
+      (who traded what, when) so you can spot a pattern and have a conversation about it —
+      that's the real safety valve, and it's a parenting moment rather than a code rule.
+    </div>
+  </div>
+</section>
+
+</div>
+
+<div id="toast"></div>
+<canvas id="fx"></canvas>
+
+<nav id="switcher">
+  <b>Mockup</b>
+  <button data-go="mine" class="on">🏅 My banner</button>
+  <button data-go="visit">👀 Visiting Jax</button>
+  <button data-go="trade">🔁 Build a trade</button>
+  <button data-go="incoming">📬 Incoming offer</button>
+</nav>
+
+<script>
+(function(){
+'use strict';
+
+/* ---------- sound ---------- */
+var ctx=null;
+function ac(){if(!ctx){try{ctx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){return null;}}if(ctx.state==='suspended')ctx.resume();return ctx;}
+function beep(f,d,t,v,w){var c=ac();if(!c)return;var s=c.currentTime+(w||0),o=c.createOscillator(),g=c.createGain();o.type=t||'square';o.frequency.setValueAtTime(f,s);g.gain.setValueAtTime(v||.08,s);g.gain.exponentialRampToValueAtTime(.0001,s+d);o.connect(g);g.connect(c.destination);o.start(s);o.stop(s+d+.02);}
+var S={tap:function(){beep(660,.06,'square',.05);},pop:function(){beep(520,.05,'triangle',.09);beep(780,.08,'triangle',.07,.05);},
+       nope:function(){beep(200,.15,'sawtooth',.05);},
+       win:function(){[523,659,784,1047,1319].forEach(function(f,i){beep(f,.17,'triangle',.09,i*.088);});}};
+
+/* ---------- confetti ---------- */
+var cv=document.getElementById('fx'),c2=cv.getContext('2d'),bits=[];
+function size(){cv.width=innerWidth;cv.height=innerHeight;}size();addEventListener('resize',size);
+var COLORS=['#FF5A5A','#FFC93C','#4C9BFF','#A971F5','#2ECC71','#FFFFFF'];
+function burst(x,y,n,p){for(var i=0;i<(n||24);i++){var a=Math.random()*Math.PI*2,sp=Math.random()*(p||7)+2;bits.push({x:x,y:y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-3,s:4+Math.random()*7,r:Math.random()*6,vr:(Math.random()-.5)*.5,c:COLORS[Math.floor(Math.random()*COLORS.length)],life:1});}}
+function rain(n){for(var i=0;i<(n||90);i++)bits.push({x:Math.random()*cv.width,y:-20-Math.random()*320,vx:(Math.random()-.5)*2,vy:2+Math.random()*4,s:6+Math.random()*9,r:Math.random()*6,vr:(Math.random()-.5)*.4,c:COLORS[Math.floor(Math.random()*COLORS.length)],life:1});}
+(function loop(){c2.clearRect(0,0,cv.width,cv.height);for(var i=bits.length-1;i>=0;i--){var b=bits[i];b.vy+=.28;b.x+=b.vx;b.y+=b.vy;b.r+=b.vr;b.life-=.006;if(b.life<=0||b.y>cv.height+60){bits.splice(i,1);continue;}c2.save();c2.translate(b.x,b.y);c2.rotate(b.r);c2.globalAlpha=Math.max(0,Math.min(1,b.life*1.6));c2.fillStyle=b.c;c2.fillRect(-b.s/2,-b.s/2,b.s,b.s*.66);c2.restore();}requestAnimationFrame(loop);})();
+function burstAt(el,n,p){var r=el.getBoundingClientRect();burst(r.left+r.width/2,r.top+r.height/2,n||20,p||7);}
+
+var toastT;
+function toast(m){var t=document.getElementById('toast');t.textContent=m;t.className='show';clearTimeout(toastT);toastT=setTimeout(function(){t.className='';},2200);}
+
+function go(id){document.querySelectorAll('.screen').forEach(function(s){s.classList.toggle('on',s.id==='s-'+id);});
+  document.querySelectorAll('#switcher button').forEach(function(b){b.classList.toggle('on',b.dataset.go===id);});scrollTo(0,0);S.tap();}
+document.addEventListener('click',function(e){var t=e.target.closest('[data-go]');if(t)go(t.dataset.go);});
+
+/* ============================================================
+   BADGE BANNERS
+   ============================================================ */
+var ALL=[
+ {e:'🦴',n:'Dino Expert'},{e:'🐍',n:'Snake Charmer'},{e:'🌴',n:'Jungle Guide'},
+ {e:'🐝',n:'Bug Whisperer'},{e:'🌊',n:'Ocean Explorer'},{e:'🐕',n:'Top Dog'},
+ {e:'🧸',n:'Heart of Gold'},{e:'✨',n:'Dreamweaver'}
+];
+function renderBanner(hostId,countId,earnedNames){
+  var host=document.getElementById(hostId);host.innerHTML='';
+  var earned=ALL.filter(function(b){return earnedNames.indexOf(b.n)>=0;});
+  earned.forEach(function(b,i){
+    var d=document.createElement('div');
+    d.className='pennant pennant--p'+((i%5)+1);
+    d.innerHTML='<div class="pennant__e">'+b.e+'</div><div class="pennant__n">'+b.n+'</div>';
+    host.appendChild(d);
+  });
+  var left=ALL.length-earned.length;
+  for(var i=0;i<Math.min(left,3);i++){
+    var d2=document.createElement('div');d2.className='pennant pennant--empty';
+    d2.innerHTML='<div class="pennant__e">🔒</div><div class="pennant__n">?</div>';
+    host.appendChild(d2);
+  }
+  document.getElementById(countId).textContent=
+    earned.length+' of '+ALL.length+' badges'+(left?' · '+left+' still to win':' · ALL BADGES! 🏆');
+}
+renderBanner('myBanner','myCount',['Bug Whisperer','Heart of Gold','Dino Expert']);
+renderBanner('jaxBanner','jaxCount',['Dino Expert','Ocean Explorer','Top Dog','Jungle Guide','Snake Charmer']);
+
+/* ============================================================
+   TRADE BUILDER — any count either side
+   ============================================================ */
+var MAX=6;
+var MINE=[{e:'🐙',n:'Ink Ops',r:'rare',spare:2},{e:'🦋',n:'Flutter Byte',r:'rare',spare:1},
+          {e:'🐝',n:'Buzz Cut',r:'common',spare:3},{e:'🐞',n:'Dot Matrix',r:'common',spare:2},
+          {e:'🐜',n:'Tiny Titan',r:'common',spare:4},{e:'🐭',n:'Squeak',r:'common',spare:2},
+          {e:'👻',n:'Boo Radley',r:'epic',spare:1}];
+var JAX =[{e:'🦄',n:'Prism Hoof',r:'legendary',spare:1},{e:'🦕',n:'Longneck Lou',r:'rare',spare:2},
+          {e:'🐬',n:'Splash Dart',r:'rare',spare:1},{e:'🦮',n:'Sunny',r:'epic',spare:1},
+          {e:'🐢',n:'Tank Shell',r:'common',spare:3},{e:'🦐',n:'Pop Shrimp',r:'common',spare:2}];
+var give=[],want=[];
+
+function shelf(hostId,list,side){
+  var host=document.getElementById(hostId);host.innerHTML='';
+  list.forEach(function(it,ix){
+    var used=(side==='give'?give:want).filter(function(x){return x.ix===ix;}).length;
+    var out=used>=it.spare;
+    var d=document.createElement('div');
+    d.className='chip r-'+it.r+(out?' out':'');
+    d.textContent=it.e;
+    d.innerHTML=it.e+'<span class="chip__c">'+(it.spare-used)+'</span>';
+    d.title=it.n;
+    d.addEventListener('click',function(){
+      var arr=side==='give'?give:want;
+      if(out){S.nope();toast('That’s your last one — you keep it! 🙂');return;}
+      if(arr.length>=MAX){S.nope();toast('Six per side keeps it fair to read!');return;}
+      arr.push({ix:ix,e:it.e,r:it.r,n:it.n});
+      S.pop();burstAt(d,9,4);draw();
+    });
+    host.appendChild(d);
+  });
+}
+function tray(hostId,arr,side,nId){
+  var host=document.getElementById(hostId);host.innerHTML='';
+  if(!arr.length){
+    host.innerHTML='<span class="tray__hint">'+(side==='give'?'Tap your spares below ↓':'Tap Jackson’s spares ↓')+'</span>';
+  } else {
+    arr.forEach(function(it,i){
+      var d=document.createElement('div');
+      d.className='chip new r-'+it.r;
+      d.innerHTML=it.e+'<span class="chip__x">✕</span>';
+      d.title='Remove '+it.n;
+      d.addEventListener('click',function(){arr.splice(i,1);S.tap();draw();});
+      host.appendChild(d);
+    });
+  }
+  document.getElementById(nId).textContent=arr.length+'/'+MAX;
+  document.getElementById(side==='give'?'giveTray':'wantTray').classList.toggle('filled',arr.length>0);
+}
+var RC={common:'var(--rar-common)',rare:'var(--rar-rare)',epic:'var(--rar-epic)',
+        legendary:'var(--rar-legend)',mythic:'var(--rar-mythic)'};
+function dots(arr){
+  return '<span class="dots">'+arr.map(function(x){
+    return '<i style="background:'+RC[x.r]+'"></i>';}).join('')+'</span>';
+}
+function draw(){
+  tray('giveItems',give,'give','giveN');
+  tray('wantItems',want,'want','wantN');
+  shelf('mineShelf',MINE,'give');
+  shelf('jaxShelf',JAX,'want');
+  var t=document.getElementById('tally');
+  if(!give.length&&!want.length){t.innerHTML='Build your offer — any number on either side.';}
+  else{
+    t.innerHTML='You give <b>'+give.length+'</b> '+dots(give)+
+      ' &nbsp;⇄&nbsp; You get <b>'+want.length+'</b> '+dots(want)+
+      (give.length&&want.length?'<span style="width:100%;text-align:center;font-size:13px;color:var(--ac-text-dim)">That’s <b>'+give.length+' for '+want.length+'</b> — Jackson decides. 🙂</span>':'');
+  }
+  document.getElementById('sendBtn').disabled=!(give.length&&want.length);
+}
+document.getElementById('clearBtn').addEventListener('click',function(){give=[];want=[];S.tap();draw();});
+document.getElementById('sendBtn').addEventListener('click',function(e){
+  burstAt(e.currentTarget,36,10);rain(60);S.win();
+  toast('📨 Offer sent to Jackson!');
+  give=[];want=[];draw();
+});
+draw();
+
+document.getElementById('acceptBtn').addEventListener('click',function(e){
+  burstAt(e.currentTarget,44,11);rain(90);S.win();
+  document.getElementById('offerCard').innerHTML=
+    '<div style="text-align:center;width:100%;padding:10px"><div style="font-size:40px">🎉</div>'+
+    '<div style="font-size:19px;margin-top:6px">Trade complete! 🦄 <b>Prism Hoof</b> joined your collection.</div>'+
+    '<div style="font-size:14px;color:var(--ac-text-dim);margin-top:5px">That finished <b>Make-Believe</b> — check your banner!</div></div>';
+});
+document.getElementById('declineBtn').addEventListener('click',function(){
+  S.tap();
+  document.getElementById('offerCard').innerHTML=
+    '<div style="text-align:center;width:100%;padding:14px;font-size:16px;color:var(--ac-text-dim)">📭 No trades waiting right now.</div>';
+});
+})();
+</script>
+</body>
+</html>

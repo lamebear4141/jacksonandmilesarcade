@@ -126,7 +126,6 @@
     font-size:19px; cursor:pointer; transition:transform 0.06s, box-shadow 0.06s;
   }
   .fd-sound:active{ transform:translateY(4px); box-shadow:0 0 0 var(--ac-edge); }
-  .fd-grownups{ font-size:12px; padding:10px 14px; margin-top:0; }
 
   /* ---- reduced motion: the front door goes still, stays usable ---- */
   @media (prefers-reduced-motion: reduce){
@@ -163,9 +162,10 @@
               fill="#FFFFFF" stroke="#1E2B63" stroke-width="5" stroke-linejoin="round"/>
       </svg>
 
+      <!-- sound only: grown-ups reach the report from the signed-in bar, which
+           is where it belongs anyway (the report is behind the parent login) -->
       <div class="fd-corner">
         <button class="fd-sound" id="sndToggle" type="button" title="Sound on/off">🔊</button>
-        <a class="ac-btn ac-btn--outline ac-btn--inline fd-grownups" href="parent-report/index.html">👨‍👩‍👦 Grown-ups</a>
       </div>
 
       <div class="fd-content">

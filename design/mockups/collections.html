@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jackson &amp; Miles Arcade — Collections &amp; Badges</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ac-sky-top:#79D2FF; --ac-sky-mid:#A8E4FF; --ac-sky-bot:#D6F3FF;
+  --ac-panel:#FFFFFF; --ac-panel-2:#FFF4DA;
+  --ac-edge:#1E2B63; --ac-line:#C8D6F5;
+  --ac-text:#1E2B63; --ac-text-dim:#5C6EA8; --ac-text-mute:#8E9BC4;
+  --ac-red:#FF5A5A; --ac-red-deep:#D62A2A;
+  --ac-yellow:#FFC93C; --ac-yellow-deep:#E39B00;
+  --ac-blue:#4C9BFF; --ac-blue-deep:#1F5FD6;
+  --ac-purple:#A971F5; --ac-purple-deep:#7433CE;
+  --ac-good:#2ECC71; --ac-bad:#FF4D4D;
+  --ac-radius:24px; --ac-radius-sm:14px; --ac-bd:4px; --ac-lift:7px;
+  --ac-font:'Baloo 2','Arial Rounded MT Bold','Trebuchet MS',system-ui,sans-serif;
+  --rar-common:#9BB1D4; --rar-rare:#4C9BFF; --rar-epic:#A971F5;
+  --rar-legend:#FFC93C; --rar-mythic:#FF5F4D;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{font-family:var(--ac-font);color:var(--ac-text);background:var(--ac-sky-bot);font-weight:700;overflow-x:hidden}
+button{font-family:inherit;font-weight:800;cursor:pointer}
+h1,h2,h3{margin:0}
+
+.ac-btn{display:inline-flex;align-items:center;justify-content:center;gap:.5em;padding:12px 22px;font-size:18px;color:#fff;background:linear-gradient(180deg,var(--ac-red),var(--ac-red-deep));border:var(--ac-bd) solid var(--ac-edge);border-radius:var(--ac-radius-sm);box-shadow:0 var(--ac-lift) 0 var(--ac-edge),0 13px 14px rgba(30,43,99,.25);text-shadow:0 2px 0 rgba(0,0,0,.22);transition:transform .06s,box-shadow .06s,filter .12s}
+.ac-btn:hover{filter:brightness(1.06)}
+.ac-btn:active{transform:translateY(var(--ac-lift));box-shadow:0 0 0 var(--ac-edge)}
+.ac-btn--yellow{background:linear-gradient(180deg,var(--ac-yellow),var(--ac-yellow-deep));color:var(--ac-edge);text-shadow:0 2px 0 rgba(255,255,255,.45)}
+.ac-btn--blue{background:linear-gradient(180deg,var(--ac-blue),var(--ac-blue-deep))}
+.ac-btn--purple{background:linear-gradient(180deg,var(--ac-purple),var(--ac-purple-deep))}
+.ac-btn--green{background:linear-gradient(180deg,#63E08A,#23A354)}
+.ac-btn--outline{background:var(--ac-panel);color:var(--ac-text);text-shadow:none}
+.ac-btn--sm{padding:7px 14px;font-size:14px;border-width:3px;--ac-lift:4px;border-radius:11px}
+
+.ac-badge{display:inline-block;padding:4px 11px;font-size:11.5px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--ac-edge);background:var(--ac-panel-2);border:3px solid var(--ac-edge);border-radius:999px;white-space:nowrap}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+.ac-badge--hot{background:var(--ac-yellow);animation:breathe 1.8s ease-in-out infinite}
+
+.ac-card{background:var(--ac-panel);border:var(--ac-bd) solid var(--ac-edge);border-radius:var(--ac-radius);box-shadow:0 var(--ac-lift) 0 var(--ac-edge),0 16px 30px rgba(30,43,99,.16);padding:20px}
+.ac-page{position:relative;min-height:100vh;padding:18px 16px 120px;background:linear-gradient(180deg,var(--ac-sky-top),var(--ac-sky-mid) 45%,var(--ac-sky-bot))}
+.ac-wrap{width:min(940px,100%);margin:0 auto;position:relative;z-index:2}
+
+/* ---------- tab strip with notification dot ---------- */
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.tab{position:relative;padding:11px 20px;font-size:16px;color:var(--ac-text);background:var(--ac-panel);border:var(--ac-bd) solid var(--ac-edge);border-radius:999px;box-shadow:0 5px 0 var(--ac-edge);transition:transform .06s,box-shadow .06s}
+.tab:active{transform:translateY(5px);box-shadow:0 0 0 var(--ac-edge)}
+.tab.on{background:var(--ac-yellow)}
+.dot{
+  position:absolute;top:-9px;right:-9px;min-width:26px;height:26px;padding:0 6px;
+  display:grid;place-items:center;font-size:13px;color:#fff;
+  background:var(--ac-red);border:3px solid var(--ac-edge);border-radius:999px;
+  box-shadow:0 3px 0 var(--ac-edge);
+}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.18)}}
+.dot--pulse{animation:pulse 1.1s ease-in-out infinite}
+
+/* ---------- badge case ---------- */
+.case{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.mybadge{
+  display:flex;flex-direction:column;align-items:center;gap:4px;width:104px;padding:12px 6px 10px;
+  background:linear-gradient(180deg,#FFF8E4,#FFE9B8);border:var(--ac-bd) solid var(--ac-edge);
+  border-radius:var(--ac-radius-sm);box-shadow:0 5px 0 var(--ac-edge);text-align:center;
+}
+.mybadge__e{font-size:34px;line-height:1.1;filter:drop-shadow(0 3px 2px rgba(30,43,99,.25))}
+.mybadge__n{font-size:11.5px;line-height:1.15;color:#7A4E00;letter-spacing:.3px}
+.mybadge--empty{background:var(--ac-panel-2);border-style:dashed;border-color:var(--ac-line);box-shadow:none;opacity:.75}
+.mybadge--empty .mybadge__e{filter:grayscale(1);opacity:.5}
+
+/* ---------- set cards ---------- */
+.sets{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px}
+.set{
+  background:var(--ac-panel);border:var(--ac-bd) solid var(--ac-edge);border-radius:var(--ac-radius);
+  box-shadow:0 var(--ac-lift) 0 var(--ac-edge);overflow:hidden;cursor:pointer;
+  transition:transform .12s cubic-bezier(.34,1.6,.64,1);
+}
+.set:hover{transform:translateY(-4px)}
+.set.done{border-color:var(--ac-yellow-deep);box-shadow:0 var(--ac-lift) 0 var(--ac-yellow-deep),0 0 34px rgba(255,201,60,.5)}
+.set__top{display:flex;align-items:center;gap:13px;padding:15px 16px 12px}
+.set__icon{width:56px;height:56px;flex:none;display:grid;place-items:center;font-size:30px;border-radius:14px;border:3px solid var(--ac-edge);background:var(--ac-panel-2)}
+.set__name{font-size:19px;line-height:1.1}
+.set__sub{font-size:12.5px;color:var(--ac-text-dim)}
+.set__chev{margin-left:auto;font-size:15px;color:var(--ac-text-mute);transition:transform .2s}
+.set.open .set__chev{transform:rotate(90deg)}
+.bar{height:16px;margin:0 16px;background:var(--ac-panel-2);border:3px solid var(--ac-edge);border-radius:999px;overflow:hidden;position:relative}
+.bar__fill{height:100%;background:linear-gradient(90deg,#63E08A,#23A354);border-radius:999px;box-shadow:inset 0 -5px 0 rgba(0,0,0,.13);transition:width .7s cubic-bezier(.34,1.3,.64,1)}
+.bar__fill.full{background:linear-gradient(90deg,var(--ac-yellow),var(--ac-yellow-deep))}
+.set__reward{display:flex;align-items:center;gap:8px;padding:11px 16px 0;font-size:12.5px;color:var(--ac-text-dim)}
+.set__reward b{color:var(--ac-text)}
+.set__body{display:none;padding:12px 16px 16px}
+.set.open .set__body{display:block}
+
+.critters{display:grid;grid-template-columns:repeat(auto-fill,minmax(66px,1fr));gap:10px;margin-top:8px}
+.crit{
+  position:relative;aspect-ratio:1;display:grid;place-items:center;font-size:28px;
+  background:var(--ac-panel);border:4px solid var(--rar-common);border-radius:12px;
+  box-shadow:0 4px 0 rgba(30,43,99,.3);cursor:default;
+  transition:transform .12s cubic-bezier(.34,1.6,.64,1);
+}
+.crit:hover{transform:translateY(-3px) rotate(-2deg)}
+.crit.r-rare{border-color:var(--rar-rare)}
+.crit.r-epic{border-color:var(--rar-epic);background:linear-gradient(180deg,#fff,#F5EEFF)}
+.crit.r-legendary{border-color:var(--rar-legend);background:linear-gradient(180deg,#fff,#FFF4D2)}
+.crit.r-mythic{border-color:var(--rar-mythic);background:linear-gradient(180deg,#fff,#FFE7E3)}
+.crit.r-legendary::before,.crit.r-mythic::before{content:'';position:absolute;inset:-4px;border-radius:inherit;border:4px solid currentColor;color:inherit;filter:blur(5px);opacity:.55;pointer-events:none}
+.crit.r-legendary::before{border-color:var(--rar-legend)}
+.crit.r-mythic::before{border-color:var(--rar-mythic)}
+.crit.missing{background:var(--ac-panel-2);color:var(--ac-text-mute);border-style:dashed;border-color:var(--ac-line);box-shadow:none;font-size:22px}
+.crit__c{position:absolute;right:-6px;top:-6px;min-width:22px;height:22px;display:grid;place-items:center;padding:0 5px;font-size:11px;color:#fff;background:var(--ac-red);border:3px solid var(--ac-edge);border-radius:999px}
+.crit__tip{position:absolute;bottom:-7px;left:50%;transform:translateX(-50%);font-size:9px;letter-spacing:.4px;padding:1px 6px;background:var(--ac-blue);color:#fff;border:2px solid var(--ac-edge);border-radius:99px;white-space:nowrap}
+.crit__name{position:absolute;bottom:-19px;left:50%;transform:translateX(-50%);font-size:9.5px;color:var(--ac-text-mute);white-space:nowrap}
+.critters{row-gap:26px}
+
+.hint{display:flex;align-items:center;gap:9px;margin-top:20px;padding:10px 13px;font-size:13px;background:#EAF3FF;border:3px dashed var(--ac-blue);border-radius:12px;color:var(--ac-text)}
+
+/* ---------- completion modal ---------- */
+.ac-modal{position:fixed;inset:0;z-index:70;display:none;place-items:center;padding:18px;background:rgba(30,43,99,.6);backdrop-filter:blur(4px)}
+.ac-modal.open{display:grid}
+@keyframes pop{from{transform:scale(.8) translateY(24px);opacity:0}to{transform:none;opacity:1}}
+.ac-modal-card{width:min(470px,100%);animation:pop .3s cubic-bezier(.34,1.5,.64,1);text-align:center;max-height:88vh;overflow:auto}
+.rewards{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin:16px 0}
+.rw{padding:13px 7px;background:var(--ac-panel-2);border:3px solid var(--ac-edge);border-radius:14px}
+.rw__e{font-size:32px;line-height:1.2}
+.rw__k{font-size:9.5px;letter-spacing:.9px;text-transform:uppercase;color:var(--ac-text-mute);margin-top:3px}
+.rw__n{font-size:12.5px;line-height:1.2}
+
+#fx{position:fixed;inset:0;pointer-events:none;z-index:65}
+.note{margin:24px auto 0;padding:13px 17px;max-width:720px;font-size:13.5px;font-weight:600;line-height:1.6;color:#2A3A73;background:rgba(255,255,255,.75);border:2px dashed #7E90C9;border-radius:14px}
+.note b{color:#1E2B63}
+.section-head{display:flex;align-items:center;gap:12px;margin:26px 0 13px}
+.section-head__ribbon{padding:7px 18px;font-size:14px;letter-spacing:1.4px;text-transform:uppercase;color:#fff;background:var(--ac-edge);border-radius:999px;box-shadow:0 4px 0 rgba(30,43,99,.35)}
+.section-head__rule{flex:1;height:5px;border-radius:99px;background:repeating-linear-gradient(90deg,var(--ac-edge) 0 12px,transparent 12px 24px);opacity:.35}
+</style>
+</head>
+<body>
+
+<div class="ac-page">
+<div class="ac-wrap">
+
+  <div class="tabs">
+    <button class="tab">🎮 Play</button>
+    <button class="tab on">📖 Collections</button>
+    <button class="tab">🎒 Locker</button>
+    <button class="tab">🛒 Shop</button>
+    <button class="tab" id="tradeTab">🔁 Trade <span class="dot dot--pulse" id="tradeDot">2</span></button>
+    <button class="tab">🏆</button>
+  </div>
+
+  <div class="ac-card" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+    <div style="font-size:44px" >📖</div>
+    <div style="flex:1;min-width:200px">
+      <h2 style="font-size:27px">Collections</h2>
+      <div style="color:var(--ac-text-dim);font-size:15px">Finish a set to earn a <b>badge</b>, a <b>statue</b> for your world, and a <b>new look</b>.</div>
+    </div>
+    <div style="text-align:center">
+      <div style="font-size:31px;line-height:1" id="uniqueN">37</div>
+      <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--ac-text-mute)">of 81 found</div>
+    </div>
+  </div>
+
+  <div class="section-head"><span class="section-head__ribbon" style="background:var(--ac-yellow-deep)">🏅 My badges</span><span class="section-head__rule"></span></div>
+  <div class="ac-card">
+    <div class="case" id="case"></div>
+    <div style="margin-top:13px;font-size:13px;color:var(--ac-text-dim)">Badges show up next to your name on the leaderboard and when friends visit your world.</div>
+  </div>
+
+  <div class="section-head"><span class="section-head__ribbon" style="background:var(--ac-purple-deep)">📚 Sets</span><span class="section-head__rule"></span></div>
+  <div class="sets" id="sets"></div>
+
+  <div class="note">
+    <b>Why sets make trading matter.</b> Every set mixes easy commons with one or two
+    genuinely rare capstones, so nobody finishes alone — you'll always be two creatures short
+    of something, and your brother will have a spare. The blue tags show exactly that:
+    <b>the album reads your sibling's collection and tells you who has your missing piece</b>,
+    which turns "I need Longneck Lou" into a trade instead of a wish. Tap a set to open it,
+    then use the demo button on <b>Dino Dig</b> to see what completing one feels like.
+  </div>
+
+</div>
+</div>
+
+<div class="ac-modal" id="doneModal">
+  <div class="ac-card ac-modal-card">
+    <div style="font-size:14px;letter-spacing:2px;color:var(--ac-text-mute)">SET COMPLETE!</div>
+    <div style="font-size:60px;line-height:1.1" id="mIcon">🦴</div>
+    <h2 style="font-size:29px" id="mName">Dino Dig</h2>
+    <div style="color:var(--ac-text-dim);font-size:15px;margin-top:3px">All 6 found. You're officially an expert!</div>
+    <div class="rewards">
+      <div class="rw"><div class="rw__e" id="mB">🦴</div><div class="rw__k">Badge</div><div class="rw__n" id="mBn">Dino Expert</div></div>
+      <div class="rw"><div class="rw__e" id="mS">🦴</div><div class="rw__k">For your world</div><div class="rw__n" id="mSn">T-Rex Skeleton</div></div>
+      <div class="rw"><div class="rw__e" id="mA">🎩</div><div class="rw__k">New look</div><div class="rw__n" id="mAn">Dig Crew Hat</div></div>
+    </div>
+    <button class="ac-btn ac-btn--yellow" id="mClose">Awesome!</button>
+  </div>
+</div>
+
+<canvas id="fx"></canvas>
+
+<script>
+(function(){
+'use strict';
+
+/* ---------- sound ---------- */
+var ctx=null;
+function ac(){if(!ctx){try{ctx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){return null;}}if(ctx.state==='suspended')ctx.resume();return ctx;}
+function beep(f,d,t,v,w){var c=ac();if(!c)return;var s=c.currentTime+(w||0),o=c.createOscillator(),g=c.createGain();o.type=t||'square';o.frequency.setValueAtTime(f,s);g.gain.setValueAtTime(v||.08,s);g.gain.exponentialRampToValueAtTime(.0001,s+d);o.connect(g);g.connect(c.destination);o.start(s);o.stop(s+d+.02);}
+var S={tap:function(){beep(660,.06,'square',.05);},pop:function(){beep(520,.05,'triangle',.09);beep(780,.08,'triangle',.07,.05);},
+       win:function(){[523,659,784,1047,1319].forEach(function(f,i){beep(f,.17,'triangle',.09,i*.088);});}};
+
+/* ---------- confetti ---------- */
+var cv=document.getElementById('fx'),c2=cv.getContext('2d'),bits=[];
+function size(){cv.width=innerWidth;cv.height=innerHeight;}size();addEventListener('resize',size);
+var COLORS=['#FF5A5A','#FFC93C','#4C9BFF','#A971F5','#2ECC71','#FFFFFF'];
+function burst(x,y,n,p){for(var i=0;i<(n||24);i++){var a=Math.random()*Math.PI*2,sp=Math.random()*(p||7)+2;bits.push({x:x,y:y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-3,s:4+Math.random()*7,r:Math.random()*6,vr:(Math.random()-.5)*.5,c:COLORS[Math.floor(Math.random()*COLORS.length)],life:1});}}
+function rain(n){for(var i=0;i<(n||90);i++)bits.push({x:Math.random()*cv.width,y:-20-Math.random()*320,vx:(Math.random()-.5)*2,vy:2+Math.random()*4,s:6+Math.random()*9,r:Math.random()*6,vr:(Math.random()-.5)*.4,c:COLORS[Math.floor(Math.random()*COLORS.length)],life:1});}
+(function loop(){c2.clearRect(0,0,cv.width,cv.height);for(var i=bits.length-1;i>=0;i--){var b=bits[i];b.vy+=.28;b.x+=b.vx;b.y+=b.vy;b.r+=b.vr;b.life-=.006;if(b.life<=0||b.y>cv.height+60){bits.splice(i,1);continue;}c2.save();c2.translate(b.x,b.y);c2.rotate(b.r);c2.globalAlpha=Math.max(0,Math.min(1,b.life*1.6));c2.fillStyle=b.c;c2.fillRect(-b.s/2,-b.s/2,b.s,b.s*.66);c2.restore();}requestAnimationFrame(loop);})();
+
+/* ============================================================
+   THE SETS — designed against the real 60 sprites in catalog.js,
+   plus 21 appended ones. "sib" = brother has a spare to trade.
+   ============================================================ */
+var SETS=[
+ {id:'dino',icon:'🦴',name:'Dino Dig',badge:'🦴',badgeName:'Dino Expert',
+  statue:'🦴',statueName:'T-Rex Skeleton',avatar:'🎩',avatarName:'Dig Crew Hat',
+  blurb:'Bones, eggs, and the biggest teeth ever',
+  m:[{e:'🥚',n:'Nest Egg',r:'common',c:2},{e:'🦴',n:'Rattlebones',r:'common',c:1},
+     {e:'🐾',n:'Trackway',r:'common',c:3},{e:'🪶',n:'First Feather',r:'common',c:1},
+     {e:'🦕',n:'Longneck Lou',r:'rare',c:0,sib:true},{e:'🦖',n:'Rex Prime',r:'legendary',c:1}]},
+
+ {id:'scales',icon:'🐍',name:'Scales & Slither',badge:'🐍',badgeName:'Snake Charmer',
+  statue:'🪨',statueName:'Basking Rock',avatar:'🧣',avatarName:'Serpent Hood',
+  blurb:'Cold-blooded, warm-hearted',
+  m:[{e:'🐍',n:'Noodle',r:'common',c:1},{e:'🪱',n:'Wiggle',r:'common',c:4},
+     {e:'🦎',n:'Gecko Zap',r:'common',c:2},{e:'🐢',n:'Tank Shell',r:'common',c:1},
+     {e:'🐊',n:'Snapjaw',r:'rare',c:0,sib:true},{e:'🐉',n:'Scaldrake',r:'legendary',c:0}]},
+
+ {id:'jungle',icon:'🌴',name:'Jungle Canopy',badge:'🌴',badgeName:'Jungle Guide',
+  statue:'🛖',statueName:'Treehouse Lookout',avatar:'🪢',avatarName:'Vine Swing',
+  blurb:'Everything that swings, croaks, or prowls',
+  m:[{e:'🐒',n:'Banana Split',r:'common',c:2},{e:'🦥',n:'Slow Clap',r:'common',c:1},
+     {e:'🐸',n:'Hopper Jax',r:'common',c:3},{e:'🦜',n:'Skwak',r:'common',c:1},
+     {e:'🦧',n:'Copper Kong',r:'rare',c:1},{e:'🐯',n:'Stripe Storm',r:'rare',c:0,sib:true},
+     {e:'🐆',n:'Spot Rush',r:'epic',c:0}]},
+
+ {id:'bugs',icon:'🐝',name:'Bug Brigade',badge:'🐝',badgeName:'Bug Whisperer',
+  statue:'🦋',statueName:'Butterfly Garden',avatar:'🥽',avatarName:'Antenna Band',
+  blurb:'Small, six-legged, secretly the toughest',
+  m:[{e:'🐜',n:'Tiny Titan',r:'common',c:3},{e:'🐌',n:'Slow Mo',r:'common',c:2},
+     {e:'🕷️',n:'Web Slinger',r:'common',c:1},{e:'🐝',n:'Buzz Cut',r:'common',c:2},
+     {e:'🐞',n:'Dot Matrix',r:'common',c:1},{e:'🦋',n:'Flutter Byte',r:'rare',c:1},
+     {e:'🦂',n:'Sting Ray',r:'rare',c:1}]},
+
+ {id:'sea',icon:'🌊',name:'Deep Blue',badge:'🌊',badgeName:'Ocean Explorer',
+  statue:'🐠',statueName:'Coral Reef Pool',avatar:'🤿',avatarName:'Snorkel Set',
+  blurb:'Everything under the waves',
+  m:[{e:'🐟',n:'Finn',r:'common',c:2},{e:'🦐',n:'Pop Shrimp',r:'common',c:1},
+     {e:'🐧',n:'Chill Pip',r:'common',c:1},{e:'🦀',n:'Pinch Perfect',r:'rare',c:1},
+     {e:'🐙',n:'Ink Ops',r:'rare',c:2},{e:'🐬',n:'Splash Dart',r:'rare',c:0,sib:true},
+     {e:'🦈',n:'Chomp Zone',r:'rare',c:0}]},
+
+ {id:'dogs',icon:'🐕',name:'Good Dogs',badge:'🐕',badgeName:'Top Dog',
+  statue:'🏠',statueName:'Dog House & Yard',avatar:'👂',avatarName:'Puppy Ears',
+  blurb:'Every one of them is a good boy',
+  m:[{e:'🐕',n:'Biscuit',r:'common',c:2},{e:'🐩',n:'Fluffernutter',r:'common',c:1},
+     {e:'🐕‍🦺',n:'Ranger',r:'common',c:1},{e:'🐺',n:'Ridgehowl',r:'common',c:2},
+     {e:'🦊',n:'Ember Fox',r:'rare',c:1},{e:'🦮',n:'Sunny',r:'epic',c:0,sib:true}]},
+
+ {id:'cuddle',icon:'🧸',name:'Cuddle Crew',badge:'🧸',badgeName:'Heart of Gold',
+  statue:'🧺',statueName:'Cuddle Corner',avatar:'🧥',avatarName:'Fuzzy Hoodie',
+  blurb:'The softest squad in the arcade',
+  m:[{e:'🐰',n:'Thumper',r:'common',c:2},{e:'🦔',n:'Spike Lee',r:'common',c:1},
+     {e:'🐹',n:'Pocket Rocket',r:'common',c:2},{e:'🐭',n:'Squeak',r:'common',c:3},
+     {e:'🐨',n:'Snoozle',r:'common',c:1},{e:'🐼',n:'Bamboo Blast',r:'rare',c:1},
+     {e:'🐻',n:'Grizzly Grip',r:'rare',c:1}]},
+
+ {id:'dream',icon:'✨',name:'Make-Believe',badge:'✨',badgeName:'Dreamweaver',
+  statue:'🌈',statueName:'Rainbow Portal',avatar:'🧿',avatarName:'Starlight Cape',
+  blurb:'The hardest set in the game. Nobody finishes this alone.',
+  m:[{e:'🧚',n:'Pixie',r:'common',c:1},{e:'🍄',n:'Toadstool',r:'common',c:2},
+     {e:'👻',n:'Boo Radley',r:'epic',c:1},{e:'🧙',n:'Runecaster',r:'epic',c:0},
+     {e:'👽',n:'Zeta Ray',r:'epic',c:0,sib:true},{e:'🦄',n:'Prism Hoof',r:'legendary',c:0},
+     {e:'🌈',n:'Spectrum',r:'mythic',c:0}]}
+];
+
+/* the Cuddle Crew is already finished in this demo */
+SETS.find(function(s){return s.id==='cuddle';}).m.forEach(function(c){if(!c.c)c.c=1;});
+
+function have(s){return s.m.filter(function(c){return c.c>0;}).length;}
+function done(s){return have(s)===s.m.length;}
+
+/* ---------- badge case ---------- */
+function renderCase(){
+  var host=document.getElementById('case');host.innerHTML='';
+  var earned=SETS.filter(done);
+  earned.forEach(function(s){
+    var d=document.createElement('div');d.className='mybadge';
+    d.innerHTML='<div class="mybadge__e">'+s.badge+'</div><div class="mybadge__n">'+s.badgeName+'</div>';
+    host.appendChild(d);
+  });
+  var left=SETS.length-earned.length;
+  for(var i=0;i<Math.min(left,3);i++){
+    var d2=document.createElement('div');d2.className='mybadge mybadge--empty';
+    d2.innerHTML='<div class="mybadge__e">🔒</div><div class="mybadge__n">Keep collecting…</div>';
+    host.appendChild(d2);
+  }
+  if(left>3){
+    var more=document.createElement('div');
+    more.style.cssText='font-size:13px;color:var(--ac-text-dim)';
+    more.textContent='+'+(left-3)+' more to earn';
+    host.appendChild(more);
+  }
+}
+
+/* ---------- set cards ---------- */
+function renderSets(){
+  var host=document.getElementById('sets');host.innerHTML='';
+  SETS.forEach(function(s){
+    var n=have(s),total=s.m.length,full=n===total;
+    var card=document.createElement('div');
+    card.className='set'+(full?' done':'');
+    card.innerHTML=
+      '<div class="set__top">'+
+        '<div class="set__icon">'+s.icon+'</div>'+
+        '<div><div class="set__name">'+s.name+'</div><div class="set__sub">'+s.blurb+'</div></div>'+
+        '<div class="set__chev">▶</div>'+
+      '</div>'+
+      '<div class="bar"><div class="bar__fill'+(full?' full':'')+'" style="width:'+(n/total*100)+'%"></div></div>'+
+      '<div class="set__reward">'+(full
+        ? '<span class="ac-badge ac-badge--hot">✓ '+s.badgeName+'</span>'
+        : '<b>'+n+'/'+total+'</b> · unlocks '+s.badge+' '+s.badgeName+' · '+s.statue+' '+s.statueName)+
+      '</div>'+
+      '<div class="set__body"></div>';
+
+    var body=card.querySelector('.set__body');
+    var grid=document.createElement('div');grid.className='critters';
+    s.m.forEach(function(c){
+      var d=document.createElement('div');
+      d.className='crit '+(c.c>0?('r-'+c.r):'missing');
+      d.textContent=c.c>0?c.e:'?';
+      var extra='';
+      if(c.c>1)extra+='<span class="crit__c">×'+c.c+'</span>';
+      if(c.c===0&&c.sib)extra+='<span class="crit__tip">JAX HAS ONE</span>';
+      extra+='<span class="crit__name">'+(c.c>0?c.n:'???')+'</span>';
+      d.innerHTML=d.textContent+extra;
+      grid.appendChild(d);
+    });
+    body.appendChild(grid);
+
+    var missingWithSib=s.m.filter(function(c){return c.c===0&&c.sib;}).length;
+    if(missingWithSib){
+      var h=document.createElement('div');h.className='hint';
+      h.innerHTML='<span style="font-size:19px">🔁</span><span>Your brother has <b>'+missingWithSib+'</b> you still need — send a trade offer!</span>'+
+        '<button class="ac-btn ac-btn--sm ac-btn--purple" style="margin-left:auto">Trade</button>';
+      body.appendChild(h);
+    }
+    if(s.id==='dino'&&!full){
+      var demo=document.createElement('div');
+      demo.style.cssText='margin-top:14px;text-align:center';
+      demo.innerHTML='<button class="ac-btn ac-btn--green ac-btn--sm">▶ Demo: trade for the last one</button>';
+      demo.querySelector('button').addEventListener('click',function(ev){
+        ev.stopPropagation();
+        s.m.forEach(function(c){if(!c.c)c.c=1;});
+        renderSets();renderCase();bumpUnique(1);
+        setTimeout(function(){celebrate(s);},260);
+      });
+      body.appendChild(demo);
+    }
+
+    card.querySelector('.set__top').addEventListener('click',function(){
+      card.classList.toggle('open');S.tap();
+    });
+    host.appendChild(card);
+  });
+}
+
+function bumpUnique(n){
+  var el=document.getElementById('uniqueN');
+  el.textContent=parseInt(el.textContent,10)+n;
+}
+
+function celebrate(s){
+  document.getElementById('mIcon').textContent=s.icon;
+  document.getElementById('mName').textContent=s.name;
+  document.getElementById('mB').textContent=s.badge;
+  document.getElementById('mBn').textContent=s.badgeName;
+  document.getElementById('mS').textContent=s.statue;
+  document.getElementById('mSn').textContent=s.statueName;
+  document.getElementById('mA').textContent=s.avatar;
+  document.getElementById('mAn').textContent=s.avatarName;
+  document.getElementById('doneModal').classList.add('open');
+  rain(110);burst(innerWidth/2,innerHeight/2,60,12);S.win();
+}
+document.getElementById('mClose').addEventListener('click',function(){
+  document.getElementById('doneModal').classList.remove('open');S.tap();
+});
+document.getElementById('doneModal').addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
+
+document.getElementById('tradeTab').addEventListener('click',function(){
+  var d=document.getElementById('tradeDot');
+  if(d){d.remove();S.pop();}
+});
+
+renderCase();renderSets();
+})();
+</script>
+</body>
+</html>

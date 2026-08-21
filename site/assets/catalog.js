@@ -218,7 +218,7 @@ export const GAMES = {
                             emoji:'⚾', grades:'ALL GRADES', section:'practice',
                             href:'math-baseball/index.html', tileClass:'ac-tile--math' },
   'critter-catchers':     { name:'Critter Catchers',     kind:'learn', xpMult:1.0,  coinMult:1.0,
-                            emoji:'\u{1F4D6}', grades:'GRADES 1–2', section:'practice',
+                            emoji:'\u{1F4D6}', grades:'GRADES 1–3', section:'practice',
                             href:'critter-catchers/index.html', tileClass:'ac-tile--reading' },
   'multiverse-collector': { name:'Raining Cats and Dogs',  kind:'fun',   xpMult:0.30, coinMult:0.25,
                             emoji:'\u{1F436}', grades:'ANY AGE', section:'fun',
