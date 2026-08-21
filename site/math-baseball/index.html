@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/arcade.css">
+<title>Math Baseball</title>
+<style>
+  /* The playground identity, game-side: daytime sky, chunky navy edges,
+     white panels. Everything inside the play area lives in this file. */
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{
+    margin:0; height:100%; overflow:hidden;
+    background:linear-gradient(180deg,var(--ac-sky-top),var(--ac-sky-mid) 55%,var(--ac-sky-bot));
+    font-family:var(--ac-font);
+    color:var(--ac-text); touch-action:manipulation; user-select:none;
+  }
+  #wrap{ position:relative; width:100vw; height:100vh; display:flex; flex-direction:column; align-items:center; }
+
+  /* ---------- scoreboard ---------- */
+  #topbar{
+    width:100%; max-width:640px; display:flex; justify-content:space-between; align-items:center;
+    gap:6px; padding:8px 12px; font-weight:800;
+  }
+  #topbar .cell{ text-align:center; min-width:56px; }
+  #topbar .label{ color:var(--ac-text-dim); font-weight:800; font-size:10px; display:block; letter-spacing:1px; }
+  #runsValue{ font-size:30px; line-height:1; color:var(--ac-red-deep); }
+  #outsValue, #strikesValue{ font-size:15px; letter-spacing:2px; }
+  #best{ color:var(--ac-yellow-deep); font-size:15px; }
+
+  /* the little HUD diamond with runner dots */
+  #hudDiamond{ position:relative; width:44px; height:44px; margin:0 auto; }
+  #hudDiamond .bag{
+    position:absolute; width:12px; height:12px; background:var(--ac-panel);
+    border:2px solid var(--ac-edge); transform:rotate(45deg); transition:background 0.2s;
+  }
+  #hudDiamond .bag.on{ background:var(--ac-yellow); }
+  #hudDiamond .bag--1{ right:2px; top:16px; }
+  #hudDiamond .bag--2{ left:16px; top:2px; }
+  #hudDiamond .bag--3{ left:2px; top:16px; }
+  #hudDiamond .bag--home{ left:16px; bottom:2px; border-radius:0 0 6px 0; background:var(--ac-panel-2); }
+
+  /* ---------- field ---------- */
+  canvas#game{
+    background:#7ec8f2;
+    border-radius:16px;
+    border:4px solid var(--ac-edge);
+    box-shadow:0 6px 0 var(--ac-edge), 0 12px 18px rgba(30,43,99,0.25);
+    width:min(94vw,600px); max-height:38vh;
+    image-rendering:pixelated;
+  }
+
+  /* ---------- question + inputs ---------- */
+  #playArea{ width:100%; max-width:640px; flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:0; }
+  #question{
+    background:var(--ac-panel); border:4px solid var(--ac-edge); border-radius:18px;
+    box-shadow:0 5px 0 var(--ac-edge);
+    padding:8px 26px; margin:8px 0 4px;
+    font-size:clamp(26px,7vw,40px); font-weight:800; letter-spacing:2px;
+    min-width:min(90vw,300px); text-align:center; display:flex; align-items:center; justify-content:center; gap:12px;
+  }
+  #answer{
+    width:130px; text-align:center; font-family:inherit; font-weight:800;
+    font-size:clamp(24px,6vw,36px); color:var(--ac-accent-ink);
+    background:linear-gradient(180deg,#FFF6D8,var(--ac-yellow));
+    border:3px solid var(--ac-edge); border-radius:14px; padding:2px 8px;
+    outline:none; caret-color:var(--ac-edge);
+  }
+  #feedback{ min-height:26px; font-weight:800; font-size:clamp(15px,4vw,19px); margin:4px 0; text-align:center; padding:0 10px; }
+  #feedback.good{ color:#1c7a45; }
+  #feedback.info{ color:var(--ac-blue-deep); }
+  #feedback.warm{ color:var(--ac-purple-deep); }
+
+  /* multiple choice (easy tier) */
+  #choices{
+    display:grid; grid-template-columns:repeat(3,1fr); gap:12px;
+    width:min(94vw,520px); padding:0 6px 12px;
+  }
+  .choice{
+    border:4px solid var(--ac-edge); border-radius:20px; padding:18px 0;
+    font-family:inherit; font-weight:800; font-size:clamp(24px,6vw,34px);
+    background:linear-gradient(180deg,var(--ac-yellow),var(--ac-yellow-deep)); color:var(--ac-accent-ink);
+    box-shadow:0 6px 0 var(--ac-edge); cursor:pointer;
+  }
+  .choice:active{ box-shadow:0 0 0 var(--ac-edge); transform:translateY(6px); }
+  .choice.right{ background:linear-gradient(180deg,#9cf07f,#3fb96f); color:#08331a; }
+  .choice.wrong{ background:linear-gradient(180deg,#ffa896,#e35a5a); color:#4a0d0d; }
+  .choice[disabled]{ cursor:default; }
+
+  /* keypad (medium/hard tiers) */
+  #keypad{
+    display:grid; grid-template-columns:repeat(5,1fr); gap:8px;
+    width:min(94vw,460px); padding:0 4px 10px;
+  }
+  .key{
+    border:3px solid var(--ac-edge); border-radius:14px; padding:12px 0;
+    background:var(--ac-panel); color:var(--ac-text);
+    font-family:inherit; font-weight:800; font-size:20px;
+    box-shadow:0 4px 0 var(--ac-edge); cursor:pointer;
+  }
+  .key:active{ box-shadow:0 0 0 var(--ac-edge); transform:translateY(4px); }
+  .key.go{ background:linear-gradient(180deg,#63E08A,#23A354); color:#06301a; }
+  .key.del{ background:linear-gradient(180deg,var(--ac-red),var(--ac-red-deep)); color:#fff; }
+
+  /* the SWING button — thumb-sized, the star of the show */
+  #swingWrap{ display:flex; flex-direction:column; align-items:center; gap:6px; padding:0 0 14px; }
+  #swingBtn{
+    border:5px solid var(--ac-edge); border-radius:999px;
+    width:min(80vw,320px); padding:22px 0;
+    font-family:inherit; font-weight:800; font-size:clamp(26px,7vw,36px); letter-spacing:3px;
+    background:linear-gradient(180deg,var(--ac-red),var(--ac-red-deep)); color:#fff;
+    text-shadow:0 2px 0 rgba(0,0,0,0.22);
+    box-shadow:0 9px 0 var(--ac-edge), 0 14px 16px rgba(30,43,99,0.28); cursor:pointer;
+  }
+  #swingBtn:active{ box-shadow:0 0 0 var(--ac-edge); transform:translateY(9px); }
+  #swingHint{ font-size:12px; color:var(--ac-text-dim); font-weight:800; }
+
+  /* ---------- overlays ---------- */
+  .overlay{
+    position:absolute; inset:0; z-index:10; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center; padding:20px 18px;
+    background:linear-gradient(180deg,var(--ac-sky-top),var(--ac-sky-bot)); overflow-y:auto;
+  }
+  .overlay h1{ font-size:clamp(30px,8vw,44px); margin:0 0 4px; color:var(--ac-yellow);
+    -webkit-text-stroke:6px var(--ac-edge); paint-order:stroke fill;
+    text-shadow:0 5px 0 rgba(30,43,99,0.3); letter-spacing:1px; }
+  .overlay h2{ font-size:28px; margin:0 0 8px; color:var(--ac-text); }
+  .overlay p{ color:var(--ac-text-dim); margin:0 0 14px; font-size:15px; max-width:420px; line-height:1.5; font-weight:700; }
+  .btn{
+    background:linear-gradient(180deg,var(--ac-red),var(--ac-red-deep)); color:#fff;
+    text-shadow:0 2px 0 rgba(0,0,0,0.22);
+    border:4px solid var(--ac-edge); padding:14px 34px; border-radius:999px;
+    font-family:inherit; font-weight:800; font-size:19px;
+    box-shadow:0 6px 0 var(--ac-edge); cursor:pointer; margin:6px;
+  }
+  .btn:active{ box-shadow:0 0 0 var(--ac-edge); transform:translateY(6px); }
+  .btn.ghost{
+    background:var(--ac-panel); color:var(--ac-text); text-shadow:none;
+    font-size:14px; padding:11px 22px;
+  }
+  .chooser{ display:flex; flex-wrap:wrap; justify-content:center; gap:10px; margin-bottom:6px; }
+  .chip{
+    border:3px solid var(--ac-edge); border-radius:999px; padding:11px 22px; cursor:pointer;
+    font-family:inherit; font-weight:800; font-size:15px;
+    background:var(--ac-panel); color:var(--ac-text-dim); box-shadow:0 4px 0 var(--ac-edge);
+  }
+  .chip.on{ background:var(--ac-yellow); color:var(--ac-accent-ink); }
+  .sectionLabel{ font-size:12px; letter-spacing:2px; color:var(--ac-text-dim); font-weight:800; margin:14px 0 8px; }
+
+  .scoreRow{ font-size:18px; margin:4px 0; color:var(--ac-text); font-weight:800; }
+  .scoreRow b{ color:var(--ac-red-deep); font-size:26px; }
+  #newRecord{ color:var(--ac-yellow-deep); font-size:24px; font-weight:800; margin:10px 0; }
+  .recordBoard{
+    background:var(--ac-panel); border:4px solid var(--ac-edge); border-radius:18px;
+    padding:14px 22px; margin:12px 0;
+    min-width:260px; box-shadow:0 5px 0 var(--ac-edge); color:var(--ac-text);
+  }
+  .recordBoard div{ display:flex; justify-content:space-between; gap:20px; font-size:15px; padding:3px 0; font-weight:800; }
+  .recordBoard span:last-child{ color:var(--ac-yellow-deep); }
+  .hidden{ display:none !important; }
+  a.back{ position:absolute; top:10px; left:14px; color:var(--ac-text-dim); text-decoration:none; font-size:13px; font-weight:800; z-index:20; }
+  #tierNote{ color:var(--ac-text-dim); font-size:11px; margin:-4px 0 10px; }
+
+  /* the biggest moments only */
+  .shakeHard{ animation:mb-shake 0.4s ease-in-out; }
+  @keyframes mb-shake{
+    0%,100%{ transform:translate(0,0); }
+    20%{ transform:translate(-7px,3px); } 40%{ transform:translate(6px,-4px); }
+    60%{ transform:translate(-5px,2px); } 80%{ transform:translate(4px,-2px); }
+  }
+  @media (prefers-reduced-motion: reduce){ .shakeHard{ animation:none; } }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <a class="back" href="../index.html">&larr; Arcade</a>
+
+  <div id="topbar">
+    <div class="cell"><span class="label">RUNS</span><span id="runsValue">0</span></div>
+    <div class="cell"><span class="label">OUTS</span><span id="outsValue">⚪⚪⚪</span></div>
+    <div class="cell"><span class="label">STRIKES</span><span id="strikesValue">⚪⚪⚪</span></div>
+    <div class="cell"><span class="label">BASES</span>
+      <div id="hudDiamond">
+        <span class="bag bag--2"></span>
+        <span class="bag bag--3"></span>
+        <span class="bag bag--1"></span>
+        <span class="bag bag--home"></span>
+      </div>
+    </div>
+    <div class="cell"><span class="label">BEST</span><span id="best">—</span></div>
+  </div>
+
+  <canvas id="game" width="600" height="340"></canvas>
+
+  <div id="playArea">
+    <div id="question"><span id="qText">7 × 8 = ?</span><input id="answer" class="hidden" type="text" inputmode="numeric" maxlength="4" autocomplete="off"></div>
+    <div id="feedback"></div>
+    <div id="choices" class="hidden"></div>
+    <div id="keypad" class="hidden"></div>
+    <div id="swingWrap" class="hidden">
+      <button id="swingBtn" type="button">⚾ SWING!</button>
+      <span id="swingHint">Spacebar, Enter, or tap — swing when the rings line up!</span>
+    </div>
+  </div>
+
+  <!-- ================= START SCREEN ================= -->
+  <div class="overlay" id="startScreen">
+    <h1>⚾ MATH BASEBALL</h1>
+    <p>Answer the math to earn a pitch, then swing as the rings line up over the
+       plate. A perfect swing is a <b>HOME RUN</b>. Three outs and the inning's over —
+       how many runs can you score?</p>
+
+    <p id="tierNote" class="hidden"></p>
+    <div class="recordBoard" id="recordBoard"></div>
+    <button class="btn" id="startBtn">PLAY BALL!</button>
+  </div>
+
+  <!-- ================= END SCREEN ================= -->
+  <div class="overlay hidden" id="endScreen">
+    <h2 id="endTitle">Inning over!</h2>
+    <div id="newRecord" class="hidden">⭐ NEW RECORD! ⭐</div>
+    <div id="endStats"></div>
+    <div id="awardLine" class="scoreRow" style="color:var(--ac-yellow-deep);min-height:1.2em"></div>
+    <div class="recordBoard" id="endBoard"></div>
+    <button class="btn" id="againBtn">PLAY AGAIN</button>
+    <a class="btn ghost" href="../index.html" style="text-decoration:none">Back to the arcade</a>
+  </div>
+</div>
+
+<script type="module">
+import {
+  isGuestKid, getChild, ageFromBirthday, tierForAge,
+  saveChildProgress, loadChildProgress,
+} from '../firebase-config.js';
+import { requireKid, mountBar, finishRun, celebrateLevelUp, describeAward } from '../assets/arcade-shell.js';
+
+// No profile, no game — the gate replaces the page and nothing below runs.
+const kid = await requireKid({ gameName: 'Math Baseball' });
+if (kid) {
+  await mountBar({ title: 'Math Baseball' });
+  main(kid);
+}
+
+function main(kid){
+
+/* ===================== PURE LOGIC — START =====================
+   Everything between these markers is DOM-free on purpose: the
+   Phase-1 unit checks extract this block and run it in Node.
+   ============================================================== */
+
+/* =====================================================================
+   MATH BASEBALL — tweak anything in here
+   ===================================================================== */
+const CONFIG = {
+  // ---- the inning ----
+  outsPerInning: 3,     // the whole game is one inning: this many outs ends it
+  strikesPerOut: 3,     // strikes on one batter before they're out (fouls can never ring up the last one)
+  // what a wrong answer costs, per tier: 'out' (default) or 'strike' (softer, for later)
+  wrongAnswerCosts: { easy:'out', medium:'out', hard:'out' },
+
+  // ---- the pitch ----
+  beatMs:   450,        // the "⚾ Here it comes!" pause between answering and the windup
+  windupMs: 600,        // how long the pitcher telegraphs before releasing the ball
+  noSwingGraceMs: 160,  // after the last foul window closes, this long with no swing = a called strike
+
+  // ---- the look (presentation only — no effect on rules or timing) ----
+  look: {
+    ringStart:    46,   // the shrinking ring starts this big (px) and lands on ringTarget
+    ringTarget:   13,   // both rings sit at this radius at the perfect contact moment
+    trailLen:      6,   // motion-trail ghosts behind the pitch
+    stampMs:     950,   // how long the big result lettering ("HOME RUN!") stays up
+    fireworkPops:  3,   // firework bursts when a homer clears the fence
+    cheerMs:     700,   // batter fist-pumps this long before the sprint pose
+  },
+
+  // ---- rewards ----
+  unitsPerRun: 2,       // each run scored adds this many bonus units on top of correct answers
+
+  // ---- per-tier pitch speed and timing windows ----
+  // flightMs: mound-to-plate time. windows: how far from the perfect
+  // contact moment (in ms, either side) still earns each hit.
+  tiers: {
+    easy:   { flightMs:1600, windows:{ homer:70, triple:130, double:200, single:280, foul:380 } },
+    medium: { flightMs:1250, windows:{ homer:50, triple:100, double:160, single:230, foul:320 } },
+    hard:   { flightMs:1000, windows:{ homer:40, triple:85,  double:140, single:200, foul:280 } },
+  },
+
+  // ---- adaptive practice (the ADAPT engine below reads these) ----
+  focusChance:   0.30,  // share of questions pulled from the "needs practice" list; the rest stay random
+  missWeightCap: 3,     // most weight one fact can carry, so one bad day can't haunt it
+  recoverRate:   0.5,   // 2 right answers cancel 1 wrong — facts graduate back out
+  cooldown:      4,     // never repeat a fact within this many questions
+  maxWeakStreak: 2,     // weak facts can never come more than this many in a row
+};
+
+const rnd = n => Math.floor(Math.random()*n);
+const pick = a => a[rnd(a.length)];
+
+/* ---------------- fact pools for adaptive practice --------------------
+   Where the space is small we track individual facts (every times-table
+   fact, every add/sub-within-20 fact); where it's huge we track kinds
+   ('mul'/'div'/'add'/'sub'), exactly like Math Defender's mixed mode. */
+const POOL_CACHE = {};
+function easyPool(){
+  if (POOL_CACHE.easy) return POOL_CACHE.easy;
+  const out = [];
+  for (let a=1; a<20; a++) for (let b=1; b<=20-a; b++) out.push(a+'+'+b);   // sums stay within 20
+  for (let a=2; a<=20; a++) for (let b=1; b<a; b++) out.push(a+'-'+b);      // never goes below zero
+  return (POOL_CACHE.easy = out);
+}
+function timesPool(){
+  if (POOL_CACHE.times) return POOL_CACHE.times;
+  const out = [];
+  for (let a=0; a<=12; a++) for (let b=0; b<=12; b++) out.push(a+'x'+b);
+  return (POOL_CACHE.times = out);
+}
+const MEDIUM_MIX_KINDS = ['add','sub'];               // 2-digit add/subtract
+const HARD_KINDS = ['mul','div','add','sub'];         // the hard tier's mixed set
+
+/* =====================================================================
+   ADAPTIVE PRACTICE — the same engine and brakes as Math Defender and
+   Coin Climb. The game remembers what gets missed and brings it back
+   more often, but only for CONFIG.focusChance of questions; everything
+   else stays random, because a game that only asks what you're bad at
+   is a game you stop playing. save() is a no-op here and is overridden
+   outside this block (guest localStorage, or the child doc at inning
+   end) so this engine stays testable without a browser.
+   ===================================================================== */
+const ADAPT = {
+  data: {},          // fact id -> { n: times seen, w: current weight, m: total misses }
+  recent: [],
+  weakStreak: 0,
+  save(){},          // overridden by the persistence wiring below
+
+  weight(id){ const r = this.data[id]; return r ? r.w : 0; },
+
+  // one right answer heals half a wrong one, so 2 in a row graduates a fact out
+  record(id, wasRight){
+    if (!id) return;
+    const r = this.data[id] || (this.data[id] = { n:0, w:0, m:0 });
+    r.n++;
+    if (wasRight){ r.w = Math.max(0, r.w - CONFIG.recoverRate); }
+    else { r.w = Math.min(CONFIG.missWeightCap, r.w + 1); r.m++; }
+    this.save();
+  },
+
+  /* Pick an id out of `all`. Sometimes weighted toward weak facts, usually
+     not. Two brakes: focusChance caps how often we even try, and weakStreak
+     makes sure hard ones never arrive in a long row. */
+  pick(all){
+    const weak = all.filter(id => this.weight(id) > 0);
+    const streakBlocked = this.weakStreak >= CONFIG.maxWeakStreak;
+    const useWeak = weak.length > 0 && !streakBlocked && Math.random() < CONFIG.focusChance;
+    for (let tries = 0; tries < 8; tries++){
+      const id = useWeak ? this.weightedPick(weak) : all[rnd(all.length)];
+      if (!this.recent.includes(id)) return this.remember(id);   // respect the cooldown
+    }
+    return this.remember(all[rnd(all.length)]);
+  },
+  weightedPick(weak){
+    let total = 0;
+    for (const id of weak) total += this.weight(id);
+    let r = Math.random() * total;
+    for (const id of weak){ r -= this.weight(id); if (r <= 0) return id; }
+    return weak[weak.length-1];
+  },
+  remember(id){
+    // count actual weak facts, whether they came from the weighted draw or by luck
+    this.weakStreak = this.weight(id) > 0 ? this.weakStreak + 1 : 0;
+    this.recent.push(id);
+    while (this.recent.length > CONFIG.cooldown) this.recent.shift();
+    return id;
+  },
+
+  // the parent report reads this shape
+  practiceList(n=5){
+    return Object.entries(this.data)
+      .filter(([,r]) => r.w > 0)
+      .sort((a,b) => b[1].w - a[1].w)
+      .slice(0,n)
+      .map(([id,r]) => ({ id, misses:r.m, seen:r.n }));
+  },
+};
+
+/* ---------------- question generation --------------------------------
+   The tier decides the math AND the input style: easy gets 3 big
+   multiple-choice buttons, medium/hard type the answer (with auto-fire,
+   so typos are never punished). Every branch draws its fact through
+   ADAPT.pick. Invariants the checks assert: answers never negative,
+   division always whole, the right answer is always among the choices,
+   distractors are plausible near-misses.                              */
+function makeQuestion(tier){
+  if (tier === 'easy'){
+    // add & subtract within 20, never negative
+    const id = ADAPT.pick(easyPool());
+    const plus = id.includes('+');
+    const [a,b] = id.split(plus ? '+' : '-').map(Number);
+    return plus
+      ? { text:`${a} + ${b} = ?`, answer:a+b, id, input:'choices' }
+      : { text:`${a} − ${b} = ?`, answer:a-b, id, input:'choices' };
+  }
+  if (tier === 'medium'){
+    if (Math.random() < 0.70){        // 70% times tables ×0–12, tracked per fact
+      const id = ADAPT.pick(timesPool());
+      const [a,b] = id.split('x').map(Number);
+      return { text:`${a} × ${b} = ?`, answer:a*b, id, input:'typed' };
+    }
+    // 30% 2-digit add/subtract, never negative, tracked by kind
+    const kind = ADAPT.pick(MEDIUM_MIX_KINDS);
+    if (kind === 'add'){
+      const a = 10 + rnd(90), b = 10 + rnd(90);
+      return { text:`${a} + ${b} = ?`, answer:a+b, id:'add', input:'typed' };
+    }
+    const a = 10 + rnd(90);           // 10..99
+    const b = 10 + rnd(a - 10 + 1);   // 10..a — never goes below zero
+    return { text:`${a} − ${b} = ?`, answer:a-b, id:'sub', input:'typed' };
+  }
+  // ---- hard: mixed ×0–12, whole-number ÷, 3-digit add/subtract ----
+  // The space is huge, so the whole tier adapts at the operation level.
+  const kind = ADAPT.pick(HARD_KINDS);
+  if (kind === 'mul'){
+    const a = rnd(13), b = rnd(13);
+    return { text:`${a} × ${b} = ?`, answer:a*b, id:'mul', input:'typed' };
+  }
+  if (kind === 'div'){
+    // division is built backwards from divisor × quotient, so it's always whole
+    const b = 2 + rnd(11), q = 2 + rnd(11);
+    return { text:`${b*q} ÷ ${b} = ?`, answer:q, id:'div', input:'typed' };
+  }
+  if (kind === 'add'){
+    const a = 100 + rnd(900), b = 100 + rnd(900);
+    return { text:`${a} + ${b} = ?`, answer:a+b, id:'add', input:'typed' };
+  }
+  const a = 100 + rnd(900);           // 100..999
+  const b = 100 + rnd(a - 100 + 1);   // 100..a — never goes below zero
+  return { text:`${a} − ${b} = ?`, answer:a-b, id:'sub', input:'typed' };
+}
+
+/* Three choices for the easy tier: the answer plus near-miss distractors
+   (±1, ±2, ±5, ±10), never negative, never duplicated. */
+function makeChoices(q){
+  const set = new Set([q.answer]);
+  const nudges = [1,-1,2,-2,5,-5,10,-10];
+  let guard = 0;
+  while (set.size < 3 && guard++ < 60){
+    const v = q.answer + pick(nudges);
+    if (v >= 0) set.add(v);
+  }
+  while (set.size < 3) set.add(rnd(20)+1);   // unreachable in practice; belt and braces
+  const arr = [...set].slice(0,3);
+  for (let i=arr.length-1;i>0;i--){ const j=rnd(i+1); [arr[i],arr[j]]=[arr[j],arr[i]]; }
+  return arr;
+}
+
+/* ---------------- swing timing ----------------------------------------
+   delta = how far (ms) the swing was from the perfect contact moment.
+   Inside the tightest window is a home run; each wider ring is a lesser
+   hit; the outermost ring is a foul; beyond that is a whiff.           */
+function judgeSwing(deltaMs, tier){
+  const w = CONFIG.tiers[tier].windows;
+  const d = Math.abs(deltaMs);
+  if (d <= w.homer)  return 'homer';
+  if (d <= w.triple) return 'triple';
+  if (d <= w.double) return 'double';
+  if (d <= w.single) return 'single';
+  if (d <= w.foul)   return 'foul';
+  return 'miss';
+}
+
+/* The real baseball rule: a foul counts as a strike, but can never be
+   the THIRD strike — a kid who keeps making contact cannot strike out. */
+function strikesAfterContact(strikes, kind){
+  if (kind === 'foul') return Math.min(strikes + 1, CONFIG.strikesPerOut - 1);
+  return strikes + 1;   // a whiff or a called strike counts in full
+}
+
+/* ---------------- baserunning ------------------------------------------
+   Deliberately simpler than real baseball, so a 6-year-old can read it:
+   EVERY runner advances exactly as many bases as the hit (single = 1,
+   double = 2, triple = 3), and a home run scores everyone plus the
+   batter. No forced-vs-unforced, no tagging up.
+   bases = [first, second, third] as booleans.                          */
+function advanceRunners(bases, basesToAdvance){
+  let runs = 0;
+  const next = [false,false,false];
+  for (let i=0;i<3;i++){
+    if (!bases[i]) continue;
+    const dest = i + basesToAdvance;
+    if (dest >= 3) runs++; else next[dest] = true;
+  }
+  if (basesToAdvance >= 4) runs++;          // the batter comes all the way around
+  else next[basesToAdvance-1] = true;       // the batter takes their base
+  return { bases: next, runs };
+}
+
+const HIT_BASES = { single:1, double:2, triple:3, homer:4 };
+
+/* ===================== PURE LOGIC — END ===================== */
+
+/* =====================================================================
+   RECORDS — best runs per tier ({easy, medium, hard}). A signed-in
+   kid's live on their child doc under progress['math-baseball'].records
+   so they follow the profile anywhere; a guest's stay in this browser's
+   localStorage under mathbaseball.v1.records.
+   ===================================================================== */
+const store = {
+  get(k){ try { return localStorage.getItem(k); } catch(e){ return null; } },
+  set(k,v){ try { localStorage.setItem(k,v); } catch(e){} },
+};
+const RECORDS_KEY = 'mathbaseball.v1.records';
+const FACTS_KEY   = 'mathbaseball.v1.facts';
+let records = {};        // in-memory copy; loaded once at startup, then kept current
+
+async function loadRecordsFromStore(){
+  if (isGuestKid(kid.id)){
+    try { records = JSON.parse(store.get(RECORDS_KEY) || '{}') || {}; } catch(e){ records = {}; }
+    try { ADAPT.data = JSON.parse(store.get(FACTS_KEY) || '{}') || {}; } catch(e){ ADAPT.data = {}; }
+    return;
+  }
+  const progress = await loadChildProgress(kid.id, 'math-baseball').catch(() => null);
+  records = progress?.records || {};
+  ADAPT.data = progress?.facts || {};
+}
+// Guests persist facts on every answer (localStorage is free); a signed-in
+// kid's facts ride along in the one cloud write at the end of each inning,
+// so play never waits on the network mid-at-bat.
+ADAPT.save = () => { if (isGuestKid(kid.id)) store.set(FACTS_KEY, JSON.stringify(ADAPT.data)); };
+
+function saveRecordIfBest(t, runsScored){
+  if (records[t] != null && runsScored <= records[t]) return false;
+  records[t] = runsScored;
+  if (isGuestKid(kid.id)) store.set(RECORDS_KEY, JSON.stringify(records));
+  return true;   // the cloud write happens once, in endInning, records + facts together
+}
+
+/* =====================================================================
+   DIFFICULTY — from the profile's birthday, never a menu. The game
+   deals the right math for the kid's age and steps up as they grow.
+   ?tier=easy|medium|hard overrides for tuning (the old test switcher
+   lives on there). Guests and kids with no birthday on file get medium.
+   ===================================================================== */
+async function detectTier(){
+  const note = $('tierNote');
+  const forced = new URLSearchParams(location.search).get('tier');
+  if (CONFIG.tiers[forced]){
+    tier = forced;
+    note.textContent = `Difficulty pinned to ${TIER_NAME[tier]} by ?tier= — tuning only`;
+    note.classList.remove('hidden');
+    return;
+  }
+  if (isGuestKid(kid.id)) return;               // no birthday on file → medium
+  const child = await getChild(kid.id).catch(() => null);
+  const age = ageFromBirthday(child?.birthday);
+  if (age == null) return;
+  tier = tierForAge(age);
+  note.textContent = `Difficulty set to ${TIER_NAME[tier]} for ${kid.nickname} (age ${age})`;
+  note.classList.remove('hidden');
+}
+
+/* =====================================================================
+   SOUND — all synthesized Web Audio, no files. Tones for melodies,
+   filtered white noise for the physical stuff (bat crack, whiff, mitt
+   thump, crowd). Honors the arcade-wide mute toggle in
+   localStorage('arcade.sound'), same key as the front door's corner
+   button and the shell's sfx.
+   ===================================================================== */
+let actx = null, noiseBuf = null;
+function audioOK(){
+  try { if (localStorage.getItem('arcade.sound') === 'off') return null; } catch(e){}
+  try {
+    if (!actx) actx = new (window.AudioContext||window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume().catch(()=>{});
+    return actx;
+  } catch(e){ return null; }
+}
+function tone(freq, dur, { type='square', vol=0.13, delay=0, to=null } = {}){
+  const ac = audioOK(); if (!ac) return;
+  try{
+    const t0 = ac.currentTime + delay;
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (to) o.frequency.exponentialRampToValueAtTime(to, t0 + dur);
+    g.gain.setValueAtTime(vol, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(ac.destination);
+    o.start(t0); o.stop(t0 + dur + 0.02);
+  }catch(e){}
+}
+/* A burst of filtered white noise. `attack` > 0 swells in (the crowd);
+   without it the noise snaps on (the crack). `to` sweeps the filter. */
+function noise(dur, { vol=0.2, delay=0, filter='bandpass', freq=1800, to=null, q=0.8, attack=0 } = {}){
+  const ac = audioOK(); if (!ac) return;
+  try{
+    if (!noiseBuf){
+      noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);   // one second of white noise, looped
+      const d = noiseBuf.getChannelData(0);
+      for (let i=0;i<d.length;i++) d[i] = Math.random()*2 - 1;
+    }
+    const t0 = ac.currentTime + delay;
+    const src = ac.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+    const f = ac.createBiquadFilter(); f.type = filter; f.Q.value = q;
+    f.frequency.setValueAtTime(freq, t0);
+    if (to) f.frequency.exponentialRampToValueAtTime(to, t0 + dur);
+    const g = ac.createGain();
+    if (attack > 0){
+      g.gain.setValueAtTime(0.003, t0);
+      g.gain.exponentialRampToValueAtTime(vol, t0 + attack);
+    } else {
+      g.gain.setValueAtTime(vol, t0);
+    }
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(ac.destination);
+    src.start(t0); src.stop(t0 + dur + 0.02);
+  }catch(e){}
+}
+const sfx = {
+  right(){ tone(660,0.08); tone(880,0.12,{delay:0.07}); },
+  // the bat crack: a snap of high noise over a low knock
+  crack(){ noise(0.09,{vol:0.5,filter:'highpass',freq:1600}); tone(180,0.06,{vol:0.12}); },
+  // the whiff: air, sweeping down
+  whiff(){ noise(0.22,{vol:0.16,filter:'bandpass',freq:2400,to:500,q:1.2}); },
+  // ball in the catcher's mitt: a soft low thump
+  mitt(){ tone(150,0.12,{type:'sine',vol:0.25,to:60}); noise(0.05,{vol:0.12,filter:'lowpass',freq:400}); },
+  // the crowd swells with the size of the hit
+  crowd(kind){
+    const peak = { single:0.06, double:0.11, triple:0.17 }[kind] || 0.06;
+    noise(0.9,{vol:peak,filter:'lowpass',freq:900,attack:0.25});
+    tone(1047,0.12,{type:'triangle',vol:0.07,delay:0.12});
+  },
+  // the home-run roar: big crowd plus a rising fanfare
+  roar(){
+    noise(1.6,{vol:0.22,filter:'lowpass',freq:1000,attack:0.3});
+    [784,1047,1319,1568].forEach((f,i)=>tone(f,0.16,{type:'triangle',vol:0.12,delay:0.15+i*0.09}));
+  },
+  // one firework pop (fired per burst as the ball clears the fence)
+  pop(){ noise(0.12,{vol:0.3,filter:'bandpass',freq:900,to:2600}); },
+  // "aww, good try" — two soft falling notes, deliberately warm, never a sad trombone
+  aww(){ tone(392,0.22,{type:'triangle',vol:0.09}); tone(330,0.3,{type:'triangle',vol:0.08,delay:0.18}); },
+  cheer(){ [523,659,784,1047].forEach((f,i)=>tone(f,0.15,{vol:0.12,delay:i*0.09})); },
+  fanfare(){ [523,659,784,1047,1319,1568].forEach((f,i)=>tone(f,0.18,{vol:0.14,delay:i*0.09})); },
+};
+
+/* =====================================================================
+   GAME STATE
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const cv = $('game'), ctx = cv.getContext('2d');
+const W = cv.width, H = cv.height;
+
+let tier = 'medium';
+let state = 'menu';          // menu | question | beat | windup | pitch | result | over
+let outs, strikes, runs, bases, asked, correctCount, wrongCount, comebacks;
+let hitLog, strikeouts, fieldedOuts, runStart;
+let q = null;
+let pitchStart = 0;          // performance.now() when the ball left the hand
+let windupStart = 0;
+let swung = false;
+let particles = [], scorePops = [];
+let ball = null;             // {t} while pitched, {hit:...} after contact
+let batAnim = 0;             // >0 while the bat is mid-swing
+let lastT = 0;
+let timers = [];
+
+// setTimeout that dies with the run — so PLAY AGAIN can't inherit ghosts
+function later(fn, ms){ timers.push(setTimeout(fn, ms)); }
+function clearTimers(){ timers.forEach(clearTimeout); timers = []; }
+
+function resetGame(){
+  clearTimers();
+  outs = 0; strikes = 0; runs = 0; bases = [false,false,false];
+  asked = 0; correctCount = 0; wrongCount = 0; comebacks = 0;
+  ADAPT.recent = []; ADAPT.weakStreak = 0;
+  hitLog = { homer:0, triple:0, double:0, single:0 };
+  strikeouts = 0; fieldedOuts = 0;
+  particles = []; scorePops = []; ball = null; batAnim = 0;
+  stamp = null; trail = []; catcherPop = 0; pitchAnim = 0; waggleBoost = 0;
+  batterPose = { name:'idle', t:0 };
+  runStart = Date.now();
+}
+
+/* =====================================================================
+   THE AT-BAT — QUESTION → (correct) WINDUP → PITCH → SWING/RESULT
+                QUESTION → (wrong) OUT
+   ===================================================================== */
+function askQuestion(){
+  if (state === 'over') return;
+  state = 'question';
+  ball = null; swung = false; trail = [];
+  setPose('idle');
+  q = makeQuestion(tier);
+  asked++;
+  $('qText').textContent = q.text;
+  showInput(q);
+  updateHUD();
+}
+
+function showInput(q){
+  $('swingWrap').classList.add('hidden');
+  if (q.input === 'choices'){
+    $('answer').classList.add('hidden');
+    $('keypad').classList.add('hidden');
+    const box = $('choices');
+    box.classList.remove('hidden');
+    box.innerHTML = '';
+    makeChoices(q).forEach(v=>{
+      const b = document.createElement('button');
+      b.className = 'choice'; b.textContent = v; b.dataset.value = v;
+      b.onclick = ()=>answerChoice(v, b);
+      box.appendChild(b);
+    });
+  } else {
+    $('choices').classList.add('hidden');
+    const inp = $('answer');
+    inp.classList.remove('hidden');
+    inp.value = '';
+    $('keypad').classList.remove('hidden');
+    inp.focus({ preventScroll:true });
+  }
+}
+function hideInputsShowSwing(){
+  $('choices').classList.add('hidden');
+  $('answer').classList.add('hidden');
+  $('keypad').classList.add('hidden');
+  $('swingWrap').classList.remove('hidden');
+}
+
+/* ---------------- answering ------------------------------------------- */
+function answerChoice(value, btn){
+  if (state !== 'question') return;
+  if (value === q.answer){
+    btn.classList.add('right');
+    [...document.querySelectorAll('.choice')].forEach(b=>b.disabled = true);
+    correctAnswer();
+  } else {
+    btn.classList.add('wrong');
+    [...document.querySelectorAll('.choice')].forEach(b=>{
+      b.disabled = true;
+      if (parseInt(b.dataset.value,10) === q.answer) b.classList.add('right');
+    });
+    wrongAnswer();
+  }
+}
+function submitTyped(){
+  if (state !== 'question') return;
+  const val = $('answer').value.trim();
+  if (val === '') return;
+  // auto-fire already caught every correct answer, so a deliberate ✓ /
+  // Enter with the wrong number is the only way to be wrong here
+  if (parseInt(val,10) === q.answer) correctAnswer();
+  else wrongAnswer();
+}
+
+function correctAnswer(){
+  const wasWeak = ADAPT.weight(q.id) > 0;   // check BEFORE recording clears it
+  ADAPT.record(q.id, true);
+  if (wasWeak) comebacks++;
+  correctCount++;
+  sfx.right();
+  state = 'beat';
+  setFeedback(wasWeak ? '💪 GOT IT BACK! ⚾ Here it comes!' : '⚾ Here it comes!', wasWeak ? 'good' : 'info');
+  hideInputsShowSwing();
+  later(()=>{
+    state = 'windup';
+    windupStart = performance.now();
+    later(()=>{
+      state = 'pitch';
+      pitchStart = performance.now();
+      pitchAnim = 1;          // the pitcher's follow-through
+      trail = [];
+      ball = { t:0 };
+    }, CONFIG.windupMs);
+  }, CONFIG.beatMs);
+}
+
+function wrongAnswer(){
+  ADAPT.record(q.id, false);
+  wrongCount++;
+  // Fielding flavor, never failure language — and always show the answer.
+  const catches = ['line drive, caught!', 'easy fly ball, caught!', 'scooped up at shortstop, out at first!'];
+  const cost = CONFIG.wrongAnswerCosts[tier] || 'out';
+  if (cost === 'out'){
+    setFeedback(`The answer was ${q.answer} — ${pick(catches)} Next batter's up.`, 'warm');
+    sfx.aww();
+    later(()=>recordOut('fielded'), 2200);      // hold the answer a beat so it lands
+  } else {
+    strikes = strikesAfterContact(strikes, 'strike');
+    setFeedback(`The answer was ${q.answer} — the umpire calls a strike!`, 'warm');
+    sfx.mitt();
+    updateHUD();
+    later(()=>{
+      if (strikes >= CONFIG.strikesPerOut) recordOut('strikeout');
+      else askQuestion();
+    }, 2200);
+  }
+}
+
+/* ---------------- the swing -------------------------------------------- */
+function swing(){
+  if (state !== 'pitch' || swung) return;
+  swung = true;
+  batAnim = 1;
+  const flight = CONFIG.tiers[tier].flightMs;
+  const delta = performance.now() - (pitchStart + flight);
+  const result = judgeSwing(delta, tier);
+  resolvePitch(result, delta);
+}
+function noSwing(){
+  if (state !== 'pitch' || swung) return;
+  swung = true;
+  resolvePitch('nomiss', 0);   // took the pitch — a called strike
+}
+
+function resolvePitch(result, delta){
+  state = 'result';
+  if (result === 'miss' || result === 'nomiss'){
+    ball = null;
+    strikes = strikesAfterContact(strikes, 'strike');
+    if (result === 'nomiss') sfx.mitt(); else sfx.whiff();
+    showStamp('STEE-RIKE!', '#A971F5');
+    setPose('scratch');                       // a mild "so close!", never sad-shaming
+    if (result === 'nomiss') catcherPop = 1;  // the mitt pops on a called strike
+    const early = delta < 0;
+    setFeedback(result === 'nomiss'
+      ? pick(['Stee-rike! Right down the middle!', 'The umpire calls a strike!'])
+      : (early ? 'Stee-rike! A little early…' : 'Stee-rike! A little late…'), 'warm');
+    updateHUD();
+    later(()=>{
+      if (strikes >= CONFIG.strikesPerOut) recordOut('strikeout');
+      else askQuestion();
+    }, 1300);
+    return;
+  }
+  if (result === 'foul'){
+    launchBall('foul');
+    batAnim = 1;
+    sfx.crack();                              // a foul is still contact
+    showStamp('FOUL BALL', '#FFC93C');
+    const wasFull = strikes >= CONFIG.strikesPerOut - 1;
+    strikes = strikesAfterContact(strikes, 'foul');
+    setFeedback(wasFull ? "Foul ball — you can't strike out on a foul! Still alive!" : 'Foul ball! Still alive!', 'info');
+    updateHUD();
+    later(askQuestion, 1300);
+    return;
+  }
+  // ---- a real hit ----
+  recordHit(result);
+}
+
+function recordHit(kind){
+  hitLog[kind]++;
+  launchBall(kind);
+  sfx.crack();
+  batAnim = 1;
+  const adv = advanceRunners(bases, HIT_BASES[kind]);
+  const stamps = { single:['SINGLE!','#63E08A'], double:['DOUBLE!','#4C9BFF'],
+                   triple:['TRIPLE!','#FF5A5A'], homer:['HOME RUN!','#FFC93C'] };
+  showStamp(stamps[kind][0], stamps[kind][1]);
+  let msg = { single:'💥 A sharp single!', double:'💥💥 A double into the gap!',
+              triple:'🔥 A triple off the fence!', homer:'🚀 Over the fence and GONE!' }[kind];
+  if (adv.runs > 0) msg += `  +${adv.runs} run${adv.runs===1?'':'s'}!`;
+  setFeedback(msg, 'good');
+  setPose('cheer');
+  later(()=>setPose('run'), CONFIG.look.cheerMs);
+
+  if (kind === 'homer'){
+    sfx.roar();    // fireworks pop from drawHitBall() the moment it clears the fence
+    document.body.classList.remove('shakeHard'); void document.body.offsetWidth;
+    document.body.classList.add('shakeHard');
+  } else {
+    sfx.crowd(kind);   // the crowd swells with the size of the hit
+    burst(300, 200, kind==='triple' ? 34 : kind==='double' ? 22 : 14);
+  }
+
+  // the runner dots on the HUD diamond advance once the ball leaves the scene
+  const hudDelay = Math.round((ball?.dur || 0.5)*1000) + 80;
+  later(()=>{
+    bases = adv.bases;
+    if (adv.runs > 0){
+      runs += adv.runs;
+      sfx.cheer();
+      for (let i=0;i<adv.runs;i++) scorePops.push({ t:0, delay:i*0.25 });
+    }
+    updateHUD();
+  }, hudDelay);
+  strikes = 0;   // a hit means a fresh batter steps in
+  updateHUD();
+  later(askQuestion, kind === 'homer' ? 2200 : 1600);
+}
+
+function recordOut(how){
+  if (how === 'strikeout'){ strikeouts++; sfx.aww(); setFeedback("Three strikes — the catcher's got it. Next batter!", 'warm'); }
+  else fieldedOuts++;
+  outs++;
+  strikes = 0;
+  ball = null;
+  updateHUD();
+  if (outs >= CONFIG.outsPerInning){ later(endInning, 900); }
+  else later(askQuestion, how === 'strikeout' ? 1400 : 200);
+}
+
+/* =====================================================================
+   HUD
+   ===================================================================== */
+function updateHUD(){
+  $('runsValue').textContent = runs;
+  $('outsValue').textContent = '⚫'.repeat(Math.min(outs,3)) + '⚪'.repeat(Math.max(0,3-outs));
+  $('strikesValue').textContent = '🟡'.repeat(strikes) + '⚪'.repeat(Math.max(0,CONFIG.strikesPerOut-strikes));
+  document.querySelector('.bag--1').classList.toggle('on', bases[0]);
+  document.querySelector('.bag--2').classList.toggle('on', bases[1]);
+  document.querySelector('.bag--3').classList.toggle('on', bases[2]);
+  const rec = records[tier];
+  $('best').textContent = rec == null ? '—' : rec + ' runs';
+}
+
+let fbTimer = null;
+function setFeedback(text, cls){
+  const fb = $('feedback');
+  fb.textContent = text; fb.className = cls;
+  clearTimeout(fbTimer);
+  fbTimer = setTimeout(()=>{ fb.textContent=''; fb.className=''; }, 2600);
+}
+
+/* =====================================================================
+   THE BACKYARD — behind-the-pitcher camera, big-head sandlot kids.
+
+   Pseudo-3D, not real 3D: the pitch interpolates position and scale
+   from the pitcher's hand (foreground) to the plate (middle distance).
+   The ball is the flavor; the two rings over the plate are the precise
+   timing cue — both run off the same clock (pitchStart + flightMs), so
+   they can never disagree.
+   ===================================================================== */
+const EDGE = '#1E2B63';
+// scene geometry (canvas pixels)
+const PLATE   = { x:300, y:172 };     // home plate, up-screen
+const CONTACT = { x:300, y:156 };     // where the timing rings sit
+const RELEASE = { x:326, y:238 };     // the pitcher's hand at the top of the windup
+const FENCE_Y = 92;                   // top of the plank fence
+const BATTER  = { x:256, y:182 };     // beside the plate, facing us
+const CATCHER = { x:312, y:158 };     // crouched beyond the plate
+
+function px(x,y,w,h,c){ ctx.fillStyle=c; ctx.fillRect(x|0,y|0,w|0,h|0); }
+function ringAt(x,y,r){ ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.stroke(); }
+function disc(c,x,y,r,fill){
+  c.fillStyle = fill; c.beginPath(); c.arc(x,y,r,0,Math.PI*2); c.fill();
+  c.strokeStyle = EDGE; c.lineWidth = 2.5; c.beginPath(); c.arc(x,y,r,0,Math.PI*2); c.stroke();
+}
+
+/* ---------------- the backyard itself, painted once ------------------- */
+const bgCanvas = document.createElement('canvas');
+bgCanvas.width = W; bgCanvas.height = H;
+paintBackyard(bgCanvas.getContext('2d'));
+// repaint once the webfont arrives so the fence signs use it too
+if (document.fonts?.ready) document.fonts.ready.then(()=>paintBackyard(bgCanvas.getContext('2d')));
+
+function paintBackyard(c){
+  // sky + sun
+  const g = c.createLinearGradient(0,0,0,FENCE_Y+30);
+  g.addColorStop(0,'#79D2FF'); g.addColorStop(1,'#C9EEFF');
+  c.fillStyle = g; c.fillRect(0,0,W,FENCE_Y+30);
+  c.fillStyle = '#FFE9A8'; c.beginPath(); c.arc(52,36,26,0,Math.PI*2); c.fill();
+  c.fillStyle = '#FFC93C'; c.beginPath(); c.arc(52,36,18,0,Math.PI*2); c.fill();
+  // puffy clouds
+  for (const [cx,cy,s] of [[168,30,1],[400,20,0.75],[512,44,0.6]]){
+    c.fillStyle = '#FFFFFF';
+    c.beginPath();
+    c.arc(cx,cy,14*s,0,Math.PI*2); c.arc(cx+16*s,cy-6*s,11*s,0,Math.PI*2);
+    c.arc(cx+32*s,cy,13*s,0,Math.PI*2); c.arc(cx+16*s,cy+6*s,13*s,0,Math.PI*2);
+    c.fill();
+  }
+  // house rooftops peeking over the fence
+  for (const [hx,body] of [[110,'#FF8A65'],[236,'#A971F5'],[430,'#4C9BFF']]){
+    c.fillStyle = body; c.fillRect(hx, FENCE_Y-24, 56, 26);
+    c.fillStyle = '#FFF4DA'; c.fillRect(hx+10, FENCE_Y-18, 10, 10); c.fillRect(hx+34, FENCE_Y-18, 10, 10);
+    c.fillStyle = EDGE;
+    c.beginPath(); c.moveTo(hx-8, FENCE_Y-22); c.lineTo(hx+28, FENCE_Y-44); c.lineTo(hx+64, FENCE_Y-22); c.closePath(); c.fill();
+  }
+  // the wooden plank fence — the outfield wall, and the home-run line
+  for (let x=0; x<W; x+=24){
+    c.fillStyle = (x/24)%2 ? '#C08A4E' : '#D2A76F';
+    c.fillRect(x, FENCE_Y, 23, 42);
+    c.beginPath(); c.moveTo(x, FENCE_Y+1); c.lineTo(x+11.5, FENCE_Y-5); c.lineTo(x+23, FENCE_Y+1); c.closePath(); c.fill();
+  }
+  c.fillStyle = 'rgba(30,43,99,0.25)';
+  c.fillRect(0, FENCE_Y+12, W, 3); c.fillRect(0, FENCE_Y+30, W, 3);   // rails
+  // hand-painted signs (invented kid brands only)
+  paintSign(c,  76, "MILO'S LEMONADE 25¢", '#FFFFFF', -0.03);
+  paintSign(c, 396, 'GO SLUGGERS!', '#FFC93C', 0.04);
+  // the shade tree hanging over the right corner
+  c.fillStyle = '#8A5A32'; c.fillRect(556, FENCE_Y-34, 15, 40);
+  for (const [tx,ty,tr] of [[588,FENCE_Y-38,34],[548,FENCE_Y-46,30],[566,FENCE_Y-62,28],[600,FENCE_Y-60,24]]){
+    c.fillStyle = '#31A84A'; c.beginPath(); c.arc(tx,ty,tr,0,Math.PI*2); c.fill();
+  }
+  for (const [tx,ty,tr] of [[580,FENCE_Y-52,20],[556,FENCE_Y-40,16]]){
+    c.fillStyle = '#3DBE58'; c.beginPath(); c.arc(tx,ty,tr,0,Math.PI*2); c.fill();
+  }
+  // grass, with mowed light/dark stripes widening toward the camera
+  c.fillStyle = '#5FD963'; c.fillRect(0, FENCE_Y+42, W, H-FENCE_Y-42);
+  let sy = FENCE_Y+42, sh = 10, dark = false;
+  while (sy < H){
+    if (dark){ c.fillStyle = 'rgba(49,168,74,0.30)'; c.fillRect(0, sy, W, sh); }
+    dark = !dark; sy += sh; sh *= 1.28;
+  }
+  // faint basepaths running off toward first and third
+  c.strokeStyle = 'rgba(217,160,91,0.55)'; c.lineWidth = 9; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(322,180); c.lineTo(586,332); c.stroke();
+  c.beginPath(); c.moveTo(278,180); c.lineTo(14,332); c.stroke();
+  // the home-plate dirt circle, chalk boxes, and the plate itself
+  c.fillStyle = '#D9A05B';
+  c.beginPath(); c.ellipse(PLATE.x, PLATE.y+2, 62, 20, 0, 0, Math.PI*2); c.fill();
+  c.strokeStyle = 'rgba(255,255,255,0.85)'; c.lineWidth = 2;
+  c.strokeRect(PLATE.x-58, PLATE.y-10, 26, 22);   // batter's boxes
+  c.strokeRect(PLATE.x+32, PLATE.y-10, 26, 22);
+  c.fillStyle = '#FFFFFF'; c.strokeStyle = EDGE; c.lineWidth = 1.5;
+  c.beginPath();
+  c.moveTo(PLATE.x-7, PLATE.y-3); c.lineTo(PLATE.x+7, PLATE.y-3);
+  c.lineTo(PLATE.x+7, PLATE.y+2); c.lineTo(PLATE.x, PLATE.y+7); c.lineTo(PLATE.x-7, PLATE.y+2);
+  c.closePath(); c.fill(); c.stroke();
+  // the pitcher's mound, big in the foreground
+  c.fillStyle = '#D9A05B';
+  c.beginPath(); c.ellipse(300, 318, 76, 20, 0, 0, Math.PI*2); c.fill();
+  c.fillStyle = '#FFFFFF'; c.fillRect(295, 306, 10, 3);   // the rubber
+}
+function paintSign(c, x, text, bgCol, tilt){
+  c.save(); c.translate(x, FENCE_Y+8); c.rotate(tilt);
+  c.fillStyle = bgCol; c.fillRect(0,0,124,20);
+  c.strokeStyle = EDGE; c.lineWidth = 2.5; c.strokeRect(0,0,124,20);
+  c.fillStyle = EDGE; c.font = '800 10px "Baloo 2", sans-serif'; c.textAlign = 'center';
+  c.fillText(text, 62, 14);
+  c.restore();
+}
+
+/* ---------------- the kids -------------------------------------------- */
+let batterPose = { name:'idle', t:0 };
+function setPose(name){ batterPose = { name, t:0 }; }
+let catcherPop = 0;      // mitt pops up on a called strike
+let pitchAnim = 0;       // pitcher's follow-through after release
+let waggleBoost = 0;     // extra bat waggle when swing keys are mashed early
+let trail = [];          // motion-trail ghosts behind the pitch
+let stamp = null;        // the big result lettering
+function showStamp(text, color){ stamp = { text, color, t:0 }; }
+
+function drawCatcherKid(){
+  ctx.save(); ctx.translate(CATCHER.x, CATCHER.y);
+  // folded legs
+  ctx.fillStyle = '#7433CE'; ctx.fillRect(-9, -7, 18, 7);
+  // chest
+  ctx.fillStyle = '#A971F5'; ctx.strokeStyle = EDGE; ctx.lineWidth = 2;
+  ctx.fillRect(-8, -18, 16, 12); ctx.strokeRect(-8, -18, 16, 12);
+  // big head + backwards cap
+  disc(ctx, 0, -26, 9, '#FFC9A0');
+  ctx.fillStyle = '#7433CE';
+  ctx.beginPath(); ctx.arc(0, -27, 9.5, Math.PI, 0); ctx.fill();
+  // dot eyes
+  ctx.fillStyle = EDGE;
+  ctx.beginPath(); ctx.arc(-3,-25,1.3,0,Math.PI*2); ctx.arc(3,-25,1.3,0,Math.PI*2); ctx.fill();
+  // the mitt — pops up on a called strike
+  const lift = catcherPop*9, squeeze = 1 + catcherPop*0.35;
+  disc(ctx, -14, -14 - lift, 5.5*squeeze, '#C68B45');
+  ctx.restore();
+}
+
+function drawBatterKid(){
+  const p = batterPose;
+  const now = performance.now()/1000;
+  let x = BATTER.x, y = BATTER.y, lean = 0;
+  if (p.name === 'cheer') y -= Math.abs(Math.sin(p.t*9))*7;              // the fist-pump jump
+  if (p.name === 'run'){ x += Math.min(34, p.t*70); lean = 0.35; }       // bat-drop sprint
+  ctx.save(); ctx.translate(x, y); ctx.rotate(lean);
+  // legs (they scissor while sprinting)
+  const kick = p.name === 'run' ? Math.sin(p.t*18)*3 : 0;
+  ctx.fillStyle = EDGE;
+  ctx.fillRect(-7, -9 + kick, 5, 9 - kick);
+  ctx.fillRect(2, -9 - kick, 5, 9 + kick);
+  // jersey
+  ctx.fillStyle = '#4C9BFF'; ctx.strokeStyle = EDGE; ctx.lineWidth = 2.5;
+  ctx.fillRect(-10, -27, 20, 18); ctx.strokeRect(-10, -27, 20, 18);
+  // arms, by mood
+  ctx.strokeStyle = '#4C9BFF'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+  if (p.name === 'cheer'){
+    ctx.beginPath(); ctx.moveTo(-8,-24); ctx.lineTo(-16,-38); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(8,-24); ctx.lineTo(16,-38); ctx.stroke();
+  } else if (p.name === 'scratch'){
+    ctx.beginPath(); ctx.moveTo(8,-24); ctx.lineTo(12,-44); ctx.stroke();  // hand to helmet: "so close!"
+    ctx.beginPath(); ctx.moveTo(-8,-24); ctx.lineTo(-12,-16); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.moveTo(-8,-24); ctx.lineTo(6,-21); ctx.stroke();  // hands on the bat grip
+    ctx.beginPath(); ctx.moveTo(8,-24); ctx.lineTo(6,-21); ctx.stroke();
+  }
+  // big head + helmet
+  disc(ctx, 0, -41, 13, '#FFC9A0');
+  ctx.fillStyle = '#1F5FD6';
+  ctx.beginPath(); ctx.arc(0, -42, 13.5, Math.PI*0.95, Math.PI*2.05); ctx.fill();
+  // dot eyes + grin (a little "o" mouth after a strike)
+  ctx.fillStyle = EDGE;
+  ctx.beginPath(); ctx.arc(-4.5,-40,1.8,0,Math.PI*2); ctx.arc(4.5,-40,1.8,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle = EDGE; ctx.lineWidth = 1.8;
+  if (p.name === 'scratch'){ ctx.beginPath(); ctx.arc(0,-33.5,2.4,0,Math.PI*2); ctx.stroke(); }
+  else { ctx.beginPath(); ctx.arc(0,-36,4.5,0.15*Math.PI,0.85*Math.PI); ctx.stroke(); }
+  ctx.restore();
+
+  // the bat
+  ctx.strokeStyle = '#C68B45'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+  if (p.name === 'run' || p.name === 'cheer'){
+    // dropped in the batter's box
+    ctx.beginPath(); ctx.moveTo(BATTER.x-4, BATTER.y-2); ctx.lineTo(BATTER.x+22, BATTER.y+2); ctx.stroke();
+  } else {
+    const waggle = Math.sin(now*4.2) * 0.12 * (1 + waggleBoost*2);
+    const angle = batAnim > 0 ? (-2.3 + (1-batAnim)*3.1) : (-1.05 + waggle);
+    ctx.save();
+    ctx.translate(x+6, y-22);
+    ctx.rotate(angle);
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(27,0); ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawPitcherKid(){
+  const idle = state==='question' || state==='menu' || state==='over' || state==='result';
+  const sway = idle ? Math.sin(performance.now()/850)*2.5 : 0;
+  const x = 300 + sway, y = 302;   // feet on the mound
+  const wp = state === 'windup' ? Math.min(1, (performance.now()-windupStart)/CONFIG.windupMs) : 0;
+  const kick = Math.sin(Math.min(1, wp*1.15)*Math.PI);   // the leg kick rises, then plants
+  ctx.save(); ctx.translate(x, y);
+  // legs — the left one kicks up during the windup
+  ctx.fillStyle = EDGE;
+  ctx.fillRect(3, -18, 9, 18);
+  if (wp > 0){
+    ctx.save(); ctx.translate(-4,-16); ctx.rotate(-kick*1.1);
+    ctx.fillRect(-11, -4, 15, 9); ctx.restore();
+  } else {
+    ctx.fillRect(-12, -18, 9, 18);
+  }
+  // jersey back + number
+  ctx.fillStyle = '#FF5A5A'; ctx.strokeStyle = EDGE; ctx.lineWidth = 3;
+  ctx.fillRect(-16, -46, 32, 30); ctx.strokeRect(-16, -46, 32, 30);
+  ctx.fillStyle = '#FFFFFF'; ctx.font = '800 15px "Baloo 2", sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('1', 0, -25);
+  // glove arm
+  ctx.strokeStyle = '#FF5A5A'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-13,-40); ctx.lineTo(-24,-30 - kick*8); ctx.stroke();
+  disc(ctx, -26, -28 - kick*8, 6, '#C68B45');
+  // throwing arm: rises through the windup, whips forward on release
+  let hx = 20, hy = -30;
+  if (wp > 0){ hx = 20 + wp*6; hy = -30 - wp*34; }
+  if (pitchAnim > 0){ hx = 10; hy = -70 + (1-pitchAnim)*12; }
+  ctx.beginPath(); ctx.moveTo(12,-40); ctx.lineTo(hx, hy); ctx.stroke();
+  // the ball waits in his hand until the release
+  if (state === 'beat' || state === 'windup'){
+    ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); ctx.arc(hx+2, hy-4, 4, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#D62A2A'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(hx+2, hy-4, 4, 0, Math.PI*2); ctx.stroke();
+  }
+  // big head from behind + backwards cap (brim toward us)
+  disc(ctx, 0, -62, 17, '#FFC9A0');
+  ctx.fillStyle = '#D62A2A';
+  ctx.beginPath(); ctx.arc(0, -63, 17.5, Math.PI*0.92, Math.PI*2.08); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, -48, 10, 3.5, 0, 0, Math.PI*2); ctx.fill();   // the backwards brim
+  ctx.fillStyle = EDGE; ctx.beginPath(); ctx.arc(0, -79, 2, 0, Math.PI*2); ctx.fill();  // cap button
+  // ears
+  disc(ctx, -16, -60, 3.5, '#FFC9A0'); disc(ctx, 16, -60, 3.5, '#FFC9A0');
+  ctx.restore();
+}
+
+/* ---------------- the ball -------------------------------------------- */
+function drawBallAt(x, y, r){
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#D62A2A'; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.stroke();
+}
+
+/* The two rings over the plate: a fixed target, and a shrinking ring
+   synced to the pitch clock. They align exactly at the perfect moment. */
+function drawRings(){
+  const L = CONFIG.look;
+  ctx.lineWidth = 3.5; ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+  ringAt(CONTACT.x, CONTACT.y, L.ringTarget);
+  ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(30,43,99,0.45)';
+  ringAt(CONTACT.x, CONTACT.y, L.ringTarget+2.5);
+  const u = Math.min(1, (performance.now()-pitchStart)/CONFIG.tiers[tier].flightMs);
+  const r = L.ringStart - (L.ringStart - L.ringTarget)*u;
+  ctx.lineWidth = 4; ctx.strokeStyle = '#FFC93C';
+  ringAt(CONTACT.x, CONTACT.y, r);
+  ctx.lineWidth = 1.5; ctx.strokeStyle = EDGE;
+  ringAt(CONTACT.x, CONTACT.y, r+2.5);
+}
+
+function drawPitchBall(){
+  const flight = CONFIG.tiers[tier].flightMs;
+  const t = Math.min(1.12, (performance.now() - pitchStart) / flight);   // runs a touch past the plate
+  const u = Math.min(1, t);
+  const x = RELEASE.x + (CONTACT.x - RELEASE.x) * t;
+  const y = RELEASE.y + (CONTACT.y - RELEASE.y) * t - Math.sin(Math.PI*u) * 12;  // slight arc
+  const r = 7 - 3.8 * u;                                                 // shrinks into the distance
+  // soft shadow on the ground under the ball
+  const gy = 312 + (PLATE.y + 6 - 312) * t;
+  ctx.fillStyle = 'rgba(30,43,99,0.20)';
+  ctx.beginPath(); ctx.ellipse(x, gy, r*0.9, r*0.35, 0, 0, Math.PI*2); ctx.fill();
+  // faint motion trail
+  trail.push({ x, y, r });
+  if (trail.length > CONFIG.look.trailLen) trail.shift();
+  trail.forEach((p, i)=>{
+    ctx.globalAlpha = 0.22 * (i+1)/trail.length;
+    drawBallAt(p.x, p.y, p.r);
+  });
+  ctx.globalAlpha = 1;
+  drawBallAt(x, y, r);
+}
+
+/* After contact: liners grow back over the pitcher's head toward the
+   camera; a homer arcs up, shrinks, and disappears over the fence. */
+function launchBall(kind){
+  const side = Math.random() < 0.5 ? -1 : 1;
+  const from = { x:CONTACT.x, y:CONTACT.y, r:3.5 };
+  let to, dur, arc;
+  if (kind === 'homer'){
+    to = { x: 300 + side*(40+rnd(90)), y: FENCE_Y - 34, r: 2.2 }; dur = 0.95; arc = 30;
+  } else if (kind === 'foul'){
+    to = { x: 300 + side*360, y: 250, r: 15 }; dur = 0.4; arc = 8;
+  } else {
+    to = { x: 300 + side*({ single:330, double:360, triple:390 }[kind]),
+           y: 140 + rnd(60),
+           r: { single:16, double:19, triple:22 }[kind] };
+    dur = { single:0.5, double:0.62, triple:0.72 }[kind];
+    arc = { single:14, double:26, triple:40 }[kind];
+  }
+  ball = { hit:true, kind, t:0, dur, from, to, arc, popped:false };
+  trail = [];
+}
+function drawHitBall(){
+  const b = ball;
+  const p = Math.min(1, b.t / b.dur);
+  const x = b.from.x + (b.to.x - b.from.x)*p;
+  const y = b.from.y + (b.to.y - b.from.y)*p - Math.sin(Math.PI*p)*b.arc;
+  const r = b.from.r + (b.to.r - b.from.r)*p;
+  if (b.kind === 'homer' && !b.popped && y < FENCE_Y){
+    b.popped = true;
+    fenceFireworks(x);       // the moment: it's gone over the fence
+  }
+  drawBallAt(x, y, r);
+}
+function fenceFireworks(x){
+  for (let i=0;i<CONFIG.look.fireworkPops;i++){
+    later(()=>{ burst(x - 40 + rnd(80), FENCE_Y - 26 - rnd(24), 26); sfx.pop(); }, i*150);
+  }
+}
+
+function burst(x, y, n){
+  for (let i=0;i<n;i++){
+    particles.push({
+      x, y,
+      vx:(Math.random()-0.5)*300, vy:-Math.random()*260-40,
+      life:0.6+Math.random()*0.5, max:1.0, size:3+rnd(4),
+      color: pick(['#FF5A5A','#FFC93C','#4C9BFF','#A971F5','#FFFFFF']),
+    });
+  }
+}
+
+/* ---------------- main loop -------------------------------------------- */
+function loop(t){
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t-lastT)/1000 || 0);
+  lastT = t;
+
+  // a pitch nobody swung at eventually lands in the mitt: called strike
+  if (state === 'pitch' && !swung){
+    const flight = CONFIG.tiers[tier].flightMs;
+    const w = CONFIG.tiers[tier].windows;
+    if (performance.now() > pitchStart + flight + w.foul + CONFIG.noSwingGraceMs) noSwing();
+  }
+
+  if (batAnim > 0) batAnim = Math.max(0, batAnim - dt*7);
+  batterPose.t += dt;
+  if (catcherPop > 0)  catcherPop  = Math.max(0, catcherPop - dt*3);
+  if (pitchAnim > 0)   pitchAnim   = Math.max(0, pitchAnim - dt*4);
+  if (waggleBoost > 0) waggleBoost = Math.max(0, waggleBoost - dt*3);
+  if (stamp){ stamp.t += dt; if (stamp.t > CONFIG.look.stampMs/1000) stamp = null; }
+  if (ball && ball.hit){
+    ball.t += dt;
+    if (ball.t >= ball.dur + 0.05) ball = null;
+  }
+  for (let i=particles.length-1;i>=0;i--){
+    const p = particles[i];
+    p.x += p.vx*dt; p.y += p.vy*dt; p.vy += 600*dt; p.life -= dt;
+    if (p.life <= 0) particles.splice(i,1);
+  }
+  for (let i=scorePops.length-1;i>=0;i--){
+    const s = scorePops[i];
+    if (s.delay > 0){ s.delay -= dt; continue; }
+    s.t += dt;
+    if (s.t > 1.1) scorePops.splice(i,1);
+  }
+  draw();
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  ctx.drawImage(bgCanvas, 0, 0);
+  // far to near: catcher, batter, pitch (rings under ball), pitcher, hit ball
+  drawCatcherKid();
+  drawBatterKid();
+  if (state === 'pitch' && ball && !ball.hit){ drawRings(); drawPitchBall(); }
+  drawPitcherKid();
+  if (ball && ball.hit) drawHitBall();
+  particles.forEach(p=>{
+    ctx.globalAlpha = Math.max(0, p.life/p.max);
+    px(p.x, p.y, p.size, p.size, p.color);
+  });
+  ctx.globalAlpha = 1;
+  // "+1" popping up over home as each runner scores
+  ctx.font = '800 22px "Baloo 2", sans-serif';
+  ctx.textAlign = 'left';
+  scorePops.forEach(s=>{
+    if (s.delay > 0) return;
+    ctx.globalAlpha = Math.max(0, 1 - s.t);
+    ctx.fillStyle = '#FFC93C';
+    ctx.strokeStyle = EDGE; ctx.lineWidth = 4;
+    ctx.strokeText('+1', PLATE.x + 38, PLATE.y - 44 - s.t*36);
+    ctx.fillText('+1', PLATE.x + 38, PLATE.y - 44 - s.t*36);
+  });
+  ctx.globalAlpha = 1;
+  // the big cartoon result lettering, stamped across the scene
+  if (stamp){
+    const p = stamp.t / (CONFIG.look.stampMs/1000);
+    const grow = Math.min(1, p/0.16);
+    const c1 = 1.70158, c3 = c1 + 1;
+    const scale = 1 + c3*Math.pow(grow-1,3) + c1*Math.pow(grow-1,2);   // ease-out-back bounce
+    ctx.save();
+    ctx.translate(300, 122); ctx.rotate(-0.04); ctx.scale(scale, scale);
+    ctx.globalAlpha = p > 0.72 ? Math.max(0, (1-p)/0.28) : 1;
+    ctx.font = '800 44px "Baloo 2", sans-serif'; ctx.textAlign = 'center';
+    ctx.lineWidth = 9; ctx.lineJoin = 'round'; ctx.strokeStyle = EDGE;
+    ctx.strokeText(stamp.text, 0, 0);
+    ctx.fillStyle = stamp.color;
+    ctx.fillText(stamp.text, 0, 0);
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+}
+
+/* =====================================================================
+   START / END
+   ===================================================================== */
+const TIER_NAME = { easy:'Easy', medium:'Medium', hard:'Hard' };
+function renderRecordBoard(el){
+  const r = records;
+  const rows = ['easy','medium','hard'].map(t =>
+    `<div><span>${TIER_NAME[t]} — most runs</span><span>${r[t] == null ? '—' : r[t] + ' runs'}</span></div>`);
+  el.innerHTML = `<div style="opacity:.6;font-size:11px;letter-spacing:1.5px;justify-content:center">YOUR RECORDS</div>` + rows.join('');
+}
+
+function startGame(){
+  resetGame();
+  $('startScreen').classList.add('hidden');
+  $('endScreen').classList.add('hidden');
+  setFeedback('', '');
+  tone(523,0.1); tone(784,0.14,{delay:0.11});
+  askQuestion();
+}
+
+function endInning(){
+  state = 'over';
+  $('swingWrap').classList.add('hidden');
+  $('choices').classList.add('hidden');
+  $('answer').classList.add('hidden');
+  $('keypad').classList.add('hidden');
+
+  const isRecord = runs > 0 && saveRecordIfBest(tier, runs);
+  sfx.cheer();
+
+  $('endTitle').textContent = runs === 0 ? '⚾ Inning over!' :
+    runs === 1 ? '⚾ 1 RUN SCORED!' : `⚾ ${runs} RUNS SCORED!`;
+
+  // the at-bat log, e.g. "2 home runs · 1 double · 3 singles"
+  const bits = [];
+  if (hitLog.homer)  bits.push(`${hitLog.homer} home run${hitLog.homer===1?'':'s'}`);
+  if (hitLog.triple) bits.push(`${hitLog.triple} triple${hitLog.triple===1?'':'s'}`);
+  if (hitLog.double) bits.push(`${hitLog.double} double${hitLog.double===1?'':'s'}`);
+  if (hitLog.single) bits.push(`${hitLog.single} single${hitLog.single===1?'':'s'}`);
+  const hitLine = bits.length ? bits.join(' · ') : 'No hits this time — the pitcher got lucky!';
+
+  const acc = asked ? Math.round(correctCount/asked*100) : 0;
+  const stats = [];
+  stats.push(`<div class="scoreRow">Runs scored: <b>${runs}</b></div>`);
+  stats.push(`<div class="scoreRow">${hitLine}</div>`);
+  stats.push(`<div class="scoreRow">Math: ${correctCount} of ${asked} right · ${acc}%</div>`);
+  if (comebacks > 0)
+    stats.push(`<div class="scoreRow" style="color:#1c7a45">💪 ${comebacks} comeback${comebacks===1?'':'s'} — facts you'd missed before!</div>`);
+  $('endStats').innerHTML = stats.join('');
+  $('newRecord').classList.toggle('hidden', !isRecord);
+  if (isRecord) sfx.fanfare();
+
+  // one cloud write per inning for a signed-in kid: records + practice facts
+  if (!isGuestKid(kid.id)){
+    saveChildProgress(kid.id, 'math-baseball', { records, facts: ADAPT.data }).catch(() => {});
+  }
+
+  // The character award: correct answers drive the baseline and runs
+  // stack on top (units = correct + unitsPerRun × runs). The ≥80% clear
+  // bonus comes from the same accuracy the end screen shows, and below
+  // 80% still pays consolation XP — there is no zero-reward outcome.
+  const awardEl = $('awardLine');
+  awardEl.textContent = 'Saving…';
+  finishRun('math-baseball', {
+    asked,
+    correct: correctCount,
+    seconds: Math.round((Date.now() - runStart) / 1000),
+    score: runs,
+    units: correctCount + CONFIG.unitsPerRun * runs,
+  }).then((outcome) => {
+    awardEl.textContent = describeAward(outcome);
+    celebrateLevelUp(outcome);
+  });
+
+  renderRecordBoard($('endBoard'));
+  $('endScreen').classList.remove('hidden');
+}
+
+/* =====================================================================
+   WIRING
+   ===================================================================== */
+// typed input: auto-fire the instant the number is right (typos never punished)
+const inp = $('answer');
+inp.addEventListener('input', ()=>{
+  inp.value = inp.value.replace(/[^0-9]/g,'').slice(0,4);
+  if (state === 'question' && inp.value !== '' && parseInt(inp.value,10) === q.answer){
+    correctAnswer();
+  }
+});
+
+// on-screen keypad
+const keypad = $('keypad');
+['1','2','3','4','5','6','7','8','9','0'].forEach(n=>{
+  const b = document.createElement('button');
+  b.className = 'key'; b.textContent = n; b.type = 'button';
+  b.onclick = ()=>{ if (state!=='question') return; inp.value = (inp.value + n).slice(0,4); inp.dispatchEvent(new Event('input')); };
+  keypad.appendChild(b);
+});
+const del = document.createElement('button');
+del.className = 'key del'; del.textContent = '⌫'; del.type = 'button';
+del.onclick = ()=>{ inp.value = inp.value.slice(0,-1); };
+keypad.appendChild(del);
+const go = document.createElement('button');
+go.className = 'key go'; go.textContent = '✓'; go.type = 'button'; go.style.gridColumn = 'span 4';
+go.onclick = submitTyped;
+keypad.appendChild(go);
+
+// the swing: giant button, spacebar, ENTER, or a tap/click on the field.
+// Swing keys are only live while the ball is in flight — during the
+// question they belong to the answer UI, during the windup they just
+// waggle the bat — and auto-repeat never swings, so a held Enter from
+// typing can never turn into a phantom swing.
+$('swingBtn').addEventListener('click', swing);
+cv.addEventListener('pointerdown', ()=>{ if (state === 'pitch') swing(); });
+document.addEventListener('keydown', e=>{
+  const swingKey = e.code === 'Space' || e.key === 'Enter';
+  if (swingKey && state === 'pitch'){
+    e.preventDefault();
+    if (!e.repeat) swing();
+    return;
+  }
+  if (swingKey && (state === 'beat' || state === 'windup')){
+    e.preventDefault();
+    waggleBoost = 1;          // too eager — the bat waggles, nothing else
+    return;
+  }
+  if (e.code === 'Space'){ e.preventDefault(); return; }
+  if (e.key === 'Enter'){
+    e.preventDefault();
+    if (e.repeat) return;
+    if (state === 'question' && q?.input === 'typed') submitTyped();
+    else if (state === 'menu' || state === 'over') startGame();
+    return;
+  }
+  // number keys pick a choice on the easy tier
+  if (state === 'question' && q?.input === 'choices' && ['1','2','3'].includes(e.key)){
+    const btns = document.querySelectorAll('.choice');
+    const b = btns[parseInt(e.key,10)-1];
+    if (b && !b.disabled) b.click();
+  }
+});
+
+// (The old start-screen tier switcher is gone — the profile's birthday
+// decides now, and ?tier=easy|medium|hard remains for tuning.)
+
+$('startBtn').onclick = startGame;
+$('againBtn').onclick = startGame;
+
+resetGame();
+renderRecordBoard($('recordBoard'));
+updateHUD();
+requestAnimationFrame(loop);
+// The tier and any cloud records arrive async — repaint the boards when
+// they land. The game is playable immediately either way.
+(async () => {
+  await detectTier();
+  await loadRecordsFromStore();
+  renderRecordBoard($('recordBoard'));
+  updateHUD();
+})();
+} // end main()
+</script>
+</body>
+</html>

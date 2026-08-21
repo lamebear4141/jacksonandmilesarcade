@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jackson &amp; Miles Arcade — "Playground" chrome system</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   PLAYGROUND — shared chrome tokens
+   Namespaced --ac-* so game-local vars (Coin Climb's --ink etc.)
+   never collide. Drop-in replacement for the token block in
+   site-architecture-spec.md §3.
+   ============================================================ */
+:root{
+  /* surfaces */
+  --ac-sky-top:#79D2FF;
+  --ac-sky-mid:#A8E4FF;
+  --ac-sky-bot:#D6F3FF;
+  --ac-grass:#5FD963;
+  --ac-grass-deep:#31A84A;
+  --ac-panel:#FFFFFF;
+  --ac-panel-2:#FFF4DA;      /* cream wells, inputs, keypad keys */
+  --ac-edge:#1E2B63;         /* THE outline. every chunky thing gets it */
+  --ac-line:#C8D6F5;
+
+  /* text */
+  --ac-text:#1E2B63;
+  --ac-text-dim:#5C6EA8;
+  --ac-text-mute:#8E9BC4;
+
+  /* the four play colors */
+  --ac-red:#FF5A5A;      --ac-red-deep:#D62A2A;
+  --ac-yellow:#FFC93C;   --ac-yellow-deep:#E39B00;
+  --ac-blue:#4C9BFF;     --ac-blue-deep:#1F5FD6;
+  --ac-purple:#A971F5;   --ac-purple-deep:#7433CE;
+
+  /* status */
+  --ac-good:#2ECC71;
+  --ac-bad:#FF4D4D;
+
+  /* shape + type */
+  --ac-radius:24px;
+  --ac-radius-sm:14px;
+  --ac-bd:4px;               /* border width on chunky things */
+  --ac-lift:7px;             /* resting drop offset */
+  --ac-font:'Baloo 2','Arial Rounded MT Bold','Trebuchet MS',system-ui,sans-serif;
+}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--ac-font);
+  color:var(--ac-text);
+  background:var(--ac-sky-bot);
+  overflow-x:hidden;
+  font-weight:700;
+}
+button{font-family:inherit;font-weight:800;cursor:pointer}
+
+/* ---------- shake ---------- */
+@keyframes shake{
+  0%,100%{transform:translate(0,0)}
+  20%{transform:translate(-6px,3px) rotate(-.4deg)}
+  40%{transform:translate(5px,-4px) rotate(.4deg)}
+  60%{transform:translate(-4px,-2px)}
+  80%{transform:translate(3px,3px)}
+}
+body.shake #app{animation:shake .32s ease}
+
+/* ============================================================
+   .ac-btn — the chunky 3D button, three weights
+   ============================================================ */
+.ac-btn{
+  position:relative;
+  display:inline-flex;align-items:center;justify-content:center;gap:.5em;
+  padding:14px 26px;
+  font-size:20px;letter-spacing:.3px;
+  color:#fff;
+  background:linear-gradient(180deg,var(--ac-red) 0%,var(--ac-red-deep) 100%);
+  border:var(--ac-bd) solid var(--ac-edge);
+  border-radius:var(--ac-radius-sm);
+  box-shadow:0 var(--ac-lift) 0 var(--ac-edge), 0 calc(var(--ac-lift) + 6px) 14px rgba(30,43,99,.25);
+  text-shadow:0 2px 0 rgba(0,0,0,.22);
+  transition:transform .06s ease, box-shadow .06s ease, filter .12s ease;
+  text-decoration:none;
+}
+.ac-btn:hover{filter:brightness(1.06)}
+.ac-btn:active,.ac-btn.is-press{
+  transform:translateY(var(--ac-lift));
+  box-shadow:0 0 0 var(--ac-edge), 0 2px 4px rgba(30,43,99,.3);
+}
+.ac-btn--yellow{background:linear-gradient(180deg,var(--ac-yellow),var(--ac-yellow-deep));color:var(--ac-edge);text-shadow:0 2px 0 rgba(255,255,255,.45)}
+.ac-btn--blue{background:linear-gradient(180deg,var(--ac-blue),var(--ac-blue-deep))}
+.ac-btn--purple{background:linear-gradient(180deg,var(--ac-purple),var(--ac-purple-deep))}
+.ac-btn--green{background:linear-gradient(180deg,#63E08A,#23A354)}
+.ac-btn--outline{background:var(--ac-panel);color:var(--ac-text);text-shadow:none}
+.ac-btn--ghost{
+  background:transparent;color:var(--ac-text);border-style:dashed;
+  box-shadow:none;text-shadow:none;
+}
+.ac-btn--ghost:active{transform:translateY(2px);box-shadow:none}
+.ac-btn--sm{padding:8px 16px;font-size:15px;border-width:3px;--ac-lift:4px;border-radius:11px}
+.ac-btn--xl{padding:24px 60px;font-size:40px;border-radius:26px;--ac-lift:10px}
+
+/* the giant PLAY breathes so it reads as the target from across the room */
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.045)}}
+.ac-btn--play{animation:breathe 1.6s ease-in-out infinite}
+.ac-btn--play:active{animation:none}
+
+/* ============================================================
+   .ac-badge — grade pills. never a name, always a grade.
+   ============================================================ */
+.ac-badge{
+  display:inline-block;padding:4px 12px;
+  font-size:12px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;
+  color:var(--ac-edge);background:var(--ac-panel-2);
+  border:3px solid var(--ac-edge);border-radius:999px;
+  white-space:nowrap;
+}
+.ac-badge--blue{background:#CBE4FF}
+.ac-badge--purple{background:#E9DAFF}
+.ac-badge--green{background:#CFF6D9}
+.ac-badge--warn{background:#FFD9D9}
+.ac-badge--hot{background:var(--ac-yellow);animation:breathe 1.8s ease-in-out infinite}
+
+/* ============================================================
+   .ac-card / .ac-tile
+   ============================================================ */
+.ac-card{
+  background:var(--ac-panel);
+  border:var(--ac-bd) solid var(--ac-edge);
+  border-radius:var(--ac-radius);
+  box-shadow:0 var(--ac-lift) 0 var(--ac-edge), 0 16px 30px rgba(30,43,99,.18);
+  padding:26px;
+}
+.ac-tile{
+  position:relative;
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  padding:18px 14px 16px;
+  background:var(--ac-panel);
+  border:var(--ac-bd) solid var(--ac-edge);
+  border-radius:var(--ac-radius);
+  box-shadow:0 var(--ac-lift) 0 var(--ac-edge), 0 12px 22px rgba(30,43,99,.16);
+  text-align:center;cursor:pointer;
+  transition:transform .12s cubic-bezier(.34,1.6,.64,1), box-shadow .12s;
+}
+.ac-tile:hover{transform:translateY(-5px);box-shadow:0 calc(var(--ac-lift) + 5px) 0 var(--ac-edge),0 20px 30px rgba(30,43,99,.22)}
+.ac-tile:active{transform:translateY(var(--ac-lift));box-shadow:0 0 0 var(--ac-edge)}
+.ac-tile__icon{
+  width:74px;height:74px;display:grid;place-items:center;
+  font-size:38px;border-radius:50%;
+  border:var(--ac-bd) solid var(--ac-edge);
+  box-shadow:inset 0 -5px 0 rgba(0,0,0,.14);
+}
+.ac-tile__name{font-size:19px;line-height:1.1}
+.ac-tile--feature{
+  flex-direction:row;text-align:left;gap:20px;align-items:center;
+  padding:22px 26px;
+  background:linear-gradient(135deg,#FFE9A8,#FFC93C 60%,#FFB020);
+}
+.ac-tile--feature .ac-tile__icon{width:92px;height:92px;font-size:50px;background:#fff;flex:none}
+.ac-tile--picked{outline:5px dashed var(--ac-purple);outline-offset:5px}
+
+/* gentle idle float, staggered so the grid feels alive not synchronized */
+@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.floaty{animation:floaty 3.4s ease-in-out infinite}
+
+/* ============================================================
+   .ac-bar — the top bar every game mounts
+   ============================================================ */
+.ac-bar{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:10px 14px;margin-bottom:18px;
+  background:var(--ac-panel);
+  border:var(--ac-bd) solid var(--ac-edge);
+  border-radius:999px;
+  box-shadow:0 5px 0 var(--ac-edge);
+}
+.ac-bar__who{
+  display:flex;align-items:center;gap:9px;
+  padding:5px 14px 5px 5px;margin-right:auto;
+  background:var(--ac-panel-2);border:3px solid var(--ac-edge);border-radius:999px;
+}
+.ac-avatar{
+  width:36px;height:36px;flex:none;border-radius:50%;
+  display:grid;place-items:center;font-size:21px;
+  border:3px solid var(--ac-edge);
+}
+.ac-bar__label{font-size:11px;letter-spacing:1px;color:var(--ac-text-mute);line-height:1;text-transform:uppercase}
+.ac-bar__name{font-size:17px;line-height:1.1}
+
+/* ============================================================
+   inputs / pin / modal / error
+   ============================================================ */
+.ac-label{display:block;font-size:13px;letter-spacing:.6px;text-transform:uppercase;color:var(--ac-text-dim);margin:0 0 6px 4px}
+.ac-input,.ac-select{
+  width:100%;padding:14px 16px;font-family:inherit;font-size:18px;font-weight:700;
+  color:var(--ac-text);background:var(--ac-panel-2);
+  border:var(--ac-bd) solid var(--ac-edge);border-radius:var(--ac-radius-sm);
+  box-shadow:inset 0 4px 0 rgba(30,43,99,.09);
+}
+.ac-input:focus,.ac-select:focus{outline:4px solid var(--ac-blue);outline-offset:2px}
+.ac-input::placeholder{color:var(--ac-text-mute)}
+.ac-error{
+  display:flex;align-items:center;gap:8px;
+  padding:10px 14px;font-size:15px;color:#fff;
+  background:var(--ac-bad);border:3px solid var(--ac-edge);border-radius:var(--ac-radius-sm);
+}
+.ac-pin-dots{display:flex;gap:14px;justify-content:center;margin:6px 0 18px}
+.ac-pin-dot{
+  width:22px;height:22px;border-radius:50%;
+  background:var(--ac-panel-2);border:3px solid var(--ac-edge);
+  transition:transform .16s cubic-bezier(.34,1.8,.64,1),background .16s;
+}
+.ac-pin-dot.on{background:var(--ac-purple);transform:scale(1.28)}
+.ac-pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:290px;margin:0 auto}
+.ac-key{
+  padding:16px 0;font-size:28px;color:var(--ac-text);
+  background:var(--ac-panel-2);
+  border:var(--ac-bd) solid var(--ac-edge);border-radius:var(--ac-radius-sm);
+  box-shadow:0 5px 0 var(--ac-edge);
+  transition:transform .06s,box-shadow .06s;
+}
+.ac-key:active{transform:translateY(5px);box-shadow:0 0 0 var(--ac-edge)}
+.ac-modal{
+  position:fixed;inset:0;z-index:60;display:none;
+  place-items:center;padding:20px;
+  background:rgba(30,43,99,.55);backdrop-filter:blur(4px);
+}
+.ac-modal.open{display:grid}
+@keyframes pop{from{transform:scale(.82) translateY(20px);opacity:0}to{transform:none;opacity:1}}
+.ac-modal-card{width:min(420px,100%);animation:pop .26s cubic-bezier(.34,1.5,.64,1)}
+
+/* ============================================================
+   page scaffold + scenery
+   ============================================================ */
+.ac-page{position:relative;min-height:100vh;padding:78px 18px 120px;overflow:hidden}
+.ac-wrap{width:min(860px,100%);margin:0 auto;position:relative;z-index:2}
+.sky{position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,var(--ac-sky-top),var(--ac-sky-mid) 55%,var(--ac-sky-bot))}
+.hills{position:absolute;left:0;right:0;bottom:0;height:230px;z-index:0}
+.cloud{position:absolute;z-index:1;opacity:.92;pointer-events:none}
+@keyframes drift{from{transform:translateX(-30vw)}to{transform:translateX(115vw)}}
+.coin{position:absolute;z-index:1;font-size:26px;pointer-events:none;opacity:.9}
+@keyframes rise{
+  0%{transform:translateY(0) rotateY(0);opacity:0}
+  12%{opacity:.95}
+  100%{transform:translateY(-70vh) rotateY(1080deg);opacity:0}
+}
+
+h1,h2,h3{margin:0}
+.section-head{
+  display:flex;align-items:center;gap:12px;margin:34px 0 14px;
+}
+.section-head__ribbon{
+  padding:7px 20px;font-size:15px;letter-spacing:1.4px;text-transform:uppercase;
+  color:#fff;background:var(--ac-edge);border-radius:999px;
+  box-shadow:0 4px 0 rgba(30,43,99,.35);
+}
+.section-head__rule{flex:1;height:5px;border-radius:99px;background:repeating-linear-gradient(90deg,var(--ac-edge) 0 12px,transparent 12px 24px);opacity:.35}
+
+.grid{display:grid;gap:18px}
+.grid--3{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.grid--2{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+
+/* ============================================================
+   logo lockup
+   ============================================================ */
+.logo{text-align:center;position:relative;z-index:3}
+.logo__kicker{
+  display:inline-block;padding:5px 18px;margin-bottom:6px;
+  font-size:15px;letter-spacing:3px;text-transform:uppercase;color:#fff;
+  background:var(--ac-edge);border-radius:999px;
+}
+.logo__word{
+  font-size:clamp(56px,13vw,124px);line-height:.92;letter-spacing:2px;
+  color:var(--ac-yellow);
+  -webkit-text-stroke:9px var(--ac-edge);
+  paint-order:stroke fill;
+  filter:drop-shadow(0 9px 0 rgba(30,43,99,.35));
+}
+.logo__word span{display:inline-block;animation:hop 2.4s ease-in-out infinite}
+@keyframes hop{0%,72%,100%{transform:translateY(0)}80%{transform:translateY(-16px)}88%{transform:translateY(0)}}
+
+/* attract ticker */
+.ticker{
+  display:flex;align-items:center;gap:10px;justify-content:center;
+  margin-top:6px;padding:9px 18px;
+  background:rgba(255,255,255,.82);border:3px solid var(--ac-edge);border-radius:999px;
+  font-size:16px;
+}
+.ticker__dot{width:11px;height:11px;border-radius:50%;background:var(--ac-good);box-shadow:0 0 0 0 rgba(46,204,113,.7);animation:ping 1.4s infinite}
+@keyframes ping{70%{box-shadow:0 0 0 11px rgba(46,204,113,0)}100%{box-shadow:0 0 0 0 rgba(46,204,113,0)}}
+.ticker__game{min-width:190px;text-align:left}
+.ticker__game.swap{animation:swapIn .45s ease}
+@keyframes swapIn{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
+
+/* mascot */
+.mascot{width:120px;height:120px;animation:floaty 2.8s ease-in-out infinite}
+.mascot.cheer{animation:cheer .5s ease}
+@keyframes cheer{0%,100%{transform:translateY(0) rotate(0)}30%{transform:translateY(-24px) rotate(-9deg)}60%{transform:translateY(-8px) rotate(7deg)}}
+
+/* corner chrome */
+.corner{position:absolute;top:14px;z-index:5;display:flex;gap:8px}
+.corner--l{left:16px}
+.corner--r{right:16px}
+
+/* who's playing */
+.who-card{
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+  padding:24px 16px;background:var(--ac-panel);
+  border:var(--ac-bd) solid var(--ac-edge);border-radius:var(--ac-radius);
+  box-shadow:0 var(--ac-lift) 0 var(--ac-edge);cursor:pointer;
+  transition:transform .13s cubic-bezier(.34,1.6,.64,1)
+}
+.who-card:hover{transform:translateY(-6px) rotate(-1.2deg)}
+.who-card__face{
+  width:104px;height:104px;border-radius:50%;display:grid;place-items:center;font-size:54px;
+  border:5px solid var(--ac-edge);box-shadow:inset 0 -7px 0 rgba(0,0,0,.13)
+}
+
+/* parts bin */
+.swatch{border:var(--ac-bd) solid var(--ac-edge);border-radius:var(--ac-radius-sm);overflow:hidden;box-shadow:0 5px 0 var(--ac-edge)}
+.swatch__chip{height:66px}
+.swatch__meta{padding:8px 10px;background:#fff;font-size:12px;line-height:1.35}
+.swatch__meta code{font-family:ui-monospace,Menlo,monospace;color:var(--ac-text-dim);font-size:11px}
+.part{margin-bottom:34px}
+.part__title{font-size:14px;letter-spacing:1.6px;text-transform:uppercase;color:var(--ac-text-dim);margin-bottom:12px}
+.row{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+
+/* mockup switcher — NOT part of the design */
+#switcher{
+  position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:80;
+  display:flex;gap:5px;align-items:center;padding:6px 6px 6px 14px;
+  background:#0E1533;border:2px solid #37447D;border-radius:999px;
+  box-shadow:0 10px 30px rgba(0,0,0,.4);max-width:calc(100vw - 24px);overflow-x:auto;
+}
+#switcher b{color:#7F8EC4;font-size:10px;letter-spacing:1.6px;text-transform:uppercase;padding-right:6px;white-space:nowrap}
+#switcher button{
+  padding:8px 13px;font-size:13px;white-space:nowrap;
+  color:#C9D3F5;background:#1B2450;border:0;border-radius:999px
+}
+#switcher button.on{background:var(--ac-yellow);color:#0E1533}
+
+#fx{position:fixed;inset:0;pointer-events:none;z-index:70}
+.screen{display:none}
+.screen.on{display:block}
+.note{
+  margin:22px auto 0;padding:12px 16px;max-width:640px;
+  font-size:13.5px;font-weight:600;line-height:1.55;color:#2A3A73;
+  background:rgba(255,255,255,.72);border:2px dashed #7E90C9;border-radius:14px;
+}
+.note b{color:#1E2B63}
+@media (max-width:560px){
+  .ac-btn--xl{padding:18px 40px;font-size:30px}
+  .ac-page{padding-top:66px}
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+
+<!-- ══════════════════ 1. FRONT DOOR ══════════════════ -->
+<section class="screen on ac-page" id="s-door">
+  <div class="sky"></div>
+  <svg class="hills" viewBox="0 0 1200 230" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0,150 Q150,70 320,140 T650,120 T980,150 T1200,110 L1200,230 L0,230Z" fill="#7BE07F"/>
+    <path d="M0,180 Q200,120 420,175 T820,165 T1200,180 L1200,230 L0,230Z" fill="var(--ac-grass)"/>
+    <rect x="0" y="212" width="1200" height="18" fill="var(--ac-grass-deep)"/>
+  </svg>
+
+  <div class="corner corner--l">
+    <button class="ac-btn ac-btn--outline ac-btn--sm" data-go="parts">🎨 Parts bin</button>
+  </div>
+  <div class="corner corner--r">
+    <button class="ac-btn ac-btn--outline ac-btn--sm" id="soundBtn">🔊 Sound</button>
+    <button class="ac-btn ac-btn--outline ac-btn--sm">👨‍👩‍👦 Grown-ups</button>
+  </div>
+
+  <div class="ac-wrap" style="text-align:center">
+    <div class="logo">
+      <div class="logo__kicker">Jackson &amp; Miles</div>
+      <h1 class="logo__word" id="logoWord"></h1>
+    </div>
+
+    <div style="display:flex;align-items:flex-end;justify-content:center;gap:6px;margin-top:6px">
+      <svg class="mascot" id="mascot" viewBox="0 0 120 120" aria-hidden="true">
+        <ellipse cx="60" cy="112" rx="30" ry="6" fill="rgba(30,43,99,.18)"/>
+        <line x1="60" y1="30" x2="60" y2="14" stroke="#1E2B63" stroke-width="6" stroke-linecap="round"/>
+        <circle cx="60" cy="11" r="8" fill="#FF5A5A" stroke="#1E2B63" stroke-width="5"/>
+        <rect x="20" y="28" width="80" height="70" rx="24" fill="#FFC93C" stroke="#1E2B63" stroke-width="6"/>
+        <rect x="31" y="44" width="58" height="32" rx="13" fill="#1E2B63"/>
+        <circle cx="47" cy="60" r="7" fill="#8FE8FF" class="eye"/>
+        <circle cx="73" cy="60" r="7" fill="#8FE8FF" class="eye"/>
+        <circle cx="49" cy="58" r="2.4" fill="#fff"/>
+        <circle cx="75" cy="58" r="2.4" fill="#fff"/>
+        <circle cx="30" cy="84" r="7" fill="#FF9AA2" opacity=".85"/>
+        <circle cx="90" cy="84" r="7" fill="#FF9AA2" opacity=".85"/>
+        <rect x="42" y="98" width="14" height="16" rx="5" fill="#4C9BFF" stroke="#1E2B63" stroke-width="5"/>
+        <rect x="64" y="98" width="14" height="16" rx="5" fill="#4C9BFF" stroke="#1E2B63" stroke-width="5"/>
+      </svg>
+
+      <div style="padding-bottom:22px">
+        <button class="ac-btn ac-btn--xl ac-btn--play" id="playBtn">PLAY ▶</button>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+      <button class="ac-btn ac-btn--blue" data-go="who">🕹️ I have a profile</button>
+      <button class="ac-btn ac-btn--green" data-go="who">🎮 Just play for fun</button>
+    </div>
+
+    <div class="ticker">
+      <span class="ticker__dot"></span>
+      <span style="color:var(--ac-text-mute);font-size:13px;letter-spacing:1.4px">NOW PLAYING</span>
+      <span class="ticker__game" id="tickerGame">🪂 Loot Drop</span>
+    </div>
+
+    <div class="note">
+      <b>What changed:</b> the login card is gone from the front door. A kid sees a name,
+      a mascot, and one enormous button. Sign-in still happens — it's just <i>behind</i> PLAY
+      instead of in front of it, so nothing about the Firestore plan changes.
+      Guest and profile sit side by side at equal weight, per §2 of the architecture doc.
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ 2. WHO'S PLAYING ══════════════════ -->
+<section class="screen ac-page" id="s-who">
+  <div class="sky"></div>
+  <svg class="hills" viewBox="0 0 1200 230" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0,180 Q200,120 420,175 T820,165 T1200,180 L1200,230 L0,230Z" fill="var(--ac-grass)"/>
+    <rect x="0" y="212" width="1200" height="18" fill="var(--ac-grass-deep)"/>
+  </svg>
+  <div class="corner corner--l"><button class="ac-btn ac-btn--outline ac-btn--sm" data-go="door">← Back</button></div>
+
+  <div class="ac-wrap" style="text-align:center">
+    <h2 style="font-size:clamp(30px,6vw,46px);color:var(--ac-edge)">Who's playing?</h2>
+    <p style="color:var(--ac-text-dim);margin:4px 0 26px;font-size:17px">Tap your face</p>
+
+    <div class="grid grid--3" style="max-width:640px;margin:0 auto">
+      <div class="who-card" data-go="pin">
+        <div class="who-card__face" style="background:#CBE4FF">🦖</div>
+        <div style="font-size:22px">Jackson</div>
+        <span class="ac-badge ac-badge--blue">Grade 3</span>
+      </div>
+      <div class="who-card" data-go="pin">
+        <div class="who-card__face" style="background:#FFE1A8">🐸</div>
+        <div style="font-size:22px">Miles</div>
+        <span class="ac-badge">Grade 1</span>
+      </div>
+      <div class="who-card" data-go="hub">
+        <div class="who-card__face" style="background:#E9DAFF">👋</div>
+        <div style="font-size:22px">Visitor</div>
+        <span class="ac-badge ac-badge--purple">No sign-in</span>
+      </div>
+    </div>
+
+    <div style="margin-top:26px"><button class="ac-btn ac-btn--outline">➕ Add a player</button></div>
+
+    <div class="note">
+      <b>Faces, not text fields.</b> Kids never type anything identifying — the parent set
+      these up once. The visitor card is the cousin path from §2, and it's the same size as
+      the other two on purpose: it shouldn't read as the lesser option.
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ 3. PIN ══════════════════ -->
+<section class="screen ac-page" id="s-pin">
+  <div class="sky"></div>
+  <div class="corner corner--l"><button class="ac-btn ac-btn--outline ac-btn--sm" data-go="who">← Back</button></div>
+
+  <div class="ac-wrap" style="max-width:440px">
+    <div class="ac-card" style="text-align:center">
+      <div class="who-card__face" style="background:#FFE1A8;margin:0 auto 10px">🐸</div>
+      <h2 style="font-size:28px">Hi Miles!</h2>
+      <p style="color:var(--ac-text-dim);margin:2px 0 14px;font-size:16px">Type your secret code</p>
+
+      <div class="ac-pin-dots" id="pinDots">
+        <div class="ac-pin-dot"></div><div class="ac-pin-dot"></div>
+        <div class="ac-pin-dot"></div><div class="ac-pin-dot"></div>
+      </div>
+
+      <div class="ac-pin-pad" id="pinPad">
+        <button class="ac-key">1</button><button class="ac-key">2</button><button class="ac-key">3</button>
+        <button class="ac-key">4</button><button class="ac-key">5</button><button class="ac-key">6</button>
+        <button class="ac-key">7</button><button class="ac-key">8</button><button class="ac-key">9</button>
+        <button class="ac-key" data-act="clear">✖</button><button class="ac-key">0</button>
+        <button class="ac-key" data-act="back">⌫</button>
+      </div>
+      <p style="color:var(--ac-text-mute);font-size:14px;margin:16px 0 0">Forgot it? Ask a grown-up 🙂</p>
+    </div>
+
+    <div class="note">
+      <b>Try it — any 4 digits works here.</b> Wrong-PIN copy is "Not quite — try again 🙂",
+      never "Access denied". The keypad is the one place the project's no-punishing-failure
+      rule is easiest to break.
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ 4. THE HUB ══════════════════ -->
+<section class="screen ac-page" id="s-hub" style="padding-top:20px">
+  <div class="sky"></div>
+  <div class="ac-wrap">
+
+    <div class="ac-bar">
+      <div class="ac-bar__who">
+        <div class="ac-avatar" style="background:#FFE1A8">🐸</div>
+        <div style="text-align:left">
+          <div class="ac-bar__label">Playing as</div>
+          <div class="ac-bar__name">Miles</div>
+        </div>
+      </div>
+      <button class="ac-btn ac-btn--outline ac-btn--sm" data-go="who">🔄 Switch</button>
+      <button class="ac-btn ac-btn--outline ac-btn--sm">📊 Grown-ups</button>
+      <button class="ac-btn ac-btn--outline ac-btn--sm" data-go="door">🚪 Log out</button>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:14px;margin:6px 0 2px">
+      <svg class="mascot" style="width:66px;height:66px" viewBox="0 0 120 120" aria-hidden="true">
+        <rect x="20" y="28" width="80" height="70" rx="24" fill="#FFC93C" stroke="#1E2B63" stroke-width="6"/>
+        <rect x="31" y="44" width="58" height="32" rx="13" fill="#1E2B63"/>
+        <circle cx="47" cy="60" r="7" fill="#8FE8FF"/><circle cx="73" cy="60" r="7" fill="#8FE8FF"/>
+      </svg>
+      <div>
+        <h2 style="font-size:clamp(24px,5vw,34px);color:var(--ac-edge)">Welcome back, Miles!</h2>
+        <div style="color:var(--ac-text-dim);font-size:16px">🔥 3 days in a row · 🪙 128 coins</div>
+      </div>
+    </div>
+
+    <div class="section-head">
+      <span class="section-head__ribbon" style="background:var(--ac-purple-deep)">⭐ Picked for you</span>
+      <span class="section-head__rule"></span>
+    </div>
+    <div class="grid grid--2">
+      <div class="ac-tile ac-tile--picked floaty" data-pop>
+        <div class="ac-tile__icon" style="background:#CFF6D9">📖</div>
+        <div class="ac-tile__name">Critter Catchers</div>
+        <span class="ac-badge ac-badge--green">Grades 1–2</span>
+      </div>
+      <div class="ac-tile ac-tile--picked floaty" style="animation-delay:.5s" data-pop>
+        <div class="ac-tile__icon" style="background:#FFE9B8">🪙</div>
+        <div class="ac-tile__name">Coin Climb</div>
+        <span class="ac-badge">Grades 1–2</span>
+      </div>
+    </div>
+
+    <div class="section-head">
+      <span class="section-head__ribbon" style="background:var(--ac-yellow-deep)">🪂 Today's drop</span>
+      <span class="section-head__rule"></span>
+    </div>
+    <div class="ac-tile ac-tile--feature" data-pop>
+      <div class="ac-tile__icon floaty">🪂</div>
+      <div>
+        <div style="font-size:26px;line-height:1.1">Loot Drop</div>
+        <div style="font-size:16px;color:#7A4E00;margin:4px 0 8px">5 questions. One crate. What's inside?</div>
+        <span class="ac-badge ac-badge--hot">🔥 New crate today</span>
+      </div>
+    </div>
+
+    <div class="section-head">
+      <span class="section-head__ribbon">💪 Practice</span>
+      <span class="section-head__rule"></span>
+    </div>
+    <div class="grid grid--3">
+      <div class="ac-tile" data-pop>
+        <div class="ac-tile__icon" style="background:#D8CFFF">⛏️</div>
+        <div class="ac-tile__name">Math Defender</div>
+        <span class="ac-badge ac-badge--purple">Grades 3–5</span>
+      </div>
+      <div class="ac-tile" data-pop>
+        <div class="ac-tile__icon" style="background:#FFE9B8">🪙</div>
+        <div class="ac-tile__name">Coin Climb</div>
+        <span class="ac-badge">Grades 1–2</span>
+      </div>
+      <div class="ac-tile" data-pop>
+        <div class="ac-tile__icon" style="background:#CFF6D9">📖</div>
+        <div class="ac-tile__name">Critter Catchers</div>
+        <span class="ac-badge ac-badge--green">Grades 1–2</span>
+      </div>
+    </div>
+
+    <div class="section-head">
+      <span class="section-head__ribbon" style="background:var(--ac-blue-deep)">🎉 Just for fun</span>
+      <span class="section-head__rule"></span>
+    </div>
+    <div class="grid grid--3">
+      <div class="ac-tile" data-pop>
+        <div class="ac-tile__icon" style="background:#CBE4FF">🟩</div>
+        <div class="ac-tile__name">Multiverse Collector</div>
+        <span class="ac-badge ac-badge--blue">Any age</span>
+      </div>
+      <div class="ac-tile" data-pop>
+        <div class="ac-tile__icon" style="background:#FFD6D6">🧱</div>
+        <div class="ac-tile__name">Block Stacker</div>
+        <span class="ac-badge ac-badge--blue">Any age</span>
+      </div>
+    </div>
+
+    <div class="section-head">
+      <span class="section-head__ribbon" style="background:var(--ac-red-deep)">🖥️ Needs a computer</span>
+      <span class="section-head__rule"></span>
+    </div>
+    <div class="grid grid--3">
+      <div class="ac-tile" id="hnTile">
+        <div class="ac-tile__icon" style="background:#DDD6F5">👻</div>
+        <div class="ac-tile__name">Harvest Night</div>
+        <span class="ac-badge ac-badge--warn">Grades 4+ · Spooky</span>
+      </div>
+    </div>
+
+    <div class="note">
+      <b>Grade badges, never name badges.</b> A visiting cousin has no idea which tile is
+      "Jackson's" — but every kid knows what grade they're in. Nothing is locked: Picked-for-you
+      is a nudge (the dashed purple ring), not a gate. Tap Harvest Night to see the
+      friendly device guard from §2.
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ 5. PARTS BIN ══════════════════ -->
+<section class="screen ac-page" id="s-parts" style="padding-top:24px;background:#EEF4FF">
+  <div class="ac-wrap">
+    <div class="corner corner--l"><button class="ac-btn ac-btn--outline ac-btn--sm" data-go="door">← Front door</button></div>
+
+    <h2 style="font-size:36px;margin:44px 0 4px">🎨 Parts bin</h2>
+    <p style="color:var(--ac-text-dim);margin:0 0 26px;font-size:16px">
+      Everything <code>assets/arcade.css</code> would own. Chrome only — nothing inside a play area.
+    </p>
+
+    <div class="part">
+      <div class="part__title">Surfaces &amp; text</div>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(132px,1fr))">
+        <div class="swatch"><div class="swatch__chip" style="background:#79D2FF"></div><div class="swatch__meta">Sky top<br><code>--ac-sky-top</code></div></div>
+        <div class="swatch"><div class="swatch__chip" style="background:#5FD963"></div><div class="swatch__meta">Grass<br><code>--ac-grass</code></div></div>
+        <div class="swatch"><div class="swatch__chip" style="background:#FFFFFF"></div><div class="swatch__meta">Panel<br><code>--ac-panel</code></div></div>
+        <div class="swatch"><div class="swatch__chip" style="background:#FFF4DA"></div><div class="swatch__meta">Well<br><code>--ac-panel-2</code></div></div>
+        <div class="swatch"><div class="swatch__chip" style="background:#1E2B63"></div><div class="swatch__meta">Edge / ink<br><code>--ac-edge</code></div></div>
+      </div>
+    </div>
+
+    <div class="part">
+      <div class="part__title">The four play colors</div>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(132px,1fr))">
+        <div class="swatch"><div class="swatch__chip" style="background:linear-gradient(180deg,#FF5A5A,#D62A2A)"></div><div class="swatch__meta">Red — primary do-it<br><code>--ac-red</code></div></div>
+        <div class="swatch"><div class="swatch__chip" style="background:linear-gradient(180deg,#FFC93C,#E39B00)"></div><div class="swatch__meta">Yellow — reward<br><code>--ac-yellow</code></div></div>
+        <div class="swatch"><div class="swatch__chip" style="background:linear-gradient(180deg,#4C9BFF,#1F5FD6)"></div><div class="swatch__meta">Blue — navigate<br><code>--ac-blue</code></div></div>
+        <div class="swatch"><div class="swatch__chip" style="background:linear-gradient(180deg,#A971F5,#7433CE)"></div><div class="swatch__meta">Purple — personal<br><code>--ac-purple</code></div></div>
+      </div>
+    </div>
+
+    <div class="part">
+      <div class="part__title">.ac-btn — press them, they're springy</div>
+      <div class="row">
+        <button class="ac-btn" data-pop>Primary</button>
+        <button class="ac-btn ac-btn--blue" data-pop>Blue</button>
+        <button class="ac-btn ac-btn--yellow" data-pop>Yellow</button>
+        <button class="ac-btn ac-btn--purple" data-pop>Purple</button>
+        <button class="ac-btn ac-btn--green" data-pop>Green</button>
+        <button class="ac-btn ac-btn--outline" data-pop>Outline</button>
+        <button class="ac-btn ac-btn--ghost" data-pop>Ghost</button>
+        <button class="ac-btn ac-btn--sm" data-pop>Small</button>
+      </div>
+    </div>
+
+    <div class="part">
+      <div class="part__title">.ac-badge</div>
+      <div class="row">
+        <span class="ac-badge">Grades 1–2</span>
+        <span class="ac-badge ac-badge--purple">Grades 3–5</span>
+        <span class="ac-badge ac-badge--blue">Any age</span>
+        <span class="ac-badge ac-badge--green">Reading</span>
+        <span class="ac-badge ac-badge--warn">Needs a computer</span>
+        <span class="ac-badge ac-badge--hot">🔥 New today</span>
+      </div>
+    </div>
+
+    <div class="part">
+      <div class="part__title">.ac-tile</div>
+      <div class="grid grid--3" style="max-width:620px">
+        <div class="ac-tile" data-pop><div class="ac-tile__icon" style="background:#CBE4FF">🟩</div><div class="ac-tile__name">Default</div><span class="ac-badge ac-badge--blue">Any age</span></div>
+        <div class="ac-tile ac-tile--picked" data-pop><div class="ac-tile__icon" style="background:#FFE9B8">🪙</div><div class="ac-tile__name">Picked for you</div><span class="ac-badge">Grades 1–2</span></div>
+      </div>
+    </div>
+
+    <div class="part">
+      <div class="part__title">.ac-bar</div>
+      <div class="ac-bar">
+        <div class="ac-bar__who">
+          <div class="ac-avatar" style="background:#CBE4FF">🦖</div>
+          <div style="text-align:left"><div class="ac-bar__label">Playing as</div><div class="ac-bar__name">Jackson</div></div>
+        </div>
+        <button class="ac-btn ac-btn--outline ac-btn--sm">🔄 Switch</button>
+        <button class="ac-btn ac-btn--outline ac-btn--sm">📊 Grown-ups</button>
+      </div>
+    </div>
+
+    <div class="part">
+      <div class="part__title">Fields, errors, modals</div>
+      <div class="grid grid--2" style="max-width:660px;align-items:start">
+        <div>
+          <label class="ac-label" for="nn">Nickname</label>
+          <input class="ac-input" id="nn" placeholder="SuperMiles">
+          <div style="height:12px"></div>
+          <label class="ac-label" for="fa">Focus area</label>
+          <select class="ac-select" id="fa"><option>Reading</option><option>Math</option><option>Both</option></select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="ac-error">😅 Not quite — try again</div>
+          <button class="ac-btn ac-btn--purple" id="modalBtn">Open a modal</button>
+          <button class="ac-btn ac-btn--yellow" id="winBtn">🎉 Fire the win moment</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="part">
+      <div class="part__title">Type scale — Baloo 2, falls back to Arial Rounded / Trebuchet</div>
+      <div style="font-size:44px;line-height:1.1">Aa — Screen title</div>
+      <div style="font-size:26px">Aa — Card title</div>
+      <div style="font-size:19px">Aa — Tile name</div>
+      <div style="font-size:16px;color:var(--ac-text-dim)">Aa — Body / helper text</div>
+      <div style="font-size:12px;letter-spacing:.8px;text-transform:uppercase;color:var(--ac-text-mute)">Aa — Badge / label</div>
+    </div>
+  </div>
+</section>
+
+</div><!-- /#app -->
+
+<div class="ac-modal" id="modal">
+  <div class="ac-card ac-modal-card" style="text-align:center">
+    <div style="font-size:52px">🖥️</div>
+    <h3 style="font-size:26px;margin:6px 0 8px">This one needs a computer!</h3>
+    <p style="color:var(--ac-text-dim);font-size:16.5px;line-height:1.5;margin:0 0 20px">
+      Harvest Night uses a mouse to look around, so it can't work on a tablet.
+      Try it on the laptop later!
+    </p>
+    <button class="ac-btn ac-btn--blue" id="modalClose">Okay!</button>
+  </div>
+</div>
+
+<canvas id="fx"></canvas>
+
+<nav id="switcher">
+  <b>Mockup</b>
+  <button data-go="door" class="on">Front door</button>
+  <button data-go="who">Who's playing</button>
+  <button data-go="pin">PIN</button>
+  <button data-go="hub">Arcade hub</button>
+  <button data-go="parts">Parts bin</button>
+</nav>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ---------- logo letters ---------- */
+  var word = 'ARCADE', lw = document.getElementById('logoWord');
+  for (var i=0;i<word.length;i++){
+    var s = document.createElement('span');
+    s.textContent = word[i];
+    s.style.animationDelay = (i*0.09)+'s';
+    lw.appendChild(s);
+  }
+
+  /* ---------- scenery ---------- */
+  var door = document.getElementById('s-door');
+  function cloud(top, dur, delay, scale){
+    var c = document.createElement('div');
+    c.className='cloud';
+    c.style.top = top+'px';
+    c.style.transform = 'scale('+scale+')';
+    c.style.animation = 'drift '+dur+'s linear '+delay+'s infinite';
+    c.innerHTML = '<svg width="150" height="70" viewBox="0 0 150 70">'+
+      '<g fill="#fff" stroke="#1E2B63" stroke-width="4"><circle cx="45" cy="42" r="26"/>'+
+      '<circle cx="80" cy="32" r="30"/><circle cx="112" cy="45" r="22"/>'+
+      '<rect x="42" y="46" width="74" height="20" rx="10"/></g></svg>';
+    door.appendChild(c);
+  }
+  cloud(70, 44, 0, 1); cloud(160, 62, 6, .72); cloud(240, 54, 20, .9); cloud(40, 76, 33, .55);
+
+  function coin(){
+    if (!door.classList.contains('on')) return;
+    var c = document.createElement('div');
+    c.className='coin';
+    c.textContent = ['🪙','⭐','🍄','💎','🟩'][Math.floor(Math.random()*5)];
+    c.style.left = (6 + Math.random()*88)+'vw';
+    c.style.bottom = '-40px';
+    c.style.animation = 'rise '+(7+Math.random()*5)+'s linear forwards';
+    door.appendChild(c);
+    setTimeout(function(){ c.remove(); }, 12000);
+  }
+  setInterval(coin, 1100);
+  for (var k=0;k<5;k++) setTimeout(coin, k*400);
+
+  /* ---------- attract ticker ---------- */
+  var games = ['🪂 Loot Drop','⛏️ Math Defender','🪙 Coin Climb','📖 Critter Catchers',
+               '🟩 Multiverse Collector','🧱 Block Stacker','👻 Harvest Night'];
+  var gi = 0, tg = document.getElementById('tickerGame');
+  setInterval(function(){
+    gi = (gi+1) % games.length;
+    tg.textContent = games[gi];
+    tg.classList.remove('swap'); void tg.offsetWidth; tg.classList.add('swap');
+  }, 2300);
+
+  /* ---------- sound (synthesized, no files, gesture-gated) ---------- */
+  var ctx = null, soundOn = true;
+  var soundBtn = document.getElementById('soundBtn');
+  soundBtn.addEventListener('click', function(){
+    soundOn = !soundOn;
+    soundBtn.textContent = soundOn ? '🔊 Sound' : '🔇 Muted';
+    if (soundOn) beep(880,.07,'square',.05);
+  });
+  function ac(){
+    if (!ctx){ try { ctx = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){ return null; } }
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+  function beep(freq, dur, type, vol, when){
+    if (!soundOn) return;
+    var c = ac(); if (!c) return;
+    var t = c.currentTime + (when||0);
+    var o = c.createOscillator(), g = c.createGain();
+    o.type = type||'square'; o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(vol||.08, t);
+    g.gain.exponentialRampToValueAtTime(.0001, t+dur);
+    o.connect(g); g.connect(c.destination);
+    o.start(t); o.stop(t+dur+.02);
+  }
+  var S = {
+    tap:  function(){ beep(660,.06,'square',.05); },
+    pop:  function(){ beep(520,.05,'triangle',.09); beep(780,.08,'triangle',.07,.05); },
+    coin: function(){ beep(988,.07,'square',.08); beep(1319,.16,'square',.07,.07); },
+    win:  function(){ [523,659,784,1047].forEach(function(f,i){ beep(f,.16,'triangle',.09,i*.09); }); },
+    nope: function(){ beep(200,.16,'sawtooth',.05); }
+  };
+
+  /* ---------- particles ---------- */
+  var cv = document.getElementById('fx'), cx2 = cv.getContext('2d'), bits = [];
+  function size(){ cv.width = innerWidth; cv.height = innerHeight; }
+  size(); addEventListener('resize', size);
+  var COLORS = ['#FF5A5A','#FFC93C','#4C9BFF','#A971F5','#2ECC71','#FFFFFF'];
+  function burst(x, y, n, power){
+    for (var i=0;i<(n||24);i++){
+      var a = Math.random()*Math.PI*2, sp = (Math.random()*(power||7))+2;
+      bits.push({ x:x, y:y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-3,
+                  s:4+Math.random()*7, r:Math.random()*6, vr:(Math.random()-.5)*.5,
+                  c:COLORS[Math.floor(Math.random()*COLORS.length)], life:1 });
+    }
+  }
+  function rain(n){
+    for (var i=0;i<(n||90);i++){
+      bits.push({ x:Math.random()*cv.width, y:-20-Math.random()*300,
+                  vx:(Math.random()-.5)*2, vy:2+Math.random()*4,
+                  s:6+Math.random()*9, r:Math.random()*6, vr:(Math.random()-.5)*.4,
+                  c:COLORS[Math.floor(Math.random()*COLORS.length)], life:1 });
+    }
+  }
+  (function loop(){
+    cx2.clearRect(0,0,cv.width,cv.height);
+    for (var i=bits.length-1;i>=0;i--){
+      var b = bits[i];
+      b.vy += .28; b.x += b.vx; b.y += b.vy; b.r += b.vr; b.life -= .006;
+      if (b.life <= 0 || b.y > cv.height+60){ bits.splice(i,1); continue; }
+      cx2.save(); cx2.translate(b.x,b.y); cx2.rotate(b.r);
+      cx2.globalAlpha = Math.max(0,Math.min(1,b.life*1.6));
+      cx2.fillStyle = b.c;
+      cx2.fillRect(-b.s/2,-b.s/2,b.s,b.s*.66);
+      cx2.restore();
+    }
+    requestAnimationFrame(loop);
+  })();
+
+  function shake(){
+    document.body.classList.remove('shake');
+    void document.body.offsetWidth;
+    document.body.classList.add('shake');
+    setTimeout(function(){ document.body.classList.remove('shake'); }, 340);
+  }
+
+  /* ---------- screen routing ---------- */
+  function go(id){
+    document.querySelectorAll('.screen').forEach(function(s){ s.classList.toggle('on', s.id === 's'+'-'+id); });
+    document.querySelectorAll('#switcher button').forEach(function(b){ b.classList.toggle('on', b.dataset.go === id); });
+    scrollTo(0,0);
+    S.tap();
+  }
+  document.addEventListener('click', function(e){
+    var t = e.target.closest('[data-go]');
+    if (t){ go(t.dataset.go); }
+  });
+
+  /* ---------- the big moments ---------- */
+  var mascot = document.getElementById('mascot');
+  document.getElementById('playBtn').addEventListener('click', function(e){
+    var r = e.currentTarget.getBoundingClientRect();
+    burst(r.left + r.width/2, r.top + r.height/2, 46, 11);
+    rain(70); shake(); S.win();
+    mascot.classList.remove('cheer'); void mascot.offsetWidth; mascot.classList.add('cheer');
+    setTimeout(function(){ go('who'); }, 460);
+  });
+
+  document.addEventListener('click', function(e){
+    var t = e.target.closest('[data-pop]');
+    if (!t) return;
+    var r = t.getBoundingClientRect();
+    burst(r.left + r.width/2, r.top + r.height/2, 18, 6);
+    S.pop();
+  });
+
+  document.getElementById('hnTile').addEventListener('click', function(){
+    S.nope();
+    document.getElementById('modal').classList.add('open');
+  });
+  document.getElementById('modalBtn').addEventListener('click', function(){
+    S.pop(); document.getElementById('modal').classList.add('open');
+  });
+  document.getElementById('modalClose').addEventListener('click', function(){
+    S.tap(); document.getElementById('modal').classList.remove('open');
+  });
+  document.getElementById('modal').addEventListener('click', function(e){
+    if (e.target === this) this.classList.remove('open');
+  });
+
+  document.getElementById('winBtn').addEventListener('click', function(e){
+    var r = e.currentTarget.getBoundingClientRect();
+    burst(r.left + r.width/2, r.top + r.height/2, 40, 10);
+    rain(80); shake(); S.win();
+  });
+
+  /* ---------- pin pad ---------- */
+  var pin = 0, dots = document.querySelectorAll('#pinDots .ac-pin-dot');
+  function draw(){ dots.forEach(function(d,i){ d.classList.toggle('on', i < pin); }); }
+  document.getElementById('pinPad').addEventListener('click', function(e){
+    var k = e.target.closest('.ac-key'); if (!k) return;
+    var act = k.dataset.act;
+    if (act === 'clear'){ pin = 0; S.tap(); }
+    else if (act === 'back'){ pin = Math.max(0, pin-1); S.tap(); }
+    else { pin = Math.min(4, pin+1); S.coin(); }
+    draw();
+    if (pin === 4){
+      setTimeout(function(){
+        var r = document.getElementById('pinDots').getBoundingClientRect();
+        burst(r.left + r.width/2, r.top + r.height/2, 34, 9);
+        S.win();
+        setTimeout(function(){ pin = 0; draw(); go('hub'); }, 420);
+      }, 180);
+    }
+  });
+})();
+</script>
+</body>
+</html>

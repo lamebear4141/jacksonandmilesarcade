@@ -155,8 +155,13 @@ export function rollRarity(luck, rand){
    two views of the same thing; the squad code keeps using the index. */
 export function spriteId(i){ return 's' + i; }
 export function spriteIndex(id){
-  const n = Number(String(id).slice(1));
-  return Number.isInteger(n) && n >= 0 && n < SPRITES.length ? n : -1;
+  // The 's' prefix is part of the id and has to be checked. Slicing the
+  // first character off blindly used to accept '-1' or 'x5' as sprite 1,
+  // which let a malformed id write a junk key into character.counts.
+  const m = /^s([0-9]+)$/.exec(String(id));
+  if (!m) return -1;
+  const n = Number(m[1]);
+  return n >= 0 && n < SPRITES.length ? n : -1;
 }
 export function spriteById(id){
   const i = spriteIndex(id);
@@ -209,11 +214,16 @@ export const GAMES = {
   'coin-climb':           { name:'Coin Climb',           kind:'learn', xpMult:1.0,  coinMult:1.0,
                             emoji:'\u{1FA99}', grades:'GRADES 1–2', section:'practice',
                             href:'coin-climb/index.html', tileClass:'ac-tile--math' },
+  'math-baseball':        { name:'Math Baseball',        kind:'learn', xpMult:1.0,  coinMult:1.0,
+                            emoji:'⚾', grades:'ALL GRADES', section:'practice',
+                            href:'math-baseball/index.html', tileClass:'ac-tile--math' },
   'critter-catchers':     { name:'Critter Catchers',     kind:'learn', xpMult:1.0,  coinMult:1.0,
                             emoji:'\u{1F4D6}', grades:'GRADES 1–2', section:'practice',
                             href:'critter-catchers/index.html', tileClass:'ac-tile--reading' },
-  'multiverse-collector': { name:'Multiverse Collector', kind:'fun',   xpMult:0.30, coinMult:0.25,
-                            emoji:'\u{1F7E9}', grades:'ANY AGE', section:'fun',
+  'multiverse-collector': { name:'Raining Cats and Dogs',  kind:'fun',   xpMult:0.30, coinMult:0.25,
+                            emoji:'\u{1F436}', grades:'ANY AGE', section:'fun',
+                            /* the folder (and the game id) keep the old name:
+                               they key the leaderboard and every saved stat */
                             href:'multiverse-collector/index.html' },
   'block-stacker':        { name:'Block Stacker',        kind:'fun',   xpMult:0.30, coinMult:0.25,
                             emoji:'\u{1F9F1}', grades:'ANY AGE', section:'fun',

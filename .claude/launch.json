@@ -12,6 +12,18 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["-y", "http-server", "site", "-p", "8220", "-c-1"],
       "port": 8220
+    },
+    {
+      "name": "site-alt",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "http-server", "site", "-p", "8230", "-c-1"],
+      "port": 8230
+    },
+    {
+      "name": "site-mc",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "http-server", "site", "-p", "8240", "-c-1"],
+      "port": 8240
     }
   ]
 }

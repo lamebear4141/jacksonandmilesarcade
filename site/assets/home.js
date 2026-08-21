@@ -115,7 +115,10 @@ export async function mountHome(container, kid) {
     return;
   }
   renderHead();
-  ctx.show('play');
+  // A game's "My Character" button can deep-link a tab (index.html#locker),
+  // so a kid landing here straight off a run sees what they just won.
+  const wanted = (location.hash || '').replace('#', '');
+  ctx.show(TABS.some((t) => t.id === wanted) ? wanted : 'play');
 }
 
 /* =====================================================================

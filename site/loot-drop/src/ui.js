@@ -1,18 +1,27 @@
 /* =====================================================================
-   LOOT DROP — screens, navigation, boot
+   LOOT DROP — screens, navigation, boot.
+
+   The flow is question-first now: land on CHOOSE YOUR DROP, play, see
+   what you earned, and head back to your Character page to spend it.
+   The lobby, collection, item shop and brother-compare that used to
+   live in here are the site's job — one character, one locker, one
+   wallet, shared by every game. Loot Drop keeps only what's Loot Drop's:
+   the rounds, the reboot van, loot luck, the cousin squad codes, and
+   the grown-up view.
    ===================================================================== */
-import { CONFIG, RARITY, RARITY_ORDER, SPRITES, SKINS, PETS, levelFromXp } from './config.js';
+import { CONFIG, RARITY, RARITY_ORDER, SPRITES, SKINS, PETS } from './config.js';
 import * as S from './state.js';
 import * as G from './game.js';
 import * as Speech from './speech.js';
 import { playMinigame, randomMinigame } from './minigames.js';
-import { requireKid, mountBar, celebrateLevelUp } from '../../assets/arcade-shell.js';
-import { clearCurrentKid } from '../../firebase-config.js';
+import { requireKid, mountBar, celebrateLevelUp, describeAward,
+         sfx, confettiRain } from '../../assets/arcade-shell.js';
 
 const $ = id => document.getElementById(id);
 let ALL = null;      // { profiles: { [childId]: sessionProfile } }
 let WHO = null;      // the signed-in child's id
 let KID = null;      // { id, nickname }
+let BAR = null;      // mountBar handle — refreshed after every round
 let ROUND_SNAP = null;   // character snapshot from the start of the round
 const P = () => ALL.profiles[WHO];
 const save = () => S.saveAll(ALL);
@@ -20,7 +29,12 @@ const save = () => S.saveAll(ALL);
 function show(id){
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
   $(id).classList.add('on');
+  window.scrollTo(0, 0);
 }
+function goHome(){ window.location.href = '../index.html'; }
+
+function skinGlyph(p){ return (SKINS.find(s => s.id === p.skin) || SKINS[0]).g; }
+function petGlyph(p){ return (PETS.find(s => s.id === p.pet) || PETS[0]).g; }
 
 /* ==================== ONE-TIME MIGRATION OFFER ====================
    The old lootdrop.v1 blob kept two profiles, miles and jackson. If it
@@ -42,9 +56,10 @@ function renderMigration(offers){
       <div class="pmeta">${o.sprites} sprites collected</div>`;
     c.onclick = async () => {
       box.innerHTML = '<div class="tiny">Bringing it all over…</div>';
-      const res = await S.migrateLegacy(KID, P(), o.who);
-      if (res.ok){ renderLobby(); show('scrLobby'); }
-      else { renderLobby(); show('scrLobby'); }
+      await S.migrateLegacy(KID, P(), o.who);
+      sfx.play('win'); confettiRain(100);
+      if (BAR) BAR.refresh();
+      renderDrop(); show('scrDrop');
     };
     box.appendChild(c);
   });
@@ -53,65 +68,37 @@ function renderMigration(offers){
   fresh.innerHTML = `<div class="pglyph">✨</div>
     <div class="pname">Start fresh</div>
     <div class="pmeta">None of these are mine</div>`;
-  fresh.onclick = () => { S.declineMigration(KID); renderLobby(); show('scrLobby'); };
+  fresh.onclick = () => { S.declineMigration(KID); renderDrop(); show('scrDrop'); };
   box.appendChild(fresh);
 }
-function skinGlyph(p){ return (SKINS.find(s => s.id === p.skin) || SKINS[0]).g; }
-function petGlyph(p){ return (PETS.find(s => s.id === p.pet) || PETS[0]).g; }
 
-/* ============================= LOBBY ============================= */
-function renderLobby(){
-  const p = P(), li = S.levelInfo(p);
-  $('lobbyName').textContent = p.name;
-  $('lobbyAvatar').textContent = skinGlyph(p);
-  $('lobbyPet').textContent = petGlyph(p);
-  $('lobbyLevel').textContent = 'LEVEL ' + li.level;
-  $('xpFill').style.width = (li.into / li.need * 100) + '%';
-  $('xpText').textContent = `${li.into} / ${li.need} XP`;
-  $('lobbyCoins').textContent = '🪙 ' + p.coins;
-  $('lobbyStreak').textContent = '🔥 ' + S.dayStreak(p) + ' day' + (S.dayStreak(p)===1?'':'s');
-  $('lobbyDex').textContent = `🗂️ ${S.uniqueSprites(p)}/${SPRITES.length}`;
+/* ===================== DROP (landing) SCREEN ===================== */
+function renderDrop(){
+  const p = P();
+  $('dropAvatar').textContent = skinGlyph(p);
+  $('dropPet').textContent = petGlyph(p);
+  $('dropPet').style.display = petGlyph(p) ? '' : 'none';
+  $('dropHello').textContent = `Ready, ${p.name}?`;
+  const st = S.dayStreak(p);
+  $('dropStreak').textContent = `🔥 ${st} day${st === 1 ? '' : 's'}`;
   const mins = S.minutesToday(p);
-  $('lobbyToday').textContent = mins ? `${mins} min today` : 'Not played yet today';
+  $('dropToday').textContent = mins ? `⏱ ${mins} min today` : '⏱ First drop today';
+  $('dropDex').textContent = `🗂️ ${S.uniqueSprites(p)}/${SPRITES.length}`;
 
-  renderShowcase(p);
-
-  const luckNow = Math.round(require_luck(p));
+  const luckNow = Math.round(currentLuck(p));
   $('luckFill').style.width = luckNow + '%';
-  $('luckText').textContent = luckNow + '% loot luck';
+  $('luckText').textContent = luckNow + '% loot luck right now';
   $('luckWhy').textContent = luckHint(p);
 }
-/** The rarest things they own — the thing they'll actually want to show off. */
-function renderShowcase(p){
-  const owned = SPRITES.map((s,i)=>({ s, i, c:p.counts[i]||0 }))
-    .filter(x => x.c > 0)
-    .sort((a,b)=> RARITY_ORDER.indexOf(b.s.r) - RARITY_ORDER.indexOf(a.s.r) || b.c - a.c)
-    .slice(0, 12);
-  const el = $('lobbyShowcase');
-  if (!owned.length){
-    el.innerHTML = '<div class="tiny" style="padding:14px 0">No sprites yet — drop in and win some!</div>';
-    return;
-  }
-  el.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">' + owned.map(x => {
-    const r = RARITY[x.s.r];
-    return `<div class="sprite" style="border-color:${r.color};width:74px;padding:6px 2px">
-      <div class="sp-glyph" style="font-size:24px">${x.s.g}</div>
-      <div class="sp-name" style="font-size:9px">${x.s.n}</div>
-      ${x.c>1?`<div class="sp-count">×${x.c}</div>`:''}</div>`;
-  }).join('') + '</div>';
-}
 
-function require_luck(p){
-  const { luckScore } = { luckScore: (o) => {
-    const acc = Math.max(0,(o.accuracy-0.5)/0.5)*CONFIG.accuracyBonusLuck;
-    const st = Math.min(o.dayStreak*CONFIG.streakBonusLuck, CONFIG.streakBonusMaxLuck);
-    let t=0; const capped = Math.min(o.minutesToday, CONFIG.timeBonusCapMinutes);
-    CONFIG.minutesForTimeBonus.forEach((m,i)=>{ if(capped>=m) t=CONFIG.timeBonusLuck[i]; });
-    return Math.max(0, Math.min(100, acc+st+t));
-  }};
+function currentLuck(p){
   const lt = p.lifetime;
-  return luckScore({ accuracy: lt.attempted ? lt.correct/lt.attempted : 0.8,
-                     dayStreak: S.dayStreak(p), minutesToday: S.minutesToday(p) });
+  const acc = Math.max(0, ((lt.attempted ? lt.correct/lt.attempted : 0.8) - 0.5) / 0.5) * CONFIG.accuracyBonusLuck;
+  const st = Math.min(S.dayStreak(p) * CONFIG.streakBonusLuck, CONFIG.streakBonusMaxLuck);
+  let t = 0;
+  const capped = Math.min(S.minutesToday(p), CONFIG.timeBonusCapMinutes);
+  CONFIG.minutesForTimeBonus.forEach((m, i) => { if (capped >= m) t = CONFIG.timeBonusLuck[i]; });
+  return Math.max(0, Math.min(100, acc + st + t));
 }
 function luckHint(p){
   const mins = S.minutesToday(p), st = S.dayStreak(p);
@@ -142,6 +129,11 @@ function handleFinish(res){
   }
   save();
   renderResult(res);
+
+  // The nightly email reads a progress file from the Downloads folder, so
+  // a finished round writes one (CONFIG.autoSaveReport turns it off).
+  if (CONFIG.autoSaveReport) S.downloadReport(P());
+
   // Push the round's exact delta to the shared character in the
   // background — the end screen never waits on the network.
   if (ROUND_SNAP){
@@ -149,40 +141,46 @@ function handleFinish(res){
     S.syncRoundToCharacter(KID, P(), snap, {
       asked: res.round.attempted, correct: res.round.correct,
       seconds: res.seconds, score: Math.round(res.accuracy * 100),
-    }).then((outcome) => { celebrateLevelUp(outcome); })
-      .catch(() => { /* offline round still played; character catches up next run */ });
+    }).then((outcome) => {
+        $('resSaved').textContent = '✓ Saved to your character';
+        if (BAR) BAR.refresh();
+        celebrateLevelUp(outcome);
+      })
+      .catch(() => {
+        $('resSaved').textContent = 'Playing offline — your character catches up next time.';
+      });
   }
 }
 
 function renderResult(res){
-  const p = P();
   const extracted = res.status === 'extracted';
   $('resTitle').textContent = extracted ? 'EXTRACTED!' : 'ELIMINATED';
   $('resTitle').className = 'res-title ' + (extracted ? 'win' : 'lose');
   $('resSub').textContent = extracted
     ? 'You made it home with the loot.'
-    : `You needed ${Math.round(CONFIG.extractThreshold*100)}% to get home.`;
+    : `You needed ${Math.round(CONFIG.extractThreshold*100)}% to get home — the loot stays in the storm. Try again 🙂`;
   $('resAcc').textContent = Math.round(res.accuracy * 100) + '%';
   $('resXp').textContent = '+' + res.xp;
   $('resCoins').textContent = '+' + res.coins;
+  $('resSaved').textContent = '';
 
   const lootBox = $('resLoot');
   lootBox.innerHTML = '';
   if (extracted && res.won.length){
     res.won.forEach(w => {
-      const r = RARITY[w.rarity];
       const el = document.createElement('div');
-      el.className = 'res-sprite';
-      el.style.borderColor = r.color;
-      el.innerHTML = `<div class="rs-glyph">${w.sprite.g}</div>
-        <div class="rs-name" style="color:${r.color}">${w.sprite.n}</div>
-        ${w.isNew ? '<div class="rs-new">NEW!</div>' : ''}`;
+      el.className = 'ac-sprite ac-sprite--' + w.rarity;
+      el.innerHTML = `<span class="ac-sprite__glyph">${w.sprite.g}</span>
+        <span class="ac-sprite__name">${w.sprite.n}</span>
+        ${w.isNew ? '<span class="ac-badge ac-badge--hot" style="font-size:9px;padding:1px 8px">NEW!</span>' : ''}`;
       lootBox.appendChild(el);
     });
     $('resLootTitle').textContent = `${res.won.length} sprite${res.won.length===1?'':'s'} secured`;
+    sfx.play('win');
+    confettiRain(110);
   } else {
     $('resLootTitle').textContent = res.round.backpack.length
-      ? `${res.round.backpack.length} sprites lost in the storm`
+      ? `${res.round.backpack.length} sprite${res.round.backpack.length===1?'':'s'} lost in the storm`
       : 'No loot this run';
     lootBox.innerHTML = `<div class="res-lost">${res.round.backpack.map(b=>b.sprite.g).join(' ') || '—'}</div>`;
   }
@@ -198,11 +196,8 @@ function renderResult(res){
   $('resExtra').innerHTML = extra.map(e => `<div class="res-line">${e}</div>`).join('');
 
   $('resMiniBtn').style.display = extracted ? '' : 'none';
-  $('resRetryBtn').textContent = extracted ? 'Drop again' : 'Try again';
+  $('resRetryBtn').textContent = extracted ? '🪂 Drop again' : '🪂 Try again';
   show('scrResult');
-  // (No auto-download here any more — it dropped a lootdrop-YYYY-MM-DD.json
-  // into the Downloads folder after every single round. The grown-up
-  // dashboard's "Save progress file" button still does it on demand.)
   Speech.speak(extracted ? 'Victory! You brought it all home.' : 'So close. Try again!', 1);
 }
 
@@ -211,63 +206,20 @@ function runMinigame(){
   show('scrMini');
   playMinigame(randomMinigame(), $('miniHost'), coins => {
     S.minigameCoins(KID, P(), coins); save();
+    sfx.play('coin');
+    if (BAR) BAR.refresh();
     $('miniHost').innerHTML = `<div class="mg-title">+${coins} COINS</div>
-      <div class="mg-sub">Spend them in the Item Shop.</div>`;
-    setTimeout(() => { renderLobby(); show('scrLobby'); }, 1500);
+      <div class="mg-sub">Spend them in the Shop on your Character page.</div>`;
+    setTimeout(() => { renderDrop(); show('scrDrop'); }, 1500);
   });
 }
 
-/* ========================== COLLECTION =========================== */
-function renderCollection(){
-  const p = P();
-  $('colTitle').textContent = `${p.name}'s Collection`;
-  $('colScore').textContent = `Score ${S.collectionScore(p)} · ${S.uniqueSprites(p)}/${SPRITES.length} unique · ${S.totalSprites(p)} total`;
-  const tally = S.rarityTally(p);
-  $('colTally').innerHTML = RARITY_ORDER.map(r =>
-    `<span class="tally" style="background:${RARITY[r].color}">${RARITY[r].name} ${tally[r]}</span>`).join('');
-  const grid = $('colGrid');
-  grid.innerHTML = '';
-  SPRITES.forEach((s, i) => {
-    const c = p.counts[i] || 0;
-    const r = RARITY[s.r];
-    const el = document.createElement('div');
-    el.className = 'sprite' + (c ? '' : ' locked');
-    el.style.borderColor = c ? r.color : '#2b2f47';
-    el.innerHTML = `<div class="sp-glyph">${c ? s.g : '❔'}</div>
-      <div class="sp-name">${c ? s.n : '???'}</div>
-      ${c > 1 ? `<div class="sp-count">×${c}</div>` : ''}`;
-    el.title = `${s.n} — ${r.name}`;
-    grid.appendChild(el);
-  });
-}
-
-/* ============================= SHOP ============================== */
-function renderShop(){
-  // The shop and locker live on Character Home now — one wallet, one
-  // place to buy and equip, shared by every game. This screen just
-  // points the way instead of duplicating it.
-  const p = P();
-  $('shopCoins').textContent = '🪙 ' + p.coins;
-  $('shopMsg').textContent = '';
-  $('shopSkins').innerHTML = `
-    <a class="pcard" href="../index.html" style="text-decoration:none;display:block;text-align:center">
-      <div class="pglyph">🛒</div>
-      <div class="pname" style="font-size:18px">Skins &amp; pets moved to your Character!</div>
-      <div class="pmeta">Your coins work everywhere now. Buy and equip on your
-      Character page — tap here, then open SHOP or LOCKER.</div>
-    </a>`;
-  $('shopPets').innerHTML = '';
-}
-
-/* ============================ COMPARE ============================ */
+/* ==================== SQUAD CODE (cousins) ==================== */
 function renderCompare(){
   const p = P();
-  const code = S.makeSquadCode(p);
-  $('myCode').value = code;
-  $('myLink').value = location.origin + location.pathname + '?squad=' + code;
-  // Brothers now compare automatically on the family leaderboard back on
-  // Character Home; codes are for cousins and friends in OTHER families.
-  $('cmpResult').innerHTML = '<div class="tiny">Brothers: check the 🏆 tab on your Character page!<br>Got a cousin\'s squad code? Paste it below.</div>';
+  $('myCode').value = S.makeSquadCode(p);
+  $('myLink').value = location.origin + location.pathname + '?squad=' + S.makeSquadCode(p);
+  $('cmpResult').style.display = 'none';
 }
 function summaryOf(p){
   return { who:p.who, name:p.name, level:S.levelInfo(p).level, streak:S.dayStreak(p),
@@ -289,6 +241,7 @@ function showCompare(a, b){
   RARITY_ORDER.slice().reverse().forEach(r => rows.push([RARITY[r].name, ta[r], tb[r]]));
 
   const winner = a.score === b.score ? null : (a.score > b.score ? a : b);
+  $('cmpResult').style.display = '';
   $('cmpResult').innerHTML = `
     <div class="cmp-head">
       <div class="cmp-side"><div class="cmp-name">${a.name}</div></div>
@@ -309,91 +262,85 @@ function exclusive(mine, theirs){
   return SPRITES.map((s,i)=> (mine[i]>0 && !theirs[i]) ? s.g : null).filter(Boolean).join(' ');
 }
 
-/* ============================ PARENT ============================= */
+/* ============================ GROWN-UPS ============================ */
 function renderParent(){
   const rep = S.buildReport(P());
-  const rows = () => {
-    const d = rep.player;
-    const hist = d.history.map(h => `<tr><td>${h.date}</td><td>${Math.round(h.seconds/60)}m</td>
-      <td>${h.correct}/${h.attempted}${h.attempted?` (${Math.round(h.correct/h.attempted*100)}%)`:''}</td>
-      <td>${h.extracted}/${h.rounds}</td><td>${(h.missed||[]).slice(0,6).join(', ')||'—'}</td></tr>`).join('');
-    return `<div class="par-block">
-      <h3>${d.name}</h3>
-      <p class="tiny">Level ${d.level} · 🔥 ${d.dayStreak} day streak · ${d.collection.unique}/${d.collection.outOf} sprites ·
-        lifetime accuracy ${d.lifetime.accuracyPct}% (reading ${d.lifetime.readingAccuracyPct ?? '—'}%, math ${d.lifetime.mathAccuracyPct ?? '—'}%)</p>
-      <table class="par-table"><tr><th>Date</th><th>Time</th><th>Correct</th><th>Extracted</th><th>Missed</th></tr>${hist || '<tr><td colspan=5>No sessions yet</td></tr>'}</table>
-    </div>`;
-  };
-  $('parentBody').innerHTML = rows();
+  const d = rep.player;
+  const hist = d.history.map(h => `<tr><td>${h.date}</td><td>${Math.round(h.seconds/60)}m</td>
+    <td>${h.correct}/${h.attempted}${h.attempted?` (${Math.round(h.correct/h.attempted*100)}%)`:''}</td>
+    <td>${h.extracted}/${h.rounds}</td><td>${(h.missed||[]).slice(0,6).join(', ')||'—'}</td></tr>`).join('');
+  $('parentBody').innerHTML = `<div>
+    <h3 style="margin:0 0 4px">${d.name}</h3>
+    <p class="tiny" style="margin:0 0 6px">Level ${d.level} · ${d.dayStreak}-day streak · ${d.collection.unique}/${d.collection.outOf} sprites ·
+      lifetime accuracy ${d.lifetime.accuracyPct}% (reading ${d.lifetime.readingAccuracyPct ?? '—'}%, math ${d.lifetime.mathAccuracyPct ?? '—'}%)</p>
+    <p class="tiny" style="margin:0 0 6px">A progress file saves to Downloads after every round for the nightly email.</p>
+    <table class="par-table"><tr><th>Date</th><th>Time</th><th>Correct</th><th>Extracted</th><th>Missed</th></tr>${hist || '<tr><td colspan=5>No sessions yet</td></tr>'}</table>
+  </div>`;
 }
 
 /* ============================= BOOT ============================== */
 export async function boot(){
   KID = await requireKid({ gameName: 'Loot Drop' });
   if (!KID) return;
-  await mountBar({ title: 'Loot Drop' });
+  BAR = await mountBar({ title: 'Loot Drop' });
 
   const profile = await S.initFor(KID);
   ALL = { profiles: { [KID.id]: profile } };
   WHO = KID.id;
 
-  // deep-link compare: ?squad=CODE
+  // deep-link compare: ?squad=CODE (a cousin's link)
   const q = new URLSearchParams(location.search).get('squad');
   if (q){
     const them = S.readSquadCode(q);
     if (them) window.__incoming = them;
   }
 
-  $('btnDrop').onclick    = () => show('scrDrop');
-  $('btnReading').onclick = () => beginRound('reading');
-  $('btnMath').onclick    = () => beginRound('math');
-  $('btnDropBack').onclick= () => show('scrLobby');
+  $('btnReading').onclick = () => { sfx.play('tap'); beginRound('reading'); };
+  $('btnMath').onclick    = () => { sfx.play('tap'); beginRound('math'); };
 
   $('micBtn').onclick    = () => G.micPressed();
   $('hearBtn').onclick   = () => G.hearPressed();
   $('escapeBtn').onclick = () => G.escapePressed();
-  $('quitBtn').onclick = () => { if (confirmQuit()) { renderLobby(); show('scrLobby'); } };
+  $('quitBtn').onclick   = () => { renderDrop(); show('scrDrop'); };
 
-  $('rebootYes').onclick = () => { show('scrPlay'); G.acceptReboot(); };
+  $('rebootYes').onclick = () => { sfx.play('tap'); show('scrPlay'); G.acceptReboot(); };
   $('rebootNo').onclick  = () => { const R = window.__round; R.rebootQueue = []; R.rebooting = false;
-                                   handleFinishForce(R); };
+                                   settleDeclinedReboot(R); };
 
   $('resMiniBtn').onclick  = runMinigame;
-  $('resRetryBtn').onclick = () => show('scrDrop');
-  $('resHomeBtn').onclick  = () => { renderLobby(); show('scrLobby'); };
+  $('resRetryBtn').onclick = () => { renderDrop(); show('scrDrop'); };
+  $('resHomeBtn').onclick  = goHome;
 
-  $('btnCollection').onclick = () => { renderCollection(); show('scrCollection'); };
-  $('btnShop').onclick       = () => { renderShop(); show('scrShop'); };
-  $('btnCompare').onclick    = () => { renderCompare(); if (window.__incoming) showCompare(summaryOf(P()), window.__incoming); show('scrCompare'); };
-  // Switching always routes back through the arcade's picker — a real
-  // kid re-enters their own PIN there.
-  $('btnSwitch').onclick     = () => { clearCurrentKid(); window.location.href = '../index.html'; };
-
-  document.querySelectorAll('[data-home]').forEach(b => b.onclick = () => { renderLobby(); show('scrLobby'); });
+  $('lnkCompare').onclick = () => { renderCompare(); show('scrCompare'); };
+  document.querySelectorAll('[data-home]').forEach(b => b.onclick = () => { renderDrop(); show('scrDrop'); });
 
   $('cmpGo').onclick = () => {
     const them = S.readSquadCode($('cmpInput').value);
-    if (!them){ $('cmpResult').innerHTML = '<div class="tiny bad">That code didn\'t work — check it and try again.</div>'; return; }
+    if (!them){
+      $('cmpResult').style.display = '';
+      $('cmpResult').innerHTML = '<div class="tiny bad">That code didn\'t work — check it and try again 🙂</div>';
+      return;
+    }
     showCompare(summaryOf(P()), them);
   };
   $('copyCode').onclick = () => copy($('myCode'));
   $('copyLink').onclick = () => copy($('myLink'));
 
-  $('grownup').onclick   = () => { renderParent(); show('scrParent'); };
-  $('parentSave').onclick= () => S.downloadReport(P());
+  $('grownup').onclick    = () => { renderParent(); show('scrParent'); };
+  $('parentSave').onclick = () => S.downloadReport(P());
 
   if (!Speech.hasMic) $('micNote').textContent = 'Tip: open in Chrome for read-aloud mode. Tap mode works everywhere.';
 
   const offers = S.migrationOffer(KID, P());
-  if (offers){ renderMigration(offers); show('scrProfile'); }
+  if (offers){ renderMigration(offers); show('scrGate'); }
   else if (window.__incoming){ renderCompare(); showCompare(summaryOf(P()), window.__incoming); show('scrCompare'); }
-  else { renderLobby(); show('scrLobby'); }
+  else { renderDrop(); show('scrDrop'); }
 }
 
-function confirmQuit(){ return true; }
-function handleFinishForce(R){
+function settleDeclinedReboot(R){
   // player declined the reboot van — settle the round as-is
-  R.rebootQueue = []; R.rebooting = true; R.rebootDone = 0; R._rebootBaseline = { attempted:R.attempted, correct:R.correct };
+  R.rebootQueue = []; R.rebooting = true; R.rebootDone = 0;
+  R._rebootBaseline = { attempted:R.attempted, correct:R.correct };
   G.acceptReboot();
 }
 function copy(el){
@@ -404,4 +351,4 @@ function copy(el){
 
 /* test hooks */
 window.__ld = { get ALL(){ return ALL; }, setWho: w => { WHO = w; }, P, show,
-                beginRound, renderLobby, renderCollection, renderShop, renderCompare, save };
+                beginRound, renderDrop, renderCompare, save };

@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jackson &amp; Miles Arcade — My World (creative pillar)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ac-sky-top:#79D2FF; --ac-sky-mid:#A8E4FF; --ac-sky-bot:#D6F3FF;
+  --ac-grass:#5FD963; --ac-grass-deep:#31A84A;
+  --ac-panel:#FFFFFF; --ac-panel-2:#FFF4DA;
+  --ac-edge:#1E2B63; --ac-line:#C8D6F5;
+  --ac-text:#1E2B63; --ac-text-dim:#5C6EA8; --ac-text-mute:#8E9BC4;
+  --ac-red:#FF5A5A; --ac-red-deep:#D62A2A;
+  --ac-yellow:#FFC93C; --ac-yellow-deep:#E39B00;
+  --ac-blue:#4C9BFF; --ac-blue-deep:#1F5FD6;
+  --ac-purple:#A971F5; --ac-purple-deep:#7433CE;
+  --ac-good:#2ECC71; --ac-bad:#FF4D4D;
+  --ac-radius:24px; --ac-radius-sm:14px; --ac-bd:4px; --ac-lift:7px;
+  --ac-font:'Baloo 2','Arial Rounded MT Bold','Trebuchet MS',system-ui,sans-serif;
+  /* pillar colors */
+  --p-brick:#E8734A; --p-spark:#3FC1FF; --p-coin:#FFC93C;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{font-family:var(--ac-font);color:var(--ac-text);background:var(--ac-sky-bot);overflow-x:hidden;font-weight:700}
+button{font-family:inherit;font-weight:800;cursor:pointer}
+h1,h2,h3{margin:0}
+
+.ac-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:.5em;padding:13px 24px;font-size:19px;color:#fff;background:linear-gradient(180deg,var(--ac-red),var(--ac-red-deep));border:var(--ac-bd) solid var(--ac-edge);border-radius:var(--ac-radius-sm);box-shadow:0 var(--ac-lift) 0 var(--ac-edge),0 13px 14px rgba(30,43,99,.25);text-shadow:0 2px 0 rgba(0,0,0,.22);transition:transform .06s,box-shadow .06s,filter .12s}
+.ac-btn:hover{filter:brightness(1.06)}
+.ac-btn:active{transform:translateY(var(--ac-lift));box-shadow:0 0 0 var(--ac-edge)}
+.ac-btn--yellow{background:linear-gradient(180deg,var(--ac-yellow),var(--ac-yellow-deep));color:var(--ac-edge);text-shadow:0 2px 0 rgba(255,255,255,.45)}
+.ac-btn--blue{background:linear-gradient(180deg,var(--ac-blue),var(--ac-blue-deep))}
+.ac-btn--purple{background:linear-gradient(180deg,var(--ac-purple),var(--ac-purple-deep))}
+.ac-btn--green{background:linear-gradient(180deg,#63E08A,#23A354)}
+.ac-btn--outline{background:var(--ac-panel);color:var(--ac-text);text-shadow:none}
+.ac-btn--sm{padding:7px 14px;font-size:14px;border-width:3px;--ac-lift:4px;border-radius:11px}
+.ac-btn:disabled{filter:grayscale(.7) brightness(.92);cursor:not-allowed}
+
+.ac-badge{display:inline-block;padding:4px 12px;font-size:12px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--ac-edge);background:var(--ac-panel-2);border:3px solid var(--ac-edge);border-radius:999px;white-space:nowrap}
+.ac-badge--green{background:#CFF6D9}
+.ac-badge--purple{background:#E9DAFF}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.045)}}
+.ac-badge--hot{background:var(--ac-yellow);animation:breathe 1.8s ease-in-out infinite}
+
+.ac-card{background:var(--ac-panel);border:var(--ac-bd) solid var(--ac-edge);border-radius:var(--ac-radius);box-shadow:0 var(--ac-lift) 0 var(--ac-edge),0 16px 30px rgba(30,43,99,.18);padding:20px}
+.ac-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;margin-bottom:16px;background:var(--ac-panel);border:var(--ac-bd) solid var(--ac-edge);border-radius:999px;box-shadow:0 5px 0 var(--ac-edge)}
+.ac-avatar{width:36px;height:36px;flex:none;border-radius:50%;display:grid;place-items:center;font-size:21px;border:3px solid var(--ac-edge)}
+
+.ac-page{position:relative;min-height:100vh;padding:20px 16px 130px;overflow:hidden}
+.sky{position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,var(--ac-sky-top),var(--ac-sky-mid) 55%,var(--ac-sky-bot))}
+.ac-wrap{width:min(980px,100%);margin:0 auto;position:relative;z-index:2}
+@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.floaty{animation:floaty 3.4s ease-in-out infinite}
+
+/* ---------- pillar HUD ---------- */
+.hud{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.hud__pill{display:inline-flex;align-items:center;gap:7px;padding:7px 15px;font-size:17px;background:var(--ac-panel);border:3px solid var(--ac-edge);border-radius:999px;box-shadow:0 4px 0 var(--ac-edge)}
+.hud__pill i{font-style:normal;font-size:19px}
+.hud__pill.flash{animation:hudflash .5s ease}
+@keyframes hudflash{30%{transform:scale(1.15);background:var(--ac-panel-2)}}
+.hud__earn{font-size:12px;color:var(--ac-text-dim);margin-left:2px}
+
+/* ---------- builder layout ---------- */
+.builder{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;align-items:start}
+@media (max-width:840px){.builder{grid-template-columns:1fr}}
+
+.world-frame{position:relative;background:var(--ac-panel);border:var(--ac-bd) solid var(--ac-edge);border-radius:var(--ac-radius);box-shadow:0 var(--ac-lift) 0 var(--ac-edge);padding:14px;overflow:auto}
+.world{position:relative;display:grid;grid-template-columns:repeat(18,36px);grid-auto-rows:36px;gap:0;margin:0 auto;width:fit-content;border:3px solid var(--ac-edge);border-radius:10px;overflow:hidden;cursor:crosshair}
+.cell{position:relative;width:36px;height:36px;background:#7BE07F}
+.cell:nth-child(odd){background:#74D978}
+.cell.t-path{background:#EED9A0}
+.cell.t-water{background:#7CD4FF}
+.cell.t-sand{background:#F7E3B0}
+.cell.t-dirt{background:#C9A15F}
+.cell:hover::after{content:'';position:absolute;inset:0;background:rgba(255,255,255,.35);outline:2px dashed rgba(30,43,99,.55);outline-offset:-2px}
+.item{position:absolute;display:grid;place-items:center;pointer-events:auto;cursor:pointer;line-height:1;filter:drop-shadow(0 3px 2px rgba(30,43,99,.3));transition:transform .1s;z-index:2}
+.item:hover{transform:scale(1.12)}
+.item.wander{transition:left 1.8s linear,top 1.8s linear}
+@keyframes plop{0%{transform:scale(.2) translateY(-26px)}70%{transform:scale(1.18)}100%{transform:scale(1)}}
+.item.new{animation:plop .32s cubic-bezier(.34,1.5,.64,1)}
+
+/* expansion ring */
+.expand{position:absolute;right:10px;bottom:10px;z-index:3;font-size:12px;padding:6px 12px;background:rgba(255,255,255,.9);border:3px dashed var(--ac-line);border-radius:999px;color:var(--ac-text-dim)}
+
+/* ---------- palette ---------- */
+.pal{background:var(--ac-panel);border:var(--ac-bd) solid var(--ac-edge);border-radius:var(--ac-radius);box-shadow:0 var(--ac-lift) 0 var(--ac-edge);padding:14px;max-height:640px;overflow:auto}
+.pal__tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.pal__tab{padding:7px 12px;font-size:13px;background:var(--ac-panel);color:var(--ac-text);border:3px solid var(--ac-edge);border-radius:999px;box-shadow:0 3px 0 var(--ac-edge)}
+.pal__tab.on{background:var(--ac-yellow)}
+.pal__tab:active{transform:translateY(3px);box-shadow:0 0 0 var(--ac-edge)}
+.pal__grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:9px}
+.pitem{display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 4px 7px;background:var(--ac-panel);border:3px solid var(--ac-line);border-radius:12px;cursor:pointer;transition:transform .1s,border-color .1s;text-align:center}
+.pitem:hover{transform:translateY(-3px)}
+.pitem.sel{border-color:var(--ac-edge);background:var(--ac-panel-2);box-shadow:0 3px 0 var(--ac-edge)}
+.pitem__e{font-size:28px;line-height:1.15}
+.pitem__n{font-size:10.5px;color:var(--ac-text-dim);line-height:1.05}
+.pitem__c{display:flex;gap:5px;font-size:10.5px}
+.pitem__c b{font-weight:800}
+.pitem.locked{opacity:.6}
+.pitem.locked .pitem__e{filter:grayscale(.8)}
+.pitem.free .pitem__c{color:var(--ac-good)}
+.cost-b{color:var(--p-brick)}
+.cost-s{color:#0E86C7}
+
+/* tools */
+.tools{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.tool{padding:8px 12px;font-size:14px;background:var(--ac-panel);border:3px solid var(--ac-edge);border-radius:11px;box-shadow:0 4px 0 var(--ac-edge)}
+.tool.on{background:var(--ac-blue);color:#fff}
+.tool:active{transform:translateY(4px);box-shadow:0 0 0 var(--ac-edge)}
+
+/* toast */
+#toast{position:fixed;left:50%;bottom:86px;transform:translateX(-50%) translateY(20px);z-index:90;padding:12px 22px;font-size:16px;color:#fff;background:var(--ac-edge);border-radius:999px;box-shadow:0 8px 24px rgba(30,43,99,.4);opacity:0;pointer-events:none;transition:.25s;max-width:88vw;text-align:center}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.warn{background:var(--ac-red-deep)}
+
+/* ---------- avatar studio ---------- */
+.studio{display:grid;grid-template-columns:280px minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:760px){.studio{grid-template-columns:1fr}}
+.stage{position:sticky;top:12px;display:flex;flex-direction:column;align-items:center;gap:10px;padding:20px;background:linear-gradient(180deg,#E9F6FF,#fff);border:var(--ac-bd) solid var(--ac-edge);border-radius:var(--ac-radius);box-shadow:0 var(--ac-lift) 0 var(--ac-edge)}
+.opt-group{margin-bottom:16px}
+.opt-title{font-size:13px;letter-spacing:1px;text-transform:uppercase;color:var(--ac-text-mute);margin-bottom:8px}
+.opts{display:flex;gap:8px;flex-wrap:wrap}
+.opt{min-width:46px;height:46px;display:grid;place-items:center;font-size:22px;padding:0 8px;background:var(--ac-panel);border:3px solid var(--ac-line);border-radius:12px;cursor:pointer;transition:transform .1s}
+.opt:hover{transform:translateY(-3px)}
+.opt.on{border-color:var(--ac-edge);background:var(--ac-panel-2);box-shadow:0 3px 0 var(--ac-edge)}
+.opt.locked{opacity:.55}
+.opt--sw{border-radius:50%;min-width:36px;width:36px;height:36px}
+.opt small{font-size:10px;display:block;line-height:1}
+
+/* ---------- visit ---------- */
+.visit-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.react-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.react{width:56px;height:56px;font-size:26px;display:grid;place-items:center;background:var(--ac-panel);border:4px solid var(--ac-edge);border-radius:50%;box-shadow:0 5px 0 var(--ac-edge);transition:transform .08s,box-shadow .08s}
+.react:active{transform:translateY(5px);box-shadow:0 0 0 var(--ac-edge)}
+.react.done{background:#CFF6D9;pointer-events:none}
+@keyframes handwave{0%,100%{transform:rotate(0)}25%{transform:rotate(-18deg)}75%{transform:rotate(18deg)}}
+#hifive .h{display:inline-block;animation:handwave 1.2s ease-in-out infinite}
+
+.note{margin:20px auto 0;padding:12px 16px;max-width:700px;font-size:13.5px;font-weight:600;line-height:1.55;color:#2A3A73;background:rgba(255,255,255,.72);border:2px dashed #7E90C9;border-radius:14px}
+.note b{color:#1E2B63}
+.section-head{display:flex;align-items:center;gap:12px;margin:26px 0 12px}
+.section-head__ribbon{padding:7px 18px;font-size:14px;letter-spacing:1.4px;text-transform:uppercase;color:#fff;background:var(--ac-edge);border-radius:999px;box-shadow:0 4px 0 rgba(30,43,99,.35)}
+.section-head__rule{flex:1;height:5px;border-radius:99px;background:repeating-linear-gradient(90deg,var(--ac-edge) 0 12px,transparent 12px 24px);opacity:.35}
+
+#switcher{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:95;display:flex;gap:5px;align-items:center;padding:6px 6px 6px 14px;background:#0E1533;border:2px solid #37447D;border-radius:999px;box-shadow:0 10px 30px rgba(0,0,0,.4);max-width:calc(100vw - 24px);overflow-x:auto}
+#switcher b{color:#7F8EC4;font-size:10px;letter-spacing:1.6px;text-transform:uppercase;padding-right:6px;white-space:nowrap}
+#switcher button{padding:8px 13px;font-size:13px;white-space:nowrap;color:#C9D3F5;background:#1B2450;border:0;border-radius:999px}
+#switcher button.on{background:var(--ac-yellow);color:#0E1533}
+#fx{position:fixed;inset:0;pointer-events:none;z-index:88}
+.screen{display:none}.screen.on{display:block}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ═══════════════ 1. MY WORLD — BUILD MODE ═══════════════ -->
+<section class="screen on ac-page" id="s-build">
+  <div class="sky"></div>
+  <div class="ac-wrap">
+    <div class="ac-bar">
+      <div style="display:flex;align-items:center;gap:9px;margin-right:auto">
+        <div class="ac-avatar" style="background:#FFE1A8">🧒</div>
+        <div style="text-align:left"><div style="font-size:11px;letter-spacing:1px;color:var(--ac-text-mute);text-transform:uppercase">Miles's World</div><div style="font-size:17px;line-height:1.1">Frogtopia 🐸</div></div>
+      </div>
+      <div class="hud">
+        <span class="hud__pill" id="hudB">🧱 <b id="nB">320</b><span class="hud__earn">bricks</span></span>
+        <span class="hud__pill" id="hudS">⚡ <b id="nS">45</b><span class="hud__earn">sparks</span></span>
+        <span class="hud__pill" id="hudC">🪙 <b id="nC">140</b></span>
+      </div>
+      <button class="ac-btn ac-btn--sm ac-btn--green" id="saveBtn">💾 Save</button>
+    </div>
+
+    <div class="builder">
+      <div class="world-frame">
+        <div class="world" id="world"></div>
+        <div class="expand">🔒 More land at Level 8</div>
+        <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap">
+          <span style="font-size:13px;color:var(--ac-text-dim);align-self:center">Low on something?</span>
+          <button class="ac-btn ac-btn--sm ac-btn--purple">🧱 Earn bricks — Math Defender</button>
+          <button class="ac-btn ac-btn--sm ac-btn--blue">⚡ Earn sparks — Block Stacker</button>
+        </div>
+      </div>
+
+      <div class="pal">
+        <div class="tools">
+          <button class="tool on" data-tool="build">🏗️ Build</button>
+          <button class="tool" data-tool="path">🟨 Path</button>
+          <button class="tool" data-tool="water">🟦 Water</button>
+          <button class="tool" data-tool="erase">🧽 Put away</button>
+        </div>
+        <div class="pal__tabs" id="palTabs"></div>
+        <div class="pal__grid" id="palGrid"></div>
+        <div style="margin-top:12px;font-size:12.5px;color:var(--ac-text-dim);line-height:1.5">
+          Everything costs <b class="cost-b">🧱 bricks</b> (from learning games) <b>and</b>
+          <b class="cost-s">⚡ sparks</b> (from fun games). Your collected critters are
+          <b style="color:var(--ac-good)">free to place</b> — you already earned them!
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      <b>The balance mechanic, made physical:</b> every placement costs bricks <i>and</i> sparks,
+      so a kid who only grinds math runs out of energy, and a kid who only plays fun games runs
+      out of materials. The build buttons under the world close the loop — the arcade is the
+      supply chain for the world. Terrain painting (path/water) costs a little too. "Put away"
+      returns the item to inventory — <b>no destruction, nothing is ever lost.</b> Scholar items
+      (🔭 tab) unlock by mastery badges, not purchases — visible proof of learning wins.
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. AVATAR STUDIO ═══════════════ -->
+<section class="screen ac-page" id="s-avatar">
+  <div class="sky"></div>
+  <div class="ac-wrap">
+    <div class="ac-bar">
+      <div style="margin-right:auto;font-size:19px">🎨 Avatar Studio</div>
+      <span class="hud__pill">🪙 <b id="nC2">140</b></span>
+      <button class="ac-btn ac-btn--sm ac-btn--green" id="saveLook">💾 Save my look</button>
+    </div>
+
+    <div class="studio">
+      <div class="stage">
+        <svg id="doll" width="180" height="240" viewBox="0 0 180 240" aria-label="my avatar">
+          <ellipse cx="90" cy="228" rx="44" ry="8" fill="rgba(30,43,99,.15)"/>
+          <!-- legs -->
+          <rect id="d-legL" x="66" y="168" width="20" height="52" rx="9" fill="#3E5BAA" stroke="#1E2B63" stroke-width="5"/>
+          <rect id="d-legR" x="94" y="168" width="20" height="52" rx="9" fill="#3E5BAA" stroke="#1E2B63" stroke-width="5"/>
+          <!-- body / top -->
+          <rect id="d-top" x="52" y="108" width="76" height="70" rx="22" fill="#FF5A5A" stroke="#1E2B63" stroke-width="5"/>
+          <!-- arms -->
+          <rect id="d-armL" x="34" y="116" width="18" height="48" rx="9" fill="#FF5A5A" stroke="#1E2B63" stroke-width="5"/>
+          <rect id="d-armR" x="128" y="116" width="18" height="48" rx="9" fill="#FF5A5A" stroke="#1E2B63" stroke-width="5"/>
+          <circle id="d-handL" cx="43" cy="170" r="9" fill="#F5C9A2" stroke="#1E2B63" stroke-width="4"/>
+          <circle id="d-handR" cx="137" cy="170" r="9" fill="#F5C9A2" stroke="#1E2B63" stroke-width="4"/>
+          <!-- head -->
+          <circle id="d-head" cx="90" cy="66" r="40" fill="#F5C9A2" stroke="#1E2B63" stroke-width="5"/>
+          <!-- hair variants -->
+          <g id="d-hair"></g>
+          <!-- face -->
+          <circle cx="76" cy="64" r="4.5" fill="#1E2B63"/><circle cx="104" cy="64" r="4.5" fill="#1E2B63"/>
+          <path d="M78 82 Q90 92 102 82" fill="none" stroke="#1E2B63" stroke-width="4" stroke-linecap="round"/>
+          <!-- accessory layer -->
+          <g id="d-acc"></g>
+        </svg>
+        <div style="font-size:20px">SuperMiles</div>
+        <span class="ac-badge ac-badge--green">Level 7</span>
+      </div>
+
+      <div class="ac-card">
+        <div class="opt-group"><div class="opt-title">Skin</div><div class="opts" id="optSkin"></div></div>
+        <div class="opt-group"><div class="opt-title">Hair style</div><div class="opts" id="optHair"></div></div>
+        <div class="opt-group"><div class="opt-title">Hair color</div><div class="opts" id="optHairC"></div></div>
+        <div class="opt-group"><div class="opt-title">Outfit color</div><div class="opts" id="optTop"></div></div>
+        <div class="opt-group"><div class="opt-title">Accessories</div><div class="opts" id="optAcc"></div></div>
+        <div class="opt-group"><div class="opt-title">Costumes — full looks you've earned</div>
+          <div class="opts">
+            <div class="opt on" style="min-width:64px">🧒<small>Me!</small></div>
+            <div class="opt" style="min-width:64px">🥷<small>Ninja</small></div>
+            <div class="opt" style="min-width:64px">🤖<small>Robo</small></div>
+            <div class="opt locked" style="min-width:64px">🛡️<small>Armor 🪙450</small></div>
+            <div class="opt locked" style="min-width:64px">🧙<small>Wizard Lvl 9</small></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      <b>Paper-doll SVG, not sprite art</b> — skin, hair, colors and accessories are just fills
+      and layers, so it's buildable in a sitting and every combination works. No gender field
+      stored anywhere: hair + outfit choices cover it without asking the question. Costumes
+      (the existing skins) sit on top as full-look overrides. Gear beyond the basics is bought
+      with 🪙 coins — which come from the <i>creative</i> pillar: friends visiting and
+      high-fiving your world. Express yourself → get recognized → express yourself more.
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. VISITING A FRIEND ═══════════════ -->
+<section class="screen ac-page" id="s-visit">
+  <div class="sky"></div>
+  <div class="ac-wrap">
+    <div class="ac-bar">
+      <button class="ac-btn ac-btn--sm ac-btn--outline" data-go="build">← My world</button>
+      <div class="visit-head" style="margin:0 auto 0 6px">
+        <div class="ac-avatar" style="background:#CBE4FF;width:44px;height:44px;font-size:24px">🦖</div>
+        <div><div style="font-size:19px;line-height:1.1">JAX3000's World</div><div style="font-size:13px;color:var(--ac-text-dim)">Dino Kingdom 🦕 · Level 9 · 👀 look, don't touch</div></div>
+      </div>
+      <span class="ac-badge ac-badge--purple">Visiting</span>
+    </div>
+
+    <div class="world-frame">
+      <div class="world" id="friendWorld" style="cursor:default"></div>
+    </div>
+
+    <div style="display:flex;gap:14px;align-items:center;justify-content:center;margin-top:16px;flex-wrap:wrap">
+      <button class="ac-btn ac-btn--yellow" id="hifive" style="font-size:22px;padding:16px 30px"><span class="h">🖐️</span> HIGH FIVE! <span style="font-size:14px">+5🪙 for Jackson</span></button>
+      <div class="react-row">
+        <button class="react" data-r="👍">👍</button>
+        <button class="react" data-r="🔥">🔥</button>
+        <button class="react" data-r="😍">😍</button>
+        <button class="react" data-r="🏆">🏆</button>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:10px;font-size:14px;color:var(--ac-text-dim)" id="visitMsg">One high-five per friend per day — make it count!</div>
+
+    <div class="note">
+      <b>The entire social surface is five buttons.</b> No comments, no text, no downvotes —
+      reactions are a fixed positive set, and the high-five is once per friend per day
+      (enforced by date-keyed docs, so it's idempotent by construction). The visitor gives
+      <b>+5🪙 to the owner and gets +2🪙 back</b> — generosity pays both ways, so checking on
+      friends' worlds becomes a daily ritual. Who can visit: family always; approved friends
+      only via the parent-approval flow from the Friends page. Worlds are never listed publicly
+      and never ranked against each other.
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. HOW IT ALL CONNECTS ═══════════════ -->
+<section class="screen ac-page" id="s-loop">
+  <div class="sky"></div>
+  <div class="ac-wrap" style="max-width:760px">
+    <h2 style="text-align:center;font-size:clamp(26px,5vw,38px);color:var(--ac-edge);margin:10px 0 20px">The three-pillar loop</h2>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px">
+      <div class="ac-card" style="text-align:center;border-color:var(--ac-edge)">
+        <div style="font-size:44px" class="floaty">🧠</div>
+        <h3 style="font-size:22px;margin:6px 0">LEARN</h3>
+        <div style="font-size:14.5px;color:var(--ac-text-dim);line-height:1.5">Math &amp; reading games pay <b style="color:var(--p-brick)">🧱 bricks</b> — the materials.<br><i>"Your job."</i></div>
+        <div style="margin-top:10px"><span class="ac-badge">Loot Drop · Math Defender · Coin Climb · Critter Catchers</span></div>
+      </div>
+      <div class="ac-card" style="text-align:center">
+        <div style="font-size:44px" class="floaty" style="animation-delay:.4s">🎮</div>
+        <h3 style="font-size:22px;margin:6px 0">PLAY</h3>
+        <div style="font-size:14.5px;color:var(--ac-text-dim);line-height:1.5">Fun games pay <b style="color:#0E86C7">⚡ sparks</b> — the energy.<br><i>"Recreation."</i></div>
+        <div style="margin-top:10px"><span class="ac-badge ac-badge--green">Multiverse · Block Stacker · Harvest Night</span></div>
+      </div>
+      <div class="ac-card" style="text-align:center">
+        <div style="font-size:44px" class="floaty" style="animation-delay:.8s">🎨</div>
+        <h3 style="font-size:22px;margin:6px 0">CREATE</h3>
+        <div style="font-size:14.5px;color:var(--ac-text-dim);line-height:1.5">Building your world costs <b>both</b> — and friends' visits pay <b style="color:var(--ac-yellow-deep)">🪙 coins</b>.<br><i>"Recognition."</i></div>
+        <div style="margin-top:10px"><span class="ac-badge ac-badge--hot">My World · Avatar Studio</span></div>
+      </div>
+    </div>
+
+    <div class="ac-card" style="margin-top:16px;text-align:center;font-size:17px;line-height:1.7">
+      🧱 + ⚡ → 🏗️ <b>build your world</b> → 👥 friends visit → 🖐️ high-fives → 🪙 coins →
+      🎨 <b>avatar gear &amp; rare decorations</b> → a cooler world → more visits → …
+      <div style="font-size:14px;color:var(--ac-text-dim);margin-top:8px">
+        You can't do just one thing and grow. Work + play + sharing — that's the whole game.
+      </div>
+    </div>
+
+    <div class="note" style="text-align:left">
+      <b>Where XP fits:</b> levels stay the universal ladder — all three pillars feed it, and
+      levels gate land expansions, costume unlocks, and Scholar-tier items. The old "4× for
+      practice" coin weighting retires: steering now comes from <i>which resource</i> a game
+      pays, which is stronger and fairer — a third each, exactly as intended.
+    </div>
+  </div>
+</section>
+
+</div><!-- /#app -->
+
+<div id="toast"></div>
+<canvas id="fx"></canvas>
+
+<nav id="switcher">
+  <b>Mockup</b>
+  <button data-go="build" class="on">🏗️ My World</button>
+  <button data-go="avatar">🎨 Avatar Studio</button>
+  <button data-go="visit">🖐️ Visit a friend</button>
+  <button data-go="loop">🔁 The loop</button>
+</nav>
+
+<script>
+(function(){
+'use strict';
+
+/* ---------- sound ---------- */
+var ctx=null,soundOn=true;
+function ac(){if(!ctx){try{ctx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){return null;}}if(ctx.state==='suspended')ctx.resume();return ctx;}
+function beep(f,d,t,v,w){var c=ac();if(!c||!soundOn)return;var s=c.currentTime+(w||0),o=c.createOscillator(),g=c.createGain();o.type=t||'square';o.frequency.setValueAtTime(f,s);g.gain.setValueAtTime(v||.08,s);g.gain.exponentialRampToValueAtTime(.0001,s+d);o.connect(g);g.connect(c.destination);o.start(s);o.stop(s+d+.02);}
+var S={tap:function(){beep(660,.06,'square',.05);},pop:function(){beep(520,.05,'triangle',.09);beep(780,.08,'triangle',.07,.05);},coin:function(){beep(988,.07,'square',.08);beep(1319,.16,'square',.07,.07);},win:function(){[523,659,784,1047].forEach(function(f,i){beep(f,.16,'triangle',.09,i*.09);});},nope:function(){beep(200,.16,'sawtooth',.05);},plop:function(){beep(300,.06,'sine',.1);beep(430,.09,'sine',.08,.05);}};
+
+/* ---------- confetti ---------- */
+var cv=document.getElementById('fx'),c2=cv.getContext('2d'),bits=[];
+function size(){cv.width=innerWidth;cv.height=innerHeight;}size();addEventListener('resize',size);
+var COLORS=['#FF5A5A','#FFC93C','#4C9BFF','#A971F5','#2ECC71','#FFFFFF'];
+function burst(x,y,n,p){for(var i=0;i<(n||24);i++){var a=Math.random()*Math.PI*2,sp=Math.random()*(p||7)+2;bits.push({x:x,y:y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-3,s:4+Math.random()*7,r:Math.random()*6,vr:(Math.random()-.5)*.5,c:COLORS[Math.floor(Math.random()*COLORS.length)],life:1});}}
+function rain(n){for(var i=0;i<(n||80);i++)bits.push({x:Math.random()*cv.width,y:-20-Math.random()*300,vx:(Math.random()-.5)*2,vy:2+Math.random()*4,s:6+Math.random()*9,r:Math.random()*6,vr:(Math.random()-.5)*.4,c:COLORS[Math.floor(Math.random()*COLORS.length)],life:1});}
+(function loop(){c2.clearRect(0,0,cv.width,cv.height);for(var i=bits.length-1;i>=0;i--){var b=bits[i];b.vy+=.28;b.x+=b.vx;b.y+=b.vy;b.r+=b.vr;b.life-=.006;if(b.life<=0||b.y>cv.height+60){bits.splice(i,1);continue;}c2.save();c2.translate(b.x,b.y);c2.rotate(b.r);c2.globalAlpha=Math.max(0,Math.min(1,b.life*1.6));c2.fillStyle=b.c;c2.fillRect(-b.s/2,-b.s/2,b.s,b.s*.66);c2.restore();}requestAnimationFrame(loop);})();
+function burstAt(el,n,p){var r=el.getBoundingClientRect();burst(r.left+r.width/2,r.top+r.height/2,n||22,p||8);}
+
+/* ---------- toast ---------- */
+var toastT;
+function toast(msg,warn){var t=document.getElementById('toast');t.textContent=msg;t.className=warn?'show warn':'show';clearTimeout(toastT);toastT=setTimeout(function(){t.className='';},2400);}
+
+/* ---------- routing ---------- */
+function go(id){document.querySelectorAll('.screen').forEach(function(s){s.classList.toggle('on',s.id==='s-'+id);});document.querySelectorAll('#switcher button').forEach(function(b){b.classList.toggle('on',b.dataset.go===id);});scrollTo(0,0);S.tap();}
+document.addEventListener('click',function(e){var t=e.target.closest('[data-go]');if(t)go(t.dataset.go);});
+
+/* ============================================================
+   BUILD MODE
+   ============================================================ */
+var W=18,H=12;
+var wallet={b:320,s:45,c:140};
+function hud(){document.getElementById('nB').textContent=wallet.b;document.getElementById('nS').textContent=wallet.s;document.getElementById('nC').textContent=wallet.c;var c2el=document.getElementById('nC2');if(c2el)c2el.textContent=wallet.c;}
+function flash(id){var el=document.getElementById(id);el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');}
+
+var CATS=[
+  {id:'nature',n:'🌳 Nature'},
+  {id:'home',n:'🏠 Home'},
+  {id:'animals',n:'🐾 Animals'},
+  {id:'fun',n:'🎡 Rides'},
+  {id:'farm',n:'🌾 Farm'},
+  {id:'critters',n:'📦 My Critters'},
+  {id:'scholar',n:'🔭 Scholar'}
+];
+var ITEMS=[
+  {e:'🌳',n:'Oak tree',cat:'nature',b:15,s:3},{e:'🌲',n:'Pine',cat:'nature',b:15,s:3},
+  {e:'🌸',n:'Blossom',cat:'nature',b:8,s:2},{e:'🌻',n:'Sunflower',cat:'nature',b:8,s:2},
+  {e:'⛰️',n:'Boulder',cat:'nature',b:20,s:4},{e:'⛲',n:'Fountain',cat:'nature',b:120,s:22,size:44},
+  {e:'🏠',n:'House',cat:'home',b:250,s:40,size:46},{e:'🛖',n:'Hut',cat:'home',b:120,s:20,size:40},
+  {e:'🪑',n:'Chair',cat:'home',b:10,s:2},{e:'🛋️',n:'Sofa',cat:'home',b:35,s:6},
+  {e:'💡',n:'Lamp',cat:'home',b:12,s:2},{e:'⛺',n:'Tent',cat:'home',b:60,s:12,size:40},
+  {e:'🏰',n:'Castle',cat:'home',b:900,s:150,size:52,lock:'Level 10'},
+  {e:'🐕',n:'Dog',cat:'animals',b:80,s:15},{e:'🐈',n:'Cat',cat:'animals',b:80,s:15},
+  {e:'🦆',n:'Duck',cat:'animals',b:40,s:8},{e:'🐇',n:'Bunny',cat:'animals',b:40,s:8},
+  {e:'🦄',n:'Unicorn',cat:'animals',b:400,s:70,lock:'Level 9'},
+  {e:'🎡',n:'Ferris wheel',cat:'fun',b:600,s:110,size:52},{e:'🎢',n:'Coaster',cat:'fun',b:900,s:160,size:54},
+  {e:'🎠',n:'Carousel',cat:'fun',b:350,s:60,size:46},{e:'🛝',n:'Slide',cat:'fun',b:90,s:18,size:40},
+  {e:'🎪',n:'Big top',cat:'fun',b:450,s:80,size:50},
+  {e:'🌾',n:'Wheat',cat:'farm',b:10,s:2},{e:'🚜',n:'Tractor',cat:'farm',b:150,s:28,size:40},
+  {e:'🐄',n:'Cow',cat:'farm',b:100,s:18},{e:'🐔',n:'Chicken',cat:'farm',b:45,s:9},{e:'🛖',n:'Barn',cat:'farm',b:200,s:35,size:44},
+  {e:'🐙',n:'Inky',cat:'critters',free:true},{e:'🦊',n:'Swift',cat:'critters',free:true},
+  {e:'🐸',n:'Hopper',cat:'critters',free:true},{e:'🦖',n:'Rex',cat:'critters',free:true},{e:'🐉',n:'Legend!',cat:'critters',free:true},
+  {e:'🔭',n:'Observatory',cat:'scholar',b:200,s:35,size:46,badge:'×7 tables mastered ✓'},
+  {e:'📚',n:'Library',cat:'scholar',b:180,s:30,size:42,lockBadge:'Read 50 passages'},
+  {e:'🤖',n:'Robot lab',cat:'scholar',b:300,s:50,size:46,lockBadge:'Division mastery'},
+  {e:'🏆',n:'Gold statue',cat:'scholar',b:150,s:25,lockBadge:'30-day streak'}
+];
+var curCat='nature',curItem=null,curTool='build';
+
+var palTabs=document.getElementById('palTabs'),palGrid=document.getElementById('palGrid');
+CATS.forEach(function(c){
+  var b=document.createElement('button');b.className='pal__tab'+(c.id===curCat?' on':'');b.textContent=c.n;
+  b.addEventListener('click',function(){curCat=c.id;S.tap();palTabs.querySelectorAll('.pal__tab').forEach(function(x){x.classList.remove('on');});b.classList.add('on');renderPal();});
+  palTabs.appendChild(b);
+});
+function renderPal(){
+  palGrid.innerHTML='';
+  ITEMS.filter(function(i){return i.cat===curCat;}).forEach(function(it){
+    var d=document.createElement('div');
+    var locked=it.lock||it.lockBadge;
+    d.className='pitem'+(locked?' locked':'')+(it.free?' free':'')+(curItem===it?' sel':'');
+    var cost=it.free?'<div class="pitem__c">FREE ✓</div>':
+      '<div class="pitem__c"><b class="cost-b">🧱'+it.b+'</b><b class="cost-s">⚡'+it.s+'</b></div>';
+    if(locked)cost='<div class="pitem__c" style="color:var(--ac-text-mute)">'+(it.lock||it.lockBadge)+'</div>';
+    if(it.badge)cost='<div class="pitem__c" style="color:var(--ac-good)">'+it.badge+'</div>'+cost;
+    d.innerHTML='<div class="pitem__e">'+it.e+'</div><div class="pitem__n">'+it.n+'</div>'+cost;
+    d.addEventListener('click',function(){
+      if(locked){S.nope();d.animate([{transform:'translateX(0)'},{transform:'translateX(-5px)'},{transform:'translateX(5px)'},{transform:'translateX(0)'}],{duration:220});toast(it.lock?('🔒 Unlocks at '+it.lock):'🏅 Earn it: '+it.lockBadge,false);return;}
+      curItem=it;curTool='build';syncTools();renderPal();S.pop();
+    });
+    palGrid.appendChild(d);
+  });
+}
+renderPal();
+
+document.querySelectorAll('.tool').forEach(function(t){
+  t.addEventListener('click',function(){curTool=t.dataset.tool;if(curTool!=='build')curItem=null;syncTools();renderPal();S.tap();});
+});
+function syncTools(){document.querySelectorAll('.tool').forEach(function(t){t.classList.toggle('on',t.dataset.tool===curTool);});}
+
+function buildWorld(el,cols,rows){
+  el.style.gridTemplateColumns='repeat('+cols+',36px)';
+  for(var i=0;i<cols*rows;i++){var c=document.createElement('div');c.className='cell';c.dataset.i=i;el.appendChild(c);}
+}
+var world=document.getElementById('world');
+buildWorld(world,W,H);
+
+function placeItem(el,it,x,y,mine){
+  var sp=document.createElement('span');
+  sp.className='item new';sp.textContent=it.e;
+  var fs=it.size||30;
+  sp.style.fontSize=fs+'px';
+  sp.style.width='36px';sp.style.height='36px';
+  sp.style.left=(x*36)+'px';sp.style.top=(y*36-(fs>36?fs-32:0))+'px';
+  sp.dataset.b=it.b||0;sp.dataset.s=it.s||0;
+  if(mine)sp.addEventListener('click',function(ev){
+    ev.stopPropagation();
+    if(curTool==='erase'){
+      wallet.b+=+sp.dataset.b;wallet.s+=+sp.dataset.s;hud();flash('hudB');flash('hudS');
+      S.pop();burstAt(sp,10,5);sp.remove();
+      toast('📦 Put away — materials refunded!');
+    }
+  });
+  el.appendChild(sp);
+  setTimeout(function(){sp.classList.remove('new');},350);
+  return sp;
+}
+
+world.addEventListener('click',function(e){
+  var cell=e.target.closest('.cell');if(!cell)return;
+  var i=+cell.dataset.i,x=i%W,y=Math.floor(i/W);
+  if(curTool==='path'||curTool==='water'){
+    if(wallet.b<1){toast('🧱 Out of bricks — play a learning game!',true);S.nope();return;}
+    wallet.b-=1;hud();flash('hudB');
+    cell.className='cell t-'+(curTool==='path'?'path':'water');S.tap();return;
+  }
+  if(curTool==='erase'){cell.className='cell';return;}
+  if(!curItem){toast('Pick something from the shelf first 👉');return;}
+  var it=curItem;
+  if(!it.free){
+    if(wallet.b<it.b){toast('🧱 Not enough bricks — Math Defender pays them!',true);S.nope();flash('hudB');return;}
+    if(wallet.s<it.s){toast('⚡ Out of sparks — go play Block Stacker!',true);S.nope();flash('hudS');return;}
+    wallet.b-=it.b;wallet.s-=it.s;hud();flash('hudB');flash('hudS');
+  }
+  placeItem(world,it,x,y,true);
+  S.plop();var r=cell.getBoundingClientRect();burst(r.left+18,r.top+18,12,5);
+});
+
+document.getElementById('saveBtn').addEventListener('click',function(e){
+  burstAt(e.currentTarget,26,8);S.win();toast('💾 Saved! Friends can visit Frogtopia.');
+});
+
+/* starter scene so it isn't empty */
+[['🌳',2,2],['🌳',15,1],['🌸',4,3],['🛖',8,2],['🐸',5,6],['🦆',12,8],['🌻',3,8],['⛺',14,5]].forEach(function(p){
+  var it=ITEMS.find(function(x){return x.e===p[0];})||{e:p[0],b:0,s:0};
+  placeItem(world,it,p[1],p[2],true);
+});
+/* a couple of water cells */
+[186,187,168,169].forEach(function(i){var c=world.querySelector('[data-i="'+i+'"]');if(c)c.className='cell t-water';});
+hud();
+
+/* ============================================================
+   AVATAR STUDIO
+   ============================================================ */
+var doll={skin:'#F5C9A2',hairC:'#6B4226',hair:'short',top:'#FF5A5A',acc:null};
+var SKINS=['#FBE0C4','#F5C9A2','#D9A066','#A8703D','#6E4A2A'];
+var HAIRC=['#1E2B63','#6B4226','#E8B24A','#D64545','#8E44AD','#2ECC71'];
+var TOPS=['#FF5A5A','#4C9BFF','#FFC93C','#A971F5','#2ECC71','#FF8AC2'];
+var HAIRS=[
+  {id:'short',n:'✂️',d:'M52 52 Q60 22 90 22 Q120 22 128 52 Q118 36 90 36 Q62 36 52 52 Z'},
+  {id:'spiky',n:'⚡',d:'M50 54 L58 30 L66 44 L74 24 L84 40 L92 22 L102 40 L112 28 L122 46 L130 54 Q112 34 90 34 Q66 34 50 54 Z'},
+  {id:'long',n:'🌊',d:'M50 52 Q58 20 90 20 Q122 20 130 52 L132 96 Q124 88 118 92 L116 56 Q108 36 90 36 Q72 36 64 56 L62 92 Q56 88 48 96 Z'},
+  {id:'curly',n:'🌀',d:'M52 50 Q50 30 66 30 Q66 16 84 20 Q92 10 102 20 Q118 16 116 32 Q132 34 126 52 Q112 34 90 34 Q66 34 52 50 Z'},
+  {id:'none',n:'🧢',d:''}
+];
+var ACCS=[{id:null,n:'—'},{id:'glasses',n:'👓'},{id:'cap',n:'🧢'},{id:'crown',n:'👑',lock:'🪙 300'},{id:'cape',n:'🦸',lock:'Lvl 8'}];
+
+function drawDoll(){
+  document.getElementById('d-head').setAttribute('fill',doll.skin);
+  document.getElementById('d-handL').setAttribute('fill',doll.skin);
+  document.getElementById('d-handR').setAttribute('fill',doll.skin);
+  ['d-top','d-armL','d-armR'].forEach(function(id){document.getElementById(id).setAttribute('fill',doll.top);});
+  var hg=document.getElementById('d-hair');hg.innerHTML='';
+  var h=HAIRS.find(function(x){return x.id===doll.hair;});
+  if(h&&h.d){var p=document.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d',h.d);p.setAttribute('fill',doll.hairC);p.setAttribute('stroke','#1E2B63');p.setAttribute('stroke-width','4');hg.appendChild(p);}
+  var ag=document.getElementById('d-acc');ag.innerHTML='';
+  if(doll.acc==='glasses')ag.innerHTML='<circle cx="76" cy="64" r="11" fill="none" stroke="#1E2B63" stroke-width="4"/><circle cx="104" cy="64" r="11" fill="none" stroke="#1E2B63" stroke-width="4"/><line x1="87" y1="64" x2="93" y2="64" stroke="#1E2B63" stroke-width="4"/>';
+  if(doll.acc==='cap')ag.innerHTML='<path d="M50 52 Q60 24 90 24 Q120 24 130 52 Z" fill="#4C9BFF" stroke="#1E2B63" stroke-width="4"/><rect x="118" y="44" width="30" height="10" rx="5" fill="#4C9BFF" stroke="#1E2B63" stroke-width="4"/>';
+}
+function swRow(id,vals,key){
+  var el=document.getElementById(id);
+  vals.forEach(function(v,ix){
+    var o=document.createElement('div');o.className='opt opt--sw'+(doll[key]===v?' on':'');o.style.background=v;
+    o.addEventListener('click',function(){doll[key]=v;el.querySelectorAll('.opt').forEach(function(x){x.classList.remove('on');});o.classList.add('on');drawDoll();S.pop();burstAt(o,8,4);});
+    el.appendChild(o);
+  });
+}
+swRow('optSkin',SKINS,'skin');
+swRow('optHairC',HAIRC,'hairC');
+swRow('optTop',TOPS,'top');
+var oh=document.getElementById('optHair');
+HAIRS.forEach(function(h){
+  var o=document.createElement('div');o.className='opt'+(doll.hair===h.id?' on':'');o.textContent=h.n;
+  o.addEventListener('click',function(){doll.hair=h.id;oh.querySelectorAll('.opt').forEach(function(x){x.classList.remove('on');});o.classList.add('on');drawDoll();S.pop();});
+  oh.appendChild(o);
+});
+var oa=document.getElementById('optAcc');
+ACCS.forEach(function(a){
+  var o=document.createElement('div');o.className='opt'+(a.lock?' locked':'')+(doll.acc===a.id?' on':'');
+  o.innerHTML=a.n+(a.lock?'<small>'+a.lock+'</small>':'');
+  o.addEventListener('click',function(){
+    if(a.lock){S.nope();toast('🔒 '+a.lock+' to unlock');o.animate([{transform:'translateX(0)'},{transform:'translateX(-5px)'},{transform:'translateX(5px)'},{transform:'translateX(0)'}],{duration:220});return;}
+    doll.acc=a.id;oa.querySelectorAll('.opt').forEach(function(x){x.classList.remove('on');});o.classList.add('on');drawDoll();S.pop();
+  });
+  oa.appendChild(o);
+});
+drawDoll();
+document.getElementById('saveLook').addEventListener('click',function(e){burstAt(e.currentTarget,30,9);rain(50);S.win();toast('🎨 Looking good, SuperMiles!');});
+
+/* ============================================================
+   FRIEND WORLD
+   ============================================================ */
+var fw=document.getElementById('friendWorld');
+buildWorld(fw,W,H);
+[[64,'t-path'],[65,'t-path'],[66,'t-path'],[84,'t-path'],[102,'t-path'],[30,'t-water'],[31,'t-water'],[48,'t-water'],[49,'t-water']].forEach(function(p){var c=fw.querySelector('[data-i="'+p[0]+'"]');if(c)c.className='cell '+p[1];});
+[['🏰',3,1,52],['🎢',12,1,54],['🎡',15,6,52],['🌲',1,7,30],['🌲',8,9,30],['🦖',6,5,34],['🐉',10,3,34],['🚜',2,10,38],['🐄',4,9,30],['⛲',9,7,44],['🌸',14,10,26],['🏆',7,2,30]].forEach(function(p){
+  placeItem(fw,{e:p[0],size:p[3]},p[1],p[2],false);
+});
+/* wandering critter */
+var rex=fw.querySelector('.item:nth-of-type(6)');
+if(rex){rex.classList.add('wander');setInterval(function(){rex.style.left=(Math.floor(Math.random()*14)+2)*36+'px';rex.style.top=(Math.floor(Math.random()*8)+2)*36+'px';},2200);}
+
+document.getElementById('hifive').addEventListener('click',function(){
+  var b=this;
+  burstAt(b,50,11);rain(80);S.win();
+  wallet.c+=2;hud();
+  b.disabled=true;b.innerHTML='🖐️ HIGH-FIVED! See you tomorrow';
+  document.getElementById('visitMsg').innerHTML='Jackson got <b>+5🪙</b> — and you got <b>+2🪙</b> for being a good friend! 🎉';
+});
+document.querySelectorAll('.react').forEach(function(r){
+  r.addEventListener('click',function(){r.classList.add('done');S.coin();burstAt(r,16,6);toast(r.dataset.r+' sent to JAX3000!');});
+});
+})();
+</script>
+</body>
+</html>

@@ -58,6 +58,11 @@
     border-radius:8px; background:#fff; cursor:pointer; margin:4px 6px 0 0;
   }
   button.plain:hover{ border-color:var(--accent); }
+  input.pw{
+    display:block; width:100%; font:inherit; font-size:14px; padding:8px 12px;
+    border:1px solid var(--line); border-radius:8px; margin-bottom:8px;
+  }
+  input.pw:focus{ outline:none; border-color:var(--accent); }
   details{ margin-top:8px; }
   summary{ cursor:pointer; font-size:14px; color:var(--accent); }
   @media print{ .back, .noprint{ display:none; } body{ background:#fff; } .card{ border:none; padding:10px 0; } }
@@ -96,6 +101,23 @@
 
     <div id="kids"></div>
 
+    <!-- Account settings live here on purpose: this page is already the
+         parents-only area, behind the login and away from the kids' UI. -->
+    <div class="card noprint">
+      <details id="pwDetails">
+        <summary>Change password</summary>
+        <div style="max-width:340px;margin-top:12px">
+          <p class="muted" id="pwIntro" style="margin-top:0">Enter your current password first —
+             changing it always requires knowing the old one.</p>
+          <input class="pw" id="pwCurrent" type="password" placeholder="Current password" autocomplete="current-password">
+          <input class="pw" id="pwNew" type="password" placeholder="New password (6+ characters)" autocomplete="new-password">
+          <input class="pw" id="pwConfirm" type="password" placeholder="Confirm new password" autocomplete="new-password">
+          <button class="plain" id="pwSubmit">Change password</button>
+          <p class="muted" id="pwMsg" style="min-height:1.2em"></p>
+        </div>
+      </details>
+    </div>
+
     <p class="muted noprint">Signed in as <span id="who"></span>
        · <button class="linkish" id="refreshBtn">Refresh</button>
        · <button class="linkish" onclick="window.print()">Print / save PDF</button></p>
@@ -103,7 +125,8 @@
 </div>
 
 <script type="module">
-import { onParentChange, listChildren, listFamilyCharacters, listSessions, db, auth }
+import { onParentChange, listChildren, listFamilyCharacters, listSessions,
+         changeParentPassword, db, auth }
   from '../firebase-config.js';
 import { GAMES } from '../assets/catalog.js';
 import { collection, doc, writeBatch, Timestamp }
@@ -299,10 +322,51 @@ onParentChange(async (user) => {
   $('gate').classList.add('hidden');
   $('report').classList.remove('hidden');
   $('who').textContent = user.email || 'your family account';
+  pwSetupFor(user);
   renderFamily();
 });
 
 $('refreshBtn').addEventListener('click', renderFamily);
+
+/* ---------------- change password ---------------- */
+function pwSetupFor(user){
+  // A Google-only account has no arcade password to change.
+  const hasPassword = (user.providerData || []).some((p) => p.providerId === 'password');
+  if (!hasPassword){
+    $('pwIntro').textContent = 'Your family signs in with Google, so there is no arcade password to change — manage it in your Google account.';
+    ['pwCurrent','pwNew','pwConfirm','pwSubmit'].forEach((id) => $(id).classList.add('hidden'));
+  } else {
+    ['pwCurrent','pwNew','pwConfirm','pwSubmit'].forEach((id) => $(id).classList.remove('hidden'));
+  }
+}
+
+$('pwSubmit').addEventListener('click', async () => {
+  const current = $('pwCurrent').value;
+  const next = $('pwNew').value;
+  const confirm2 = $('pwConfirm').value;
+  const msg = $('pwMsg');
+  msg.textContent = '';
+  if (!current){ msg.textContent = 'Enter your current password first.'; return; }
+  if (next.length < 6){ msg.textContent = 'The new password needs at least 6 characters.'; return; }
+  if (next !== confirm2){ msg.textContent = "Those new passwords don't match."; return; }
+  $('pwSubmit').disabled = true;
+  msg.textContent = 'Changing…';
+  try {
+    await changeParentPassword(current, next);
+    ['pwCurrent','pwNew','pwConfirm'].forEach((id) => { $(id).value = ''; });
+    msg.textContent = 'Password changed. You stay signed in here; other devices will need the new one.';
+  } catch (e) {
+    const map = {
+      'auth/wrong-password': 'That current password is wrong.',
+      'auth/invalid-credential': 'That current password is wrong.',
+      'auth/weak-password': 'The new password is too weak — use at least 6 characters.',
+      'auth/too-many-requests': 'Too many tries — wait a few minutes and try again.',
+      'auth/requires-recent-login': 'For safety, log out and sign back in, then try again.',
+    };
+    msg.textContent = map[e.code] || 'That didn’t work — check the internet and try again.';
+  }
+  $('pwSubmit').disabled = false;
+});
 </script>
 </body>
 </html>

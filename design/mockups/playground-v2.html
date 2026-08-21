@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jackson &amp; Miles Arcade — Playground v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   PLAYGROUND v2 — same tokens as v1, new screens:
+   Character Home · Friends & Trades · Parent Portal
+   ============================================================ */
+:root{
+  --ac-sky-top:#79D2FF; --ac-sky-mid:#A8E4FF; --ac-sky-bot:#D6F3FF;
+  --ac-grass:#5FD963; --ac-grass-deep:#31A84A;
+  --ac-panel:#FFFFFF; --ac-panel-2:#FFF4DA;
+  --ac-edge:#1E2B63; --ac-line:#C8D6F5;
+  --ac-text:#1E2B63; --ac-text-dim:#5C6EA8; --ac-text-mute:#8E9BC4;
+  --ac-red:#FF5A5A; --ac-red-deep:#D62A2A;
+  --ac-yellow:#FFC93C; --ac-yellow-deep:#E39B00;
+  --ac-blue:#4C9BFF; --ac-blue-deep:#1F5FD6;
+  --ac-purple:#A971F5; --ac-purple-deep:#7433CE;
+  --ac-good:#2ECC71; --ac-bad:#FF4D4D;
+  --ac-radius:24px; --ac-radius-sm:14px; --ac-bd:4px; --ac-lift:7px;
+  --ac-font:'Baloo 2','Arial Rounded MT Bold','Trebuchet MS',system-ui,sans-serif;
+
+  /* rarity */
+  --rar-common:#9BB1D4; --rar-rare:#4C9BFF; --rar-epic:#A971F5; --rar-legend:#FFC93C;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{font-family:var(--ac-font);color:var(--ac-text);background:var(--ac-sky-bot);overflow-x:hidden;font-weight:700}
+button{font-family:inherit;font-weight:800;cursor:pointer}
+h1,h2,h3,h4{margin:0}
+
+@keyframes shake{0%,100%{transform:translate(0,0)}20%{transform:translate(-6px,3px) rotate(-.4deg)}40%{transform:translate(5px,-4px) rotate(.4deg)}60%{transform:translate(-4px,-2px)}80%{transform:translate(3px,3px)}}
+body.shake #app{animation:shake .32s ease}
+
+/* ---------- buttons ---------- */
+.ac-btn{
+  position:relative;display:inline-flex;align-items:center;justify-content:center;gap:.5em;
+  padding:14px 26px;font-size:20px;letter-spacing:.3px;color:#fff;
+  background:linear-gradient(180deg,var(--ac-red) 0%,var(--ac-red-deep) 100%);
+  border:var(--ac-bd) solid var(--ac-edge);border-radius:var(--ac-radius-sm);
+  box-shadow:0 var(--ac-lift) 0 var(--ac-edge),0 calc(var(--ac-lift) + 6px) 14px rgba(30,43,99,.25);
+  text-shadow:0 2px 0 rgba(0,0,0,.22);
+  transition:transform .06s,box-shadow .06s,filter .12s;text-decoration:none;
+}
+.ac-btn:hover{filter:brightness(1.06)}
+.ac-btn:active{transform:translateY(var(--ac-lift));box-shadow:0 0 0 var(--ac-edge),0 2px 4px rgba(30,43,99,.3)}
+.ac-btn--yellow{background:linear-gradient(180deg,var(--ac-yellow),var(--ac-yellow-deep));color:var(--ac-edge);text-shadow:0 2px 0 rgba(255,255,255,.45)}
+.ac-btn--blue{background:linear-gradient(180deg,var(--ac-blue),var(--ac-blue-deep))}
+.ac-btn--purple{background:linear-gradient(180deg,var(--ac-purple),var(--ac-purple-deep))}
+.ac-btn--green{background:linear-gradient(180deg,#63E08A,#23A354)}
+.ac-btn--outline{background:var(--ac-panel);color:var(--ac-text);text-shadow:none}
+.ac-btn--sm{padding:8px 16px;font-size:15px;border-width:3px;--ac-lift:4px;border-radius:11px}
+.ac-btn--xl{padding:22px 44px;font-size:30px;border-radius:24px;--ac-lift:10px}
+.ac-btn:disabled{filter:grayscale(.7) brightness(.9);cursor:not-allowed}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.045)}}
+.ac-btn--play{animation:breathe 1.6s ease-in-out infinite}
+.ac-btn--play:active{animation:none}
+
+/* ---------- badge ---------- */
+.ac-badge{display:inline-block;padding:4px 12px;font-size:12px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--ac-edge);background:var(--ac-panel-2);border:3px solid var(--ac-edge);border-radius:999px;white-space:nowrap}
+.ac-badge--blue{background:#CBE4FF}
+.ac-badge--purple{background:#E9DAFF}
+.ac-badge--green{background:#CFF6D9}
+.ac-badge--warn{background:#FFD9D9}
+.ac-badge--hot{background:var(--ac-yellow);animation:breathe 1.8s ease-in-out infinite}
+
+/* ---------- cards / tiles ---------- */
+.ac-card{background:var(--ac-panel);border:var(--ac-bd) solid var(--ac-edge);border-radius:var(--ac-radius);box-shadow:0 var(--ac-lift) 0 var(--ac-edge),0 16px 30px rgba(30,43,99,.18);padding:24px}
+.ac-tile{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;padding:18px 14px 16px;background:var(--ac-panel);border:var(--ac-bd) solid var(--ac-edge);border-radius:var(--ac-radius);box-shadow:0 var(--ac-lift) 0 var(--ac-edge),0 12px 22px rgba(30,43,99,.16);text-align:center;cursor:pointer;transition:transform .12s cubic-bezier(.34,1.6,.64,1),box-shadow .12s}
+.ac-tile:hover{transform:translateY(-5px);box-shadow:0 calc(var(--ac-lift) + 5px) 0 var(--ac-edge),0 20px 30px rgba(30,43,99,.22)}
+.ac-tile:active{transform:translateY(var(--ac-lift));box-shadow:0 0 0 var(--ac-edge)}
+@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.floaty{animation:floaty 3.4s ease-in-out infinite}
+
+/* ---------- bar ---------- */
+.ac-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;margin-bottom:18px;background:var(--ac-panel);border:var(--ac-bd) solid var(--ac-edge);border-radius:999px;box-shadow:0 5px 0 var(--ac-edge)}
+.ac-bar__who{display:flex;align-items:center;gap:9px;padding:5px 14px 5px 5px;margin-right:auto;background:var(--ac-panel-2);border:3px solid var(--ac-edge);border-radius:999px}
+.ac-avatar{width:36px;height:36px;flex:none;border-radius:50%;display:grid;place-items:center;font-size:21px;border:3px solid var(--ac-edge)}
+.ac-bar__label{font-size:11px;letter-spacing:1px;color:var(--ac-text-mute);line-height:1;text-transform:uppercase}
+.ac-bar__name{font-size:17px;line-height:1.1}
+
+/* ---------- modal ---------- */
+.ac-modal{position:fixed;inset:0;z-index:60;display:none;place-items:center;padding:20px;background:rgba(30,43,99,.55);backdrop-filter:blur(4px)}
+.ac-modal.open{display:grid}
+@keyframes pop{from{transform:scale(.82) translateY(20px);opacity:0}to{transform:none;opacity:1}}
+.ac-modal-card{width:min(460px,100%);animation:pop .26s cubic-bezier(.34,1.5,.64,1);max-height:86vh;overflow:auto}
+
+/* ---------- page scaffold ---------- */
+.ac-page{position:relative;min-height:100vh;padding:78px 18px 120px;overflow:hidden}
+.ac-wrap{width:min(880px,100%);margin:0 auto;position:relative;z-index:2}
+.sky{position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,var(--ac-sky-top),var(--ac-sky-mid) 55%,var(--ac-sky-bot))}
+.hills{position:absolute;left:0;right:0;bottom:0;height:230px;z-index:0}
+.cloud{position:absolute;z-index:1;opacity:.92;pointer-events:none}
+@keyframes drift{from{transform:translateX(-30vw)}to{transform:translateX(115vw)}}
+.coin{position:absolute;z-index:1;font-size:26px;pointer-events:none;opacity:.9}
+@keyframes rise{0%{transform:translateY(0) rotateY(0);opacity:0}12%{opacity:.95}100%{transform:translateY(-70vh) rotateY(1080deg);opacity:0}}
+
+.section-head{display:flex;align-items:center;gap:12px;margin:30px 0 14px}
+.section-head__ribbon{padding:7px 20px;font-size:15px;letter-spacing:1.4px;text-transform:uppercase;color:#fff;background:var(--ac-edge);border-radius:999px;box-shadow:0 4px 0 rgba(30,43,99,.35)}
+.section-head__rule{flex:1;height:5px;border-radius:99px;background:repeating-linear-gradient(90deg,var(--ac-edge) 0 12px,transparent 12px 24px);opacity:.35}
+.grid{display:grid;gap:18px}
+.grid--3{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.grid--2{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+
+.logo{text-align:center;position:relative;z-index:3}
+.logo__kicker{display:inline-block;padding:5px 18px;margin-bottom:6px;font-size:15px;letter-spacing:3px;text-transform:uppercase;color:#fff;background:var(--ac-edge);border-radius:999px}
+.logo__word{font-size:clamp(52px,12vw,110px);line-height:.92;letter-spacing:2px;color:var(--ac-yellow);-webkit-text-stroke:9px var(--ac-edge);paint-order:stroke fill;filter:drop-shadow(0 9px 0 rgba(30,43,99,.35))}
+.logo__word span{display:inline-block;animation:hop 2.4s ease-in-out infinite}
+@keyframes hop{0%,72%,100%{transform:translateY(0)}80%{transform:translateY(-16px)}88%{transform:translateY(0)}}
+
+.ticker{display:flex;align-items:center;gap:10px;justify-content:center;margin:16px auto 0;padding:9px 18px;max-width:560px;background:rgba(255,255,255,.85);border:3px solid var(--ac-edge);border-radius:999px;font-size:16px}
+.ticker__dot{width:11px;height:11px;flex:none;border-radius:50%;background:var(--ac-good);box-shadow:0 0 0 0 rgba(46,204,113,.7);animation:ping 1.4s infinite}
+@keyframes ping{70%{box-shadow:0 0 0 11px rgba(46,204,113,0)}100%{box-shadow:0 0 0 0 rgba(46,204,113,0)}}
+.ticker__msg{text-align:left;min-width:0}
+.ticker__msg.swap{animation:swapIn .45s ease}
+@keyframes swapIn{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
+
+.mascot{width:110px;height:110px;animation:floaty 2.8s ease-in-out infinite}
+.mascot.cheer{animation:cheer .5s ease}
+@keyframes cheer{0%,100%{transform:translateY(0) rotate(0)}30%{transform:translateY(-24px) rotate(-9deg)}60%{transform:translateY(-8px) rotate(7deg)}}
+.corner{position:absolute;top:14px;z-index:5;display:flex;gap:8px}
+.corner--l{left:16px}.corner--r{right:16px}
+
+/* ---------- game of the day banner ---------- */
+.gotd{
+  display:flex;align-items:center;gap:16px;margin:22px auto 0;padding:14px 20px;max-width:560px;
+  background:linear-gradient(135deg,#FFE9A8,#FFC93C 60%,#FFB020);
+  border:var(--ac-bd) solid var(--ac-edge);border-radius:var(--ac-radius);
+  box-shadow:0 var(--ac-lift) 0 var(--ac-edge);text-align:left;cursor:pointer;
+  transition:transform .12s cubic-bezier(.34,1.6,.64,1);
+}
+.gotd:hover{transform:translateY(-4px)}
+.gotd__icon{width:64px;height:64px;flex:none;display:grid;place-items:center;font-size:34px;background:#fff;border:var(--ac-bd) solid var(--ac-edge);border-radius:50%;box-shadow:inset 0 -5px 0 rgba(0,0,0,.12)}
+.gotd__timer{font-size:13px;color:#7A4E00}
+
+/* ============================================================
+   CHARACTER HOME
+   ============================================================ */
+.hero{
+  display:flex;gap:22px;align-items:center;flex-wrap:wrap;
+  padding:22px 26px;background:linear-gradient(135deg,#E9F6FF,#FFFFFF 55%);
+  border:var(--ac-bd) solid var(--ac-edge);border-radius:var(--ac-radius);
+  box-shadow:0 var(--ac-lift) 0 var(--ac-edge),0 16px 30px rgba(30,43,99,.16);
+}
+.hero__stage{position:relative;width:150px;height:150px;flex:none;display:grid;place-items:center;background:radial-gradient(circle at 50% 35%,#FFF6D8,#FFE49A);border:5px solid var(--ac-edge);border-radius:50%;box-shadow:inset 0 -9px 0 rgba(0,0,0,.1)}
+.hero__avatar{font-size:76px;line-height:1;animation:floaty 2.6s ease-in-out infinite}
+.hero__pet{position:absolute;right:-8px;bottom:-4px;width:52px;height:52px;display:grid;place-items:center;font-size:29px;background:#fff;border:4px solid var(--ac-edge);border-radius:50%;animation:floaty 2.6s ease-in-out .6s infinite}
+.hero__lvl{position:absolute;left:-10px;top:-6px;padding:5px 12px;font-size:15px;color:var(--ac-edge);background:var(--ac-yellow);border:3px solid var(--ac-edge);border-radius:999px;box-shadow:0 3px 0 var(--ac-edge)}
+.xpbar{position:relative;height:26px;background:var(--ac-panel-2);border:3px solid var(--ac-edge);border-radius:999px;overflow:hidden}
+.xpbar__fill{height:100%;width:52%;border-radius:999px;background:linear-gradient(90deg,#63E08A,#23A354);box-shadow:inset 0 -6px 0 rgba(0,0,0,.14);transition:width .6s cubic-bezier(.34,1.3,.64,1)}
+.xpbar__label{position:absolute;inset:0;display:grid;place-items:center;font-size:13.5px;color:var(--ac-edge)}
+.purse{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.purse__pill{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;font-size:16px;background:var(--ac-panel-2);border:3px solid var(--ac-edge);border-radius:999px}
+
+/* equip chips */
+.equip-row{display:flex;gap:12px;flex-wrap:wrap}
+.equip{
+  display:flex;flex-direction:column;align-items:center;gap:5px;width:86px;padding:10px 6px;
+  background:var(--ac-panel);border:3px solid var(--ac-line);border-radius:var(--ac-radius-sm);
+  cursor:pointer;transition:transform .12s cubic-bezier(.34,1.6,.64,1),border-color .12s;
+}
+.equip:hover{transform:translateY(-4px)}
+.equip__icon{font-size:34px;line-height:1.2}
+.equip__name{font-size:12px;color:var(--ac-text-dim);line-height:1.1;text-align:center}
+.equip.on{border-color:var(--ac-edge);background:var(--ac-panel-2);box-shadow:0 4px 0 var(--ac-edge)}
+.equip.on::after{content:'✓ ON';font-size:10px;letter-spacing:1px;color:#fff;background:var(--ac-good);border:2px solid var(--ac-edge);border-radius:99px;padding:1px 8px;margin-top:2px}
+.equip.locked{opacity:.55;filter:grayscale(.6)}
+.equip.locked .equip__icon{filter:blur(1px)}
+
+/* collection grid */
+.col-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:12px}
+.sprite{
+  position:relative;aspect-ratio:1;display:grid;place-items:center;font-size:34px;
+  background:var(--ac-panel);border:4px solid var(--rar-common);border-radius:var(--ac-radius-sm);
+  box-shadow:0 4px 0 rgba(30,43,99,.35);cursor:pointer;
+  transition:transform .12s cubic-bezier(.34,1.6,.64,1);
+}
+.sprite:hover{transform:translateY(-4px) rotate(-2deg)}
+.sprite--rare{border-color:var(--rar-rare)}
+.sprite--epic{border-color:var(--rar-epic);background:linear-gradient(180deg,#fff,#F3EBFF)}
+.sprite--legend{border-color:var(--rar-legend);background:linear-gradient(180deg,#fff,#FFF3CF)}
+.sprite--legend::before{content:'';position:absolute;inset:-4px;border-radius:inherit;border:4px solid var(--rar-legend);filter:blur(4px);opacity:.6;pointer-events:none}
+.sprite--unknown{background:var(--ac-panel-2);color:var(--ac-text-mute);font-size:26px;border-style:dashed;border-color:var(--ac-line);box-shadow:none}
+.sprite__count{position:absolute;right:-7px;top:-7px;min-width:24px;height:24px;display:grid;place-items:center;padding:0 5px;font-size:12px;color:#fff;background:var(--ac-red);border:3px solid var(--ac-edge);border-radius:999px}
+.rar-key{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--ac-text-dim);margin-top:10px}
+.rar-key i{display:inline-block;width:14px;height:14px;border-radius:4px;margin-right:5px;vertical-align:-2px}
+
+/* stat tiles (kid side) */
+.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}
+.stat{padding:14px;background:var(--ac-panel);border:3px solid var(--ac-edge);border-radius:var(--ac-radius-sm);box-shadow:0 4px 0 var(--ac-edge);text-align:center}
+.stat__num{font-size:26px;line-height:1.1}
+.stat__lbl{font-size:12px;letter-spacing:.6px;text-transform:uppercase;color:var(--ac-text-mute)}
+
+/* friends-now strip */
+.now-strip{display:flex;flex-direction:column;gap:10px}
+.now-row{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--ac-panel);border:3px solid var(--ac-edge);border-radius:var(--ac-radius-sm);box-shadow:0 4px 0 var(--ac-edge)}
+.now-row__dot{width:10px;height:10px;flex:none;border-radius:50%;background:var(--ac-good);box-shadow:0 0 0 0 rgba(46,204,113,.7);animation:ping 1.4s infinite}
+.now-row__dot--idle{background:var(--ac-text-mute);animation:none}
+.now-row__meta{margin-left:auto;font-size:13px;color:var(--ac-text-dim);text-align:right}
+
+/* ============================================================
+   FRIENDS
+   ============================================================ */
+.friend{display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--ac-panel);border:var(--ac-bd) solid var(--ac-edge);border-radius:var(--ac-radius);box-shadow:0 5px 0 var(--ac-edge);flex-wrap:wrap}
+.friend__face{width:56px;height:56px;flex:none;display:grid;place-items:center;font-size:30px;border-radius:50%;border:4px solid var(--ac-edge)}
+.friend__body{min-width:130px}
+.friend__acts{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+.trade-slot{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px;min-width:120px;background:var(--ac-panel-2);border:3px dashed var(--ac-line);border-radius:var(--ac-radius-sm)}
+.trade-slot.filled{border-style:solid;border-color:var(--ac-edge);background:#fff}
+.trade-arrow{font-size:30px;align-self:center}
+.pick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:10px;margin-top:10px}
+
+/* ============================================================
+   PARENT PORTAL — deliberately a "document", not a toy.
+   Light surface, system sans, dataviz reference palette.
+   ============================================================ */
+.pp{
+  font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-weight:400;
+  background:#f9f9f7;color:#0b0b0b;min-height:100vh;padding:70px 18px 120px;
+}
+.pp .ac-wrap{width:min(860px,100%)}
+.pp h2{font-weight:650;font-size:26px}
+.pp h3{font-weight:600;font-size:15px;margin:0 0 12px}
+.pp-card{background:#fcfcfb;border:1px solid rgba(11,11,11,.10);border-radius:12px;padding:20px;margin-bottom:16px}
+.pp-muted{color:#52514e;font-size:13.5px}
+.pp-tiny{color:#898781;font-size:12px}
+.pp-chip{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;font-size:14px;font-weight:600;color:#52514e;background:#fcfcfb;border:1px solid rgba(11,11,11,.14);border-radius:999px;cursor:pointer;font-family:inherit}
+.pp-chip.on{color:#fff;background:#2a78d6;border-color:#2a78d6}
+.pp-grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+.pp-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px}
+.pp-stat{background:#fcfcfb;border:1px solid rgba(11,11,11,.10);border-radius:10px;padding:12px 14px}
+.pp-stat b{display:block;font-size:22px;font-weight:650}
+.pp-stat span{font-size:12px;color:#898781}
+.pp-stat .delta{font-size:12px;color:#006300;font-weight:600}
+
+/* mastery bars — sequential blue fill, status via icon+word (never color alone) */
+.skill{margin-bottom:14px}
+.skill__head{display:flex;justify-content:space-between;align-items:baseline;font-size:13.5px;margin-bottom:5px}
+.skill__status{font-size:12px;font-weight:600}
+.skill__status.s-good{color:#006300}
+.skill__status.s-warn{color:#8a5a00}
+.skill__status.s-need{color:#a03232}
+.skill__track{height:10px;background:#f0efec;border-radius:6px;overflow:hidden}
+.skill__fill{height:100%;border-radius:6px 4px 4px 6px;background:#2a78d6}
+
+/* weekly minutes — thin bars, hairline baseline, muted axis */
+.mini-bars{display:flex;align-items:flex-end;gap:10px;height:92px;padding-top:6px;border-bottom:1px solid #c3c2b7}
+.mini-bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end}
+.mini-bar i{display:block;width:100%;max-width:26px;background:#2a78d6;border-radius:4px 4px 0 0;min-height:2px}
+.mini-bar b{font-size:10.5px;color:#898781;font-weight:500}
+.mini-bar .val{font-size:10.5px;color:#52514e;font-weight:600}
+.spark{width:100%;height:56px}
+
+.pp-row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid #e1e0d9;font-size:14px}
+.pp-row:last-child{border-bottom:none}
+.pp-select{padding:8px 12px;font-size:14px;font-family:inherit;border:1px solid rgba(11,11,11,.18);border-radius:8px;background:#fff;color:#0b0b0b}
+.pp-toggle{position:relative;width:44px;height:24px;flex:none;border-radius:99px;background:#c3c2b7;border:0;transition:.15s}
+.pp-toggle::after{content:'';position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.15s}
+.pp-toggle.on{background:#2a78d6}
+.pp-toggle.on::after{left:23px}
+.pp-btn{padding:8px 14px;font-size:13px;font-weight:600;font-family:inherit;color:#fff;background:#2a78d6;border:0;border-radius:8px;cursor:pointer}
+.pp-btn--ghost{background:#fff;color:#52514e;border:1px solid rgba(11,11,11,.18)}
+.pp-btn--danger{background:#fff;color:#d03b3b;border:1px solid #d03b3b}
+.pp-flag{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;font-size:12px;font-weight:600;border-radius:99px}
+.pp-flag--good{color:#006300;background:#e7f4e7}
+.pp-flag--need{color:#a03232;background:#fbecec}
+.pp-reco{border-left:3px solid #2a78d6;padding:10px 14px;background:#f4f8fd;border-radius:0 8px 8px 0;font-size:13.5px;margin-top:8px}
+
+/* ---------- shared chrome ---------- */
+#switcher{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:80;display:flex;gap:5px;align-items:center;padding:6px 6px 6px 14px;background:#0E1533;border:2px solid #37447D;border-radius:999px;box-shadow:0 10px 30px rgba(0,0,0,.4);max-width:calc(100vw - 24px);overflow-x:auto}
+#switcher b{color:#7F8EC4;font-size:10px;letter-spacing:1.6px;text-transform:uppercase;padding-right:6px;white-space:nowrap}
+#switcher button{padding:8px 13px;font-size:13px;white-space:nowrap;color:#C9D3F5;background:#1B2450;border:0;border-radius:999px}
+#switcher button.on{background:var(--ac-yellow);color:#0E1533}
+#fx{position:fixed;inset:0;pointer-events:none;z-index:70}
+.screen{display:none}
+.screen.on{display:block}
+.note{margin:22px auto 0;padding:12px 16px;max-width:660px;font-size:13.5px;font-weight:600;line-height:1.55;color:#2A3A73;background:rgba(255,255,255,.72);border:2px dashed #7E90C9;border-radius:14px}
+.note b{color:#1E2B63}
+.pp .note{font-family:var(--ac-font)}
+@media (max-width:560px){.ac-btn--xl{padding:16px 26px;font-size:22px}.ac-page{padding-top:66px}}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ══════════════════════════ 1. FRONT DOOR v2 ══════════════════════════ -->
+<section class="screen on ac-page" id="s-door">
+  <div class="sky"></div>
+  <svg class="hills" viewBox="0 0 1200 230" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0,150 Q150,70 320,140 T650,120 T980,150 T1200,110 L1200,230 L0,230Z" fill="#7BE07F"/>
+    <path d="M0,180 Q200,120 420,175 T820,165 T1200,180 L1200,230 L0,230Z" fill="var(--ac-grass)"/>
+    <rect x="0" y="212" width="1200" height="18" fill="var(--ac-grass-deep)"/>
+  </svg>
+  <div class="corner corner--r">
+    <button class="ac-btn ac-btn--outline ac-btn--sm" id="soundBtn">🔊 Sound</button>
+    <button class="ac-btn ac-btn--outline ac-btn--sm" data-go="parents">👨‍👩‍👦 Grown-ups</button>
+  </div>
+
+  <div class="ac-wrap" style="text-align:center">
+    <div class="logo">
+      <div class="logo__kicker">Jackson &amp; Miles</div>
+      <h1 class="logo__word" id="logoWord"></h1>
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:center;gap:14px;margin-top:16px;flex-wrap:wrap">
+      <svg class="mascot" id="mascot" viewBox="0 0 120 120" aria-hidden="true">
+        <ellipse cx="60" cy="112" rx="30" ry="6" fill="rgba(30,43,99,.18)"/>
+        <line x1="60" y1="30" x2="60" y2="14" stroke="#1E2B63" stroke-width="6" stroke-linecap="round"/>
+        <circle cx="60" cy="11" r="8" fill="#FF5A5A" stroke="#1E2B63" stroke-width="5"/>
+        <rect x="20" y="28" width="80" height="70" rx="24" fill="#FFC93C" stroke="#1E2B63" stroke-width="6"/>
+        <rect x="31" y="44" width="58" height="32" rx="13" fill="#1E2B63"/>
+        <circle cx="47" cy="60" r="7" fill="#8FE8FF"/><circle cx="73" cy="60" r="7" fill="#8FE8FF"/>
+        <circle cx="49" cy="58" r="2.4" fill="#fff"/><circle cx="75" cy="58" r="2.4" fill="#fff"/>
+        <rect x="42" y="98" width="14" height="16" rx="5" fill="#4C9BFF" stroke="#1E2B63" stroke-width="5"/>
+        <rect x="64" y="98" width="14" height="16" rx="5" fill="#4C9BFF" stroke="#1E2B63" stroke-width="5"/>
+      </svg>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <button class="ac-btn ac-btn--xl ac-btn--play" id="playBtn">🕹️ PLAY WITH MY PROFILE</button>
+        <button class="ac-btn ac-btn--xl ac-btn--green" id="guestBtn" style="--ac-lift:10px">🎮 JUST PLAY FOR FUN</button>
+      </div>
+    </div>
+
+    <div class="gotd" data-go="me" id="gotd">
+      <div class="gotd__icon floaty">🪙</div>
+      <div>
+        <div style="font-size:13px;letter-spacing:1.4px;color:#7A4E00">⭐ GAME OF THE DAY</div>
+        <div style="font-size:22px;line-height:1.1">Coin Climb — 2× coins today!</div>
+        <div class="gotd__timer">New game in <b id="gotdTimer">–</b></div>
+      </div>
+      <span class="ac-badge ac-badge--hot" style="margin-left:auto">2×</span>
+    </div>
+
+    <div class="ticker">
+      <span class="ticker__dot"></span>
+      <span class="ticker__msg" id="tickerMsg">🏆 SUPERMILES just scored 12,400 in Loot Drop!</span>
+    </div>
+
+    <div class="note">
+      <b>Two doors, both huge.</b> Profile play and guest play are peers now — no more outline
+      button below the fold. <b>The ticker here shows only what's already public</b> (the
+      nickname-only <code>high_scores</code> collection). Friends' live activity is private, so
+      it lives <i>inside</i> the arcade, after PIN — you'll see it on My Character. Game of the
+      Day rotates daily through the <b>learning games only</b>, and its 2× stacks with the 4×
+      practice economy — it's a spotlight, not a new system.
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ 2. MY CHARACTER ══════════════════════════ -->
+<section class="screen ac-page" id="s-me" style="padding-top:20px">
+  <div class="sky"></div>
+  <div class="ac-wrap">
+    <div class="ac-bar">
+      <div class="ac-bar__who">
+        <div class="ac-avatar" style="background:#FFE1A8" id="barFace">🥷</div>
+        <div style="text-align:left"><div class="ac-bar__label">Playing as</div><div class="ac-bar__name">Miles</div></div>
+      </div>
+      <button class="ac-btn ac-btn--outline ac-btn--sm" data-go="door">🔄 Switch</button>
+      <button class="ac-btn ac-btn--outline ac-btn--sm" data-go="friends">👥 Friends</button>
+      <button class="ac-btn ac-btn--outline ac-btn--sm" data-go="parents">📊 Grown-ups</button>
+    </div>
+
+    <div class="hero">
+      <div class="hero__stage">
+        <div class="hero__lvl">LVL 7</div>
+        <div class="hero__avatar" id="heroAvatar">🥷</div>
+        <div class="hero__pet" id="heroPet">🐕</div>
+      </div>
+      <div style="flex:1;min-width:220px">
+        <h2 style="font-size:30px">SuperMiles</h2>
+        <div style="color:var(--ac-text-dim);font-size:15px;margin:2px 0 10px">320 XP to Level 8 — almost there!</div>
+        <div class="xpbar"><div class="xpbar__fill" id="xpFill"></div><div class="xpbar__label">340 / 660 XP</div></div>
+        <div class="purse">
+          <span class="purse__pill">🪙 <b>1,240</b></span>
+          <span class="purse__pill">🔥 <b>5-day</b> streak</span>
+          <span class="purse__pill">📦 <b>23/60</b> collected</span>
+        </div>
+      </div>
+      <button class="ac-btn ac-btn--yellow" data-go="door" style="align-self:center">▶ PLAY GAMES</button>
+    </div>
+
+    <div class="section-head"><span class="section-head__ribbon" style="background:var(--ac-purple-deep)">🎽 My gear</span><span class="section-head__rule"></span></div>
+    <div class="ac-card">
+      <div style="font-size:13px;letter-spacing:1px;text-transform:uppercase;color:var(--ac-text-mute);margin-bottom:8px">Skins — tap to wear</div>
+      <div class="equip-row" id="skinRow">
+        <div class="equip on" data-skin="🥷"><div class="equip__icon">🥷</div><div class="equip__name">Ninja</div></div>
+        <div class="equip" data-skin="🤖"><div class="equip__icon">🤖</div><div class="equip__name">Robo</div></div>
+        <div class="equip" data-skin="🦸"><div class="equip__icon">🦸</div><div class="equip__name">Hero</div></div>
+        <div class="equip locked"><div class="equip__icon">🧙</div><div class="equip__name">Wizard<br>🪙 900</div></div>
+        <div class="equip locked"><div class="equip__icon">🐲</div><div class="equip__name">Dragon<br>Reach Lvl 9</div></div>
+      </div>
+      <div style="font-size:13px;letter-spacing:1px;text-transform:uppercase;color:var(--ac-text-mute);margin:16px 0 8px">Pets</div>
+      <div class="equip-row" id="petRow">
+        <div class="equip on" data-pet="🐕"><div class="equip__icon">🐕</div><div class="equip__name">Scout</div></div>
+        <div class="equip" data-pet="🦉"><div class="equip__icon">🦉</div><div class="equip__name">Professor</div></div>
+        <div class="equip locked"><div class="equip__icon">🐉</div><div class="equip__name">Ember<br>🪙 1,500</div></div>
+      </div>
+      <div style="margin-top:14px;font-size:14px;color:var(--ac-text-dim)">Locked gear stays visible on purpose — seeing "Reach Level 9" <i>is</i> the motivation. Nothing kid-facing is ever hidden or gated by a paywall; it's all earned by playing.</div>
+    </div>
+
+    <div class="section-head"><span class="section-head__ribbon" style="background:var(--ac-blue-deep)">📦 My collection · 23/60</span><span class="section-head__rule"></span></div>
+    <div class="ac-card">
+      <div class="col-grid" id="colGrid"></div>
+      <div class="rar-key">
+        <span><i style="background:var(--rar-common)"></i>Common</span>
+        <span><i style="background:var(--rar-rare)"></i>Rare</span>
+        <span><i style="background:var(--rar-epic)"></i>Epic</span>
+        <span><i style="background:var(--rar-legend)"></i>Legendary</span>
+        <span style="margin-left:auto">Red badge = duplicates you can <b>trade</b></span>
+      </div>
+    </div>
+
+    <div class="section-head"><span class="section-head__ribbon">📈 My stats</span><span class="section-head__rule"></span></div>
+    <div class="stat-row">
+      <div class="stat"><div class="stat__num">1,872</div><div class="stat__lbl">Questions right</div></div>
+      <div class="stat"><div class="stat__num">🪂</div><div class="stat__lbl">Favorite game</div></div>
+      <div class="stat"><div class="stat__num">11</div><div class="stat__lbl">Best streak</div></div>
+      <div class="stat"><div class="stat__num">4×</div><div class="stat__lbl">Practice bonus</div></div>
+    </div>
+
+    <div class="section-head"><span class="section-head__ribbon" style="background:var(--ac-red-deep)">🟢 Playing now</span><span class="section-head__rule"></span></div>
+    <div class="now-strip">
+      <div class="now-row"><span class="now-row__dot"></span><div class="ac-avatar" style="background:#CBE4FF">🦖</div><div><b>JAX3000</b> <span style="color:var(--ac-text-dim)">is playing Math Defender</span></div><div class="now-row__meta">right now</div></div>
+      <div class="now-row"><span class="now-row__dot now-row__dot--idle"></span><div class="ac-avatar" style="background:#E9DAFF">🐢</div><div><b>TURBO_T</b> <span style="color:var(--ac-text-dim)">scored 9,220 in Coin Climb</span></div><div class="now-row__meta">1 hr ago</div></div>
+      <div class="now-row"><span class="now-row__dot now-row__dot--idle"></span><div class="ac-avatar" style="background:#CFF6D9">🐸</div><div><b>COUSIN_E</b> <span style="color:var(--ac-text-dim)">reached Level 6</span></div><div class="now-row__meta">yesterday</div></div>
+    </div>
+
+    <div class="note">
+      <b>This is Phase 3 of your character spec, wearing the Playground skin.</b> One character
+      per kid, fed by every game. "Playing now" shows <b>approved friends only, nicknames only</b>,
+      and only appears after PIN-in — it never leaks to the public front door. Seeing a friend
+      mid-game is the strongest "get in and play" magnet there is for an 8-year-old.
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ 3. FRIENDS ══════════════════════════ -->
+<section class="screen ac-page" id="s-friends" style="padding-top:20px">
+  <div class="sky"></div>
+  <div class="ac-wrap">
+    <div class="ac-bar">
+      <div class="ac-bar__who">
+        <div class="ac-avatar" style="background:#FFE1A8">🥷</div>
+        <div style="text-align:left"><div class="ac-bar__label">Playing as</div><div class="ac-bar__name">Miles</div></div>
+      </div>
+      <button class="ac-btn ac-btn--outline ac-btn--sm" data-go="me">← My character</button>
+    </div>
+
+    <h2 style="font-size:clamp(26px,5vw,36px);color:var(--ac-edge)">👥 My squad</h2>
+
+    <div class="section-head"><span class="section-head__ribbon">🏠 Family</span><span class="section-head__rule"></span></div>
+    <div class="friend">
+      <div class="friend__face" style="background:#CBE4FF">🦖</div>
+      <div class="friend__body"><div style="font-size:20px">JAX3000</div><div style="font-size:13px;color:var(--ac-text-dim)">Level 9 · 🐉 Ember · 31/60 collected</div></div>
+      <span class="ac-badge ac-badge--blue">Brother</span>
+      <div class="friend__acts">
+        <button class="ac-btn ac-btn--sm ac-btn--blue peekBtn">👀 Peek collection</button>
+        <button class="ac-btn ac-btn--sm ac-btn--purple" id="tradeBtn">🔁 Trade</button>
+      </div>
+    </div>
+
+    <div class="section-head"><span class="section-head__ribbon" style="background:var(--ac-blue-deep)">🌟 Friends</span><span class="section-head__rule"></span></div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="friend">
+        <div class="friend__face" style="background:#CFF6D9">🐸</div>
+        <div class="friend__body"><div style="font-size:20px">COUSIN_E</div><div style="font-size:13px;color:var(--ac-text-dim)">Level 6 · 🦉 pet · 18/60 collected</div></div>
+        <div class="friend__acts">
+          <button class="ac-btn ac-btn--sm ac-btn--blue peekBtn">👀 Peek</button>
+          <button class="ac-btn ac-btn--sm ac-btn--purple" id="tradeBtn2">🔁 Trade</button>
+        </div>
+      </div>
+      <div class="friend" style="opacity:.75">
+        <div class="friend__face" style="background:#E9DAFF">🐢</div>
+        <div class="friend__body"><div style="font-size:20px">TURBO_T</div><div style="font-size:13px;color:var(--ac-text-dim)">Waiting for a grown-up to say yes</div></div>
+        <span class="ac-badge ac-badge--warn">⏳ Pending</span>
+      </div>
+    </div>
+
+    <div style="margin-top:16px"><button class="ac-btn ac-btn--green" id="addFriendBtn">➕ Add a friend</button></div>
+
+    <div class="section-head"><span class="section-head__ribbon" style="background:var(--ac-purple-deep)">📬 Trade inbox</span><span class="section-head__rule"></span></div>
+    <div class="ac-card" id="inboxCard">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <div class="ac-avatar" style="background:#CBE4FF;width:44px;height:44px;font-size:24px">🦖</div>
+        <div style="flex:1;min-width:180px"><b>JAX3000</b> offers their <b>🦄 (Epic)</b> for your extra <b>🐙 (Rare)</b></div>
+        <div style="display:flex;gap:8px">
+          <button class="ac-btn ac-btn--sm ac-btn--green" id="acceptTrade">✓ Accept</button>
+          <button class="ac-btn ac-btn--sm ac-btn--outline" id="declineTrade">✗ No thanks</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      <b>Every safety rule, visible.</b> Nicknames only. No text field exists anywhere on this
+      page — adding a friend is a <b>family code</b> the parents swap, and the friendship only
+      activates when a grown-up approves it in the portal (that's the ⏳ Pending card).
+      Trading is pick-a-duplicate → pick-a-want → send: structured buttons only, and you can
+      never trade your <i>last</i> copy of anything. Family trades work out of the box;
+      cross-family friends are the explicit parent opt-in your rules require.
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ 4. PARENT PORTAL ══════════════════════════ -->
+<section class="screen pp" id="s-parents">
+  <div class="ac-wrap">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px">
+      <div>
+        <h2>Grown-ups</h2>
+        <div class="pp-muted">jacksonandmilesarcade.com · progress &amp; settings</div>
+      </div>
+      <button class="pp-btn pp-btn--ghost" data-go="door">← Back to the arcade</button>
+    </div>
+
+    <div style="display:flex;gap:8px;margin:14px 0 18px">
+      <button class="pp-chip on" data-kid="miles">Miles · Grade 1</button>
+      <button class="pp-chip" data-kid="jackson">Jackson · Grade 3</button>
+    </div>
+
+    <!-- MILES -->
+    <div id="pp-miles">
+      <div class="pp-card">
+        <h3>This week</h3>
+        <div class="pp-stats">
+          <div class="pp-stat"><b>84 min</b><span>play time</span> <span class="delta">↑ 12 min vs last week</span></div>
+          <div class="pp-stat"><b>14</b><span>sessions</span></div>
+          <div class="pp-stat"><b>81%</b><span>avg accuracy</span> <span class="delta">↑ 4 pts</span></div>
+          <div class="pp-stat"><b>92%</b><span>time in learning games</span></div>
+        </div>
+        <div class="pp-tiny" style="margin-top:10px">Learning vs fun split is the number that shows whether the 4× reward weighting is working. 92% says it is.</div>
+      </div>
+
+      <div class="pp-grid2">
+        <div class="pp-card">
+          <h3>Skills — Reading (focus area)</h3>
+          <div class="skill"><div class="skill__head"><span>Sight words (Dolch G1)</span><span class="skill__status s-good">✓ Strong · 94%</span></div><div class="skill__track"><div class="skill__fill" style="width:94%"></div></div></div>
+          <div class="skill"><div class="skill__head"><span>Short-vowel decoding</span><span class="skill__status s-good">✓ Strong · 88%</span></div><div class="skill__track"><div class="skill__fill" style="width:88%"></div></div></div>
+          <div class="skill"><div class="skill__head"><span>Reading comprehension</span><span class="skill__status s-warn">→ Practicing · 74%</span></div><div class="skill__track"><div class="skill__fill" style="width:74%"></div></div></div>
+          <div class="skill"><div class="skill__head"><span>Long-vowel patterns</span><span class="skill__status s-need">⚠ Needs work · 58%</span></div><div class="skill__track"><div class="skill__fill" style="width:58%"></div></div></div>
+          <h3 style="margin-top:18px">Skills — Math</h3>
+          <div class="skill"><div class="skill__head"><span>Addition within 20</span><span class="skill__status s-good">✓ Strong · 91%</span></div><div class="skill__track"><div class="skill__fill" style="width:91%"></div></div></div>
+          <div class="skill"><div class="skill__head"><span>Subtraction within 20</span><span class="skill__status s-need">⚠ Needs work · 63%</span></div><div class="skill__track"><div class="skill__fill" style="width:63%"></div></div></div>
+          <div class="pp-reco">💡 <b>Suggestion:</b> Long-vowel words (rain, boat, cake) are the clear gap — Loot Drop's word crates can be weighted toward them in Preferences below. Subtraction is trending up on its own; no change needed yet.</div>
+        </div>
+
+        <div class="pp-card">
+          <h3>Minutes per day</h3>
+          <div class="mini-bars" id="mb-miles"></div>
+          <div class="pp-tiny" style="margin-top:6px">Mon–Sun · this week</div>
+          <h3 style="margin-top:18px">Accuracy trend · 6 weeks</h3>
+          <svg class="spark" viewBox="0 0 300 56" preserveAspectRatio="none">
+            <polyline points="0,34 60,30 120,32 180,24 240,18 300,12" fill="none" stroke="#2a78d6" stroke-width="2"/>
+            <circle cx="300" cy="12" r="4" fill="#2a78d6"/>
+            <text x="296" y="8" font-size="10" fill="#52514e" text-anchor="end" font-weight="600">81%</text>
+          </svg>
+          <h3 style="margin-top:18px">Games played this week</h3>
+          <div class="pp-row"><span>🪂 Loot Drop</span><span class="pp-muted">8 rounds · 79% · <span class="pp-flag pp-flag--good">↑ improving</span></span></div>
+          <div class="pp-row"><span>📖 Critter Catchers</span><span class="pp-muted">4 rounds · 85%</span></div>
+          <div class="pp-row"><span>🪙 Coin Climb</span><span class="pp-muted">2 rounds · 71% · <span class="pp-flag pp-flag--need">subtraction misses</span></span></div>
+          <div class="pp-row"><span>🟩 Multiverse Collector</span><span class="pp-muted">1 session · fun</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- JACKSON -->
+    <div id="pp-jackson" style="display:none">
+      <div class="pp-card">
+        <h3>This week</h3>
+        <div class="pp-stats">
+          <div class="pp-stat"><b>102 min</b><span>play time</span></div>
+          <div class="pp-stat"><b>11</b><span>sessions</span></div>
+          <div class="pp-stat"><b>88%</b><span>avg accuracy</span> <span class="delta">↑ 2 pts</span></div>
+          <div class="pp-stat"><b>78%</b><span>time in learning games</span></div>
+        </div>
+      </div>
+      <div class="pp-grid2">
+        <div class="pp-card">
+          <h3>Skills — Math (focus area)</h3>
+          <div class="skill"><div class="skill__head"><span>Times tables ×2–×9</span><span class="skill__status s-good">✓ Strong · 96%</span></div><div class="skill__track"><div class="skill__fill" style="width:96%"></div></div></div>
+          <div class="skill"><div class="skill__head"><span>Times tables ×11–×12</span><span class="skill__status s-warn">→ Practicing · 77%</span></div><div class="skill__track"><div class="skill__fill" style="width:77%"></div></div></div>
+          <div class="skill"><div class="skill__head"><span>Division facts</span><span class="skill__status s-need">⚠ Needs work · 61%</span></div><div class="skill__track"><div class="skill__fill" style="width:61%"></div></div></div>
+          <div class="skill"><div class="skill__head"><span>3-digit add / subtract</span><span class="skill__status s-good">✓ Strong · 89%</span></div><div class="skill__track"><div class="skill__fill" style="width:89%"></div></div></div>
+          <div class="pp-reco">💡 <b>Suggestion:</b> Division ÷6–÷9 is where the misses cluster — Math Defender's Mixed Mode can be weighted toward division. His fun-game share crept up this week; the Game-of-the-Day spotlight already pulls him back to practice games.</div>
+        </div>
+        <div class="pp-card">
+          <h3>Minutes per day</h3>
+          <div class="mini-bars" id="mb-jackson"></div>
+          <div class="pp-tiny" style="margin-top:6px">Mon–Sun · this week</div>
+          <h3 style="margin-top:18px">Accuracy trend · 6 weeks</h3>
+          <svg class="spark" viewBox="0 0 300 56" preserveAspectRatio="none">
+            <polyline points="0,22 60,20 120,24 180,16 240,14 300,10" fill="none" stroke="#2a78d6" stroke-width="2"/>
+            <circle cx="300" cy="10" r="4" fill="#2a78d6"/>
+            <text x="296" y="6" font-size="10" fill="#52514e" text-anchor="end" font-weight="600">88%</text>
+          </svg>
+          <h3 style="margin-top:18px">Games played this week</h3>
+          <div class="pp-row"><span>⛏️ Math Defender</span><span class="pp-muted">7 rounds · 90%</span></div>
+          <div class="pp-row"><span>🪂 Loot Drop</span><span class="pp-muted">5 rounds · 84% · <span class="pp-flag pp-flag--need">division misses</span></span></div>
+          <div class="pp-row"><span>👻 Harvest Night</span><span class="pp-muted">2 sessions · fun</span></div>
+          <div class="pp-row"><span>🧱 Block Stacker</span><span class="pp-muted">3 sessions · fun</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- shared settings -->
+    <div class="pp-card">
+      <h3>Learning preferences — <span id="prefName">Miles</span></h3>
+      <div class="pp-row"><span>Focus area</span><select class="pp-select"><option>Reading</option><option>Math</option><option selected>Both</option></select></div>
+      <div class="pp-row"><span>Practice emphasis <div class="pp-tiny">weights question selection toward weak skills</div></span><select class="pp-select"><option selected>Auto (from results)</option><option>Long vowels</option><option>Subtraction within 20</option><option>Off</option></select></div>
+      <div class="pp-row"><span>Difficulty <div class="pp-tiny">set automatically from age; override here</div></span><select class="pp-select"><option selected>Auto — Easy tier</option><option>Easy</option><option>Medium</option><option>Hard</option></select></div>
+      <div class="pp-row"><span>Session nudge <div class="pp-tiny">gentle "take a break" after this long</div></span><select class="pp-select"><option>20 min</option><option selected>30 min</option><option>Off</option></select></div>
+    </div>
+
+    <div class="pp-card">
+      <h3>Friends &amp; visibility</h3>
+      <div class="pp-row"><span><b>TURBO_T</b> wants to be friends with Miles <div class="pp-tiny">via family code · Thompson family</div></span><span style="display:flex;gap:8px"><button class="pp-btn" id="ppApprove">Approve</button><button class="pp-btn pp-btn--danger">Decline</button></span></div>
+      <div class="pp-row"><span>Show my kids in friends' "Playing now"</span><button class="pp-toggle on" data-toggle></button></div>
+      <div class="pp-row"><span>Allow trades with approved friends <div class="pp-tiny">family (sibling) trades are always on</div></span><button class="pp-toggle on" data-toggle></button></div>
+      <div class="pp-row"><span>Default for anything new</span><span class="pp-muted">Family-only, always</span></div>
+    </div>
+
+    <div class="pp-card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div><h3 style="margin:0">Monthly progression report</h3><div class="pp-tiny">Everything above, as a PDF — August's is ready.</div></div>
+      <button class="pp-btn">Download August report</button>
+    </div>
+
+    <div class="note">
+      <b>Deliberately boring, per your architecture doc</b> — the grown-up area looks like a
+      document, not a toy, and that contrast is a feature. Everything on this page reads from
+      the <code>sessions</code> subcollection your character spec already defines; "Practice
+      emphasis" writes the same per-fact weights your math-games spec already uses. The
+      friend-approval queue is the parent side of the ⏳ Pending card on the kids' Friends page.
+    </div>
+  </div>
+</section>
+
+</div><!-- /#app -->
+
+<!-- ---------- modals ---------- -->
+<div class="ac-modal" id="m-pin">
+  <div class="ac-card ac-modal-card" style="text-align:center">
+    <div style="font-size:46px">🐸</div>
+    <h3 style="font-size:24px;margin:4px 0 12px">Hi Miles! Secret code?</h3>
+    <div style="display:flex;gap:12px;justify-content:center;margin-bottom:14px" id="pinDots">
+      <div style="width:20px;height:20px;border-radius:50%;background:var(--ac-panel-2);border:3px solid var(--ac-edge)"></div>
+      <div style="width:20px;height:20px;border-radius:50%;background:var(--ac-panel-2);border:3px solid var(--ac-edge)"></div>
+      <div style="width:20px;height:20px;border-radius:50%;background:var(--ac-panel-2);border:3px solid var(--ac-edge)"></div>
+      <div style="width:20px;height:20px;border-radius:50%;background:var(--ac-panel-2);border:3px solid var(--ac-edge)"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:260px;margin:0 auto" id="pinPad"></div>
+  </div>
+</div>
+
+<div class="ac-modal" id="m-addfriend">
+  <div class="ac-card ac-modal-card" style="text-align:center">
+    <div style="font-size:46px">🤝</div>
+    <h3 style="font-size:24px;margin:4px 0 8px">Add a friend</h3>
+    <p style="color:var(--ac-text-dim);font-size:15.5px;line-height:1.5;margin:0 0 14px">
+      Ask a grown-up! Your grown-up gives their grown-up your <b>family code</b>.
+      When both grown-ups say yes, your friend appears here. 🎉
+    </p>
+    <div style="padding:12px;background:var(--ac-panel-2);border:3px dashed var(--ac-line);border-radius:14px;font-size:26px;letter-spacing:4px;margin-bottom:16px">🦊-🌮-42</div>
+    <button class="ac-btn ac-btn--blue" data-close>Okay!</button>
+  </div>
+</div>
+
+<div class="ac-modal" id="m-peek">
+  <div class="ac-card ac-modal-card">
+    <h3 style="font-size:24px;text-align:center">🦖 JAX3000's collection</h3>
+    <p style="text-align:center;color:var(--ac-text-dim);font-size:14px;margin:4px 0 14px">Look, don't touch — 31/60</p>
+    <div class="col-grid" id="peekGrid"></div>
+    <div style="text-align:center;margin-top:16px"><button class="ac-btn ac-btn--outline" data-close>Close</button></div>
+  </div>
+</div>
+
+<div class="ac-modal" id="m-trade">
+  <div class="ac-card ac-modal-card">
+    <h3 style="font-size:24px;text-align:center">🔁 Trade with JAX3000</h3>
+    <div id="tradeStep1">
+      <p style="text-align:center;color:var(--ac-text-dim);font-size:14.5px;margin:6px 0 4px"><b>Step 1</b> — pick one of YOUR duplicates to give</p>
+      <div class="pick-grid" id="giveGrid"></div>
+    </div>
+    <div id="tradeStep2" style="display:none">
+      <p style="text-align:center;color:var(--ac-text-dim);font-size:14.5px;margin:6px 0 4px"><b>Step 2</b> — pick one you WANT from their extras</p>
+      <div class="pick-grid" id="wantGrid"></div>
+    </div>
+    <div id="tradeStep3" style="display:none;text-align:center">
+      <div style="display:flex;justify-content:center;gap:14px;margin:14px 0;flex-wrap:wrap">
+        <div class="trade-slot filled"><div style="font-size:40px" id="giveIcon">🐙</div><div style="font-size:13px">You give</div></div>
+        <div class="trade-arrow">➡️</div>
+        <div class="trade-slot filled"><div style="font-size:40px" id="wantIcon">🦄</div><div style="font-size:13px">You get</div></div>
+      </div>
+      <button class="ac-btn ac-btn--green" id="sendTrade">📨 Send offer</button>
+    </div>
+    <div style="text-align:center;margin-top:14px"><button class="ac-btn ac-btn--sm ac-btn--outline" data-close>Cancel</button></div>
+  </div>
+</div>
+
+<canvas id="fx"></canvas>
+
+<nav id="switcher">
+  <b>Mockup</b>
+  <button data-go="door" class="on">Front door</button>
+  <button data-go="me">My character</button>
+  <button data-go="friends">Friends</button>
+  <button data-go="parents">Parent portal</button>
+</nav>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ---------- logo ---------- */
+  var word='ARCADE', lw=document.getElementById('logoWord');
+  for (var i=0;i<word.length;i++){ var s=document.createElement('span'); s.textContent=word[i]; s.style.animationDelay=(i*0.09)+'s'; lw.appendChild(s); }
+
+  /* ---------- scenery ---------- */
+  var door=document.getElementById('s-door');
+  function cloud(top,dur,delay,scale){
+    var c=document.createElement('div'); c.className='cloud';
+    c.style.top=top+'px'; c.style.transform='scale('+scale+')';
+    c.style.animation='drift '+dur+'s linear '+delay+'s infinite';
+    c.innerHTML='<svg width="150" height="70" viewBox="0 0 150 70"><g fill="#fff" stroke="#1E2B63" stroke-width="4"><circle cx="45" cy="42" r="26"/><circle cx="80" cy="32" r="30"/><circle cx="112" cy="45" r="22"/><rect x="42" y="46" width="74" height="20" rx="10"/></g></svg>';
+    door.appendChild(c);
+  }
+  cloud(70,44,0,1); cloud(160,62,6,.72); cloud(40,76,20,.55);
+  function coin(){
+    if(!door.classList.contains('on')) return;
+    var c=document.createElement('div'); c.className='coin';
+    c.textContent=['🪙','⭐','🍄','💎','🟩'][Math.floor(Math.random()*5)];
+    c.style.left=(6+Math.random()*88)+'vw'; c.style.bottom='-40px';
+    c.style.animation='rise '+(7+Math.random()*5)+'s linear forwards';
+    door.appendChild(c); setTimeout(function(){c.remove();},12000);
+  }
+  setInterval(coin,1200); for(var k=0;k<4;k++) setTimeout(coin,k*400);
+
+  /* ---------- public ticker (high_scores only — no private activity) ---------- */
+  var pub=['🏆 SUPERMILES just scored 12,400 in Loot Drop!','🥇 JAX3000 holds the Math Defender record — 11,850','⭐ COUSIN_E reached Level 6!','🕹️ 7 games inside — Loot Drop, Math Defender, Coin Climb…','🔥 Someone is on a 5-day streak…'];
+  var pi=0, tm=document.getElementById('tickerMsg');
+  setInterval(function(){ pi=(pi+1)%pub.length; tm.textContent=pub[pi]; tm.classList.remove('swap'); void tm.offsetWidth; tm.classList.add('swap'); },3000);
+
+  /* ---------- game of the day countdown ---------- */
+  function gotdTick(){
+    var n=new Date(), mid=new Date(n); mid.setHours(24,0,0,0);
+    var s=Math.floor((mid-n)/1000), h=Math.floor(s/3600), m=Math.floor(s%3600/60);
+    document.getElementById('gotdTimer').textContent=h+'h '+m+'m';
+  }
+  gotdTick(); setInterval(gotdTick,30000);
+
+  /* ---------- sound ---------- */
+  var ctx=null, soundOn=true, soundBtn=document.getElementById('soundBtn');
+  soundBtn.addEventListener('click',function(){ soundOn=!soundOn; soundBtn.textContent=soundOn?'🔊 Sound':'🔇 Muted'; if(soundOn) beep(880,.07,'square',.05); });
+  function ac(){ if(!ctx){ try{ctx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){return null;} } if(ctx.state==='suspended') ctx.resume(); return ctx; }
+  function beep(f,d,t,v,w){
+    if(!soundOn) return; var c=ac(); if(!c) return;
+    var s0=c.currentTime+(w||0), o=c.createOscillator(), g=c.createGain();
+    o.type=t||'square'; o.frequency.setValueAtTime(f,s0);
+    g.gain.setValueAtTime(v||.08,s0); g.gain.exponentialRampToValueAtTime(.0001,s0+d);
+    o.connect(g); g.connect(c.destination); o.start(s0); o.stop(s0+d+.02);
+  }
+  var S={
+    tap:function(){beep(660,.06,'square',.05);},
+    pop:function(){beep(520,.05,'triangle',.09);beep(780,.08,'triangle',.07,.05);},
+    coin:function(){beep(988,.07,'square',.08);beep(1319,.16,'square',.07,.07);},
+    win:function(){[523,659,784,1047].forEach(function(f,i){beep(f,.16,'triangle',.09,i*.09);});},
+    nope:function(){beep(200,.16,'sawtooth',.05);}
+  };
+
+  /* ---------- particles ---------- */
+  var cv=document.getElementById('fx'), c2=cv.getContext('2d'), bits=[];
+  function size(){cv.width=innerWidth;cv.height=innerHeight;}
+  size(); addEventListener('resize',size);
+  var COLORS=['#FF5A5A','#FFC93C','#4C9BFF','#A971F5','#2ECC71','#FFFFFF'];
+  function burst(x,y,n,p){
+    for(var i=0;i<(n||24);i++){
+      var a=Math.random()*Math.PI*2, sp=Math.random()*(p||7)+2;
+      bits.push({x:x,y:y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-3,s:4+Math.random()*7,r:Math.random()*6,vr:(Math.random()-.5)*.5,c:COLORS[Math.floor(Math.random()*COLORS.length)],life:1});
+    }
+  }
+  function rain(n){
+    for(var i=0;i<(n||90);i++) bits.push({x:Math.random()*cv.width,y:-20-Math.random()*300,vx:(Math.random()-.5)*2,vy:2+Math.random()*4,s:6+Math.random()*9,r:Math.random()*6,vr:(Math.random()-.5)*.4,c:COLORS[Math.floor(Math.random()*COLORS.length)],life:1});
+  }
+  (function loop(){
+    c2.clearRect(0,0,cv.width,cv.height);
+    for(var i=bits.length-1;i>=0;i--){
+      var b=bits[i]; b.vy+=.28; b.x+=b.vx; b.y+=b.vy; b.r+=b.vr; b.life-=.006;
+      if(b.life<=0||b.y>cv.height+60){bits.splice(i,1);continue;}
+      c2.save(); c2.translate(b.x,b.y); c2.rotate(b.r);
+      c2.globalAlpha=Math.max(0,Math.min(1,b.life*1.6)); c2.fillStyle=b.c;
+      c2.fillRect(-b.s/2,-b.s/2,b.s,b.s*.66); c2.restore();
+    }
+    requestAnimationFrame(loop);
+  })();
+  function shake(){ document.body.classList.remove('shake'); void document.body.offsetWidth; document.body.classList.add('shake'); setTimeout(function(){document.body.classList.remove('shake');},340); }
+  function burstAt(el,n,p){ var r=el.getBoundingClientRect(); burst(r.left+r.width/2,r.top+r.height/2,n||24,p||8); }
+
+  /* ---------- routing ---------- */
+  function go(id){
+    document.querySelectorAll('.screen').forEach(function(s){ s.classList.toggle('on', s.id==='s-'+id); });
+    document.querySelectorAll('#switcher button').forEach(function(b){ b.classList.toggle('on', b.dataset.go===id); });
+    scrollTo(0,0); S.tap();
+  }
+  document.addEventListener('click',function(e){
+    var t=e.target.closest('[data-go]'); if(t) go(t.dataset.go);
+    var c=e.target.closest('[data-close]'); if(c){ S.tap(); c.closest('.ac-modal').classList.remove('open'); }
+  });
+  document.querySelectorAll('.ac-modal').forEach(function(m){ m.addEventListener('click',function(e){ if(e.target===m) m.classList.remove('open'); }); });
+
+  /* ---------- front door: PLAY → PIN modal → character ---------- */
+  var pinCount=0, pinDots=document.querySelectorAll('#pinDots div');
+  var pad=document.getElementById('pinPad');
+  '123456789✖0⌫'.split('').forEach(function(ch){
+    var b=document.createElement('button');
+    b.textContent=ch;
+    b.style.cssText='padding:13px 0;font-size:24px;color:var(--ac-text);background:var(--ac-panel-2);border:4px solid var(--ac-edge);border-radius:14px;box-shadow:0 5px 0 var(--ac-edge)';
+    b.addEventListener('click',function(){
+      if(ch==='✖'){pinCount=0;S.tap();}
+      else if(ch==='⌫'){pinCount=Math.max(0,pinCount-1);S.tap();}
+      else {pinCount=Math.min(4,pinCount+1);S.coin();}
+      pinDots.forEach(function(d,i){ d.style.background=i<pinCount?'var(--ac-purple)':'var(--ac-panel-2)'; });
+      if(pinCount===4){ setTimeout(function(){ pinCount=0; pinDots.forEach(function(d){d.style.background='var(--ac-panel-2)';}); document.getElementById('m-pin').classList.remove('open'); S.win(); rain(60); go('me'); },260); }
+    });
+    pad.appendChild(b);
+  });
+  var mascot=document.getElementById('mascot');
+  document.getElementById('playBtn').addEventListener('click',function(e){
+    burstAt(e.currentTarget,40,10); shake(); S.win();
+    mascot.classList.remove('cheer'); void mascot.offsetWidth; mascot.classList.add('cheer');
+    setTimeout(function(){ document.getElementById('m-pin').classList.add('open'); },420);
+  });
+  document.getElementById('guestBtn').addEventListener('click',function(e){
+    burstAt(e.currentTarget,30,8); S.win(); setTimeout(function(){go('me');},380);
+  });
+
+  /* ---------- character: equip ---------- */
+  function wireEquip(rowId,attr,targetId){
+    document.getElementById(rowId).addEventListener('click',function(e){
+      var t=e.target.closest('.equip'); if(!t) return;
+      if(t.classList.contains('locked')){ S.nope(); t.animate([{transform:'translateX(0)'},{transform:'translateX(-5px)'},{transform:'translateX(5px)'},{transform:'translateX(0)'}],{duration:220}); return; }
+      this.querySelectorAll('.equip').forEach(function(x){x.classList.remove('on');});
+      t.classList.add('on');
+      var v=t.dataset[attr];
+      document.getElementById(targetId).textContent=v;
+      if(attr==='skin') document.getElementById('barFace').textContent=v;
+      burstAt(t,20,7); S.pop();
+    });
+  }
+  wireEquip('skinRow','skin','heroAvatar');
+  wireEquip('petRow','pet','heroPet');
+
+  /* ---------- collection grids ---------- */
+  var OWNED=[
+    ['🐙','rare',2],['🦊','common',1],['🐸','common',3],['🦄','epic',0],['🐢','common',1],['🐝','common',2],
+    ['🦖','rare',1],['🐉','legend',1],['🦉','rare',1],['🐬','rare',0],['🦋','common',1],['🐌','common',2],
+    ['🦁','epic',1],['🐺','rare',0],['🦈','epic',0],['🐨','common',1]
+  ];
+  function fillGrid(id,peek){
+    var g=document.getElementById(id); g.innerHTML='';
+    OWNED.forEach(function(o){
+      var d=document.createElement('div');
+      var owned=o[2]>0||peek;
+      d.className='sprite'+(owned?(o[1]!=='common'?' sprite--'+o[1]:''):' sprite--unknown');
+      d.textContent=owned?o[0]:'?';
+      if(o[2]>1&&!peek){ var c=document.createElement('span'); c.className='sprite__count'; c.textContent='×'+o[2]; d.appendChild(c); }
+      d.addEventListener('click',function(){ burstAt(d,12,5); S.pop(); });
+      g.appendChild(d);
+    });
+    for(var i=0;i<4;i++){ var q=document.createElement('div'); q.className='sprite sprite--unknown'; q.textContent='?'; g.appendChild(q); }
+  }
+  fillGrid('colGrid',false);
+  fillGrid('peekGrid',true);
+
+  /* ---------- xp bar entrance ---------- */
+  var xpDone=false;
+  new MutationObserver(function(){
+    var me=document.getElementById('s-me');
+    if(me.classList.contains('on')&&!xpDone){
+      xpDone=true; var f=document.getElementById('xpFill'); f.style.width='0%';
+      setTimeout(function(){f.style.width='52%';},150);
+    }
+  }).observe(document.getElementById('s-me'),{attributes:true});
+
+  /* ---------- friends: peek / add / trade ---------- */
+  document.querySelectorAll('.peekBtn').forEach(function(b){ b.addEventListener('click',function(){ S.pop(); document.getElementById('m-peek').classList.add('open'); }); });
+  document.getElementById('addFriendBtn').addEventListener('click',function(){ S.pop(); document.getElementById('m-addfriend').classList.add('open'); });
+
+  var giveIcons=[['🐙','×2'],['🐸','×3'],['🐝','×2'],['🐌','×2']];
+  var wantIcons=['🦄','🐬','🦈','🐺'];
+  function pickGrid(id,items,dup,cb){
+    var g=document.getElementById(id); g.innerHTML='';
+    items.forEach(function(it){
+      var icon=dup?it[0]:it;
+      var d=document.createElement('div');
+      d.className='sprite'; d.style.fontSize='30px'; d.textContent=icon;
+      if(dup){ var c=document.createElement('span'); c.className='sprite__count'; c.textContent=it[1]; d.appendChild(c); }
+      d.addEventListener('click',function(){ S.pop(); burstAt(d,10,5); cb(icon); });
+      g.appendChild(d);
+    });
+  }
+  function openTrade(){
+    S.pop();
+    document.getElementById('tradeStep1').style.display='';
+    document.getElementById('tradeStep2').style.display='none';
+    document.getElementById('tradeStep3').style.display='none';
+    document.getElementById('m-trade').classList.add('open');
+    pickGrid('giveGrid',giveIcons,true,function(icon){
+      document.getElementById('giveIcon').textContent=icon;
+      document.getElementById('tradeStep1').style.display='none';
+      document.getElementById('tradeStep2').style.display='';
+      pickGrid('wantGrid',wantIcons,false,function(icon2){
+        document.getElementById('wantIcon').textContent=icon2;
+        document.getElementById('tradeStep2').style.display='none';
+        document.getElementById('tradeStep3').style.display='';
+      });
+    });
+  }
+  document.getElementById('tradeBtn').addEventListener('click',openTrade);
+  document.getElementById('tradeBtn2').addEventListener('click',openTrade);
+  document.getElementById('sendTrade').addEventListener('click',function(e){
+    burstAt(e.currentTarget,34,9); S.win();
+    document.getElementById('m-trade').classList.remove('open');
+  });
+  document.getElementById('acceptTrade').addEventListener('click',function(e){
+    burstAt(e.currentTarget,40,10); rain(60); shake(); S.win();
+    document.getElementById('inboxCard').innerHTML='<div style="text-align:center;padding:8px;font-size:18px">🎉 Trade complete! 🦄 joined your collection.</div>';
+  });
+  document.getElementById('declineTrade').addEventListener('click',function(){
+    S.tap();
+    document.getElementById('inboxCard').innerHTML='<div style="text-align:center;padding:8px;font-size:16px;color:var(--ac-text-dim)">No trades waiting. 📭</div>';
+  });
+
+  /* ---------- parent portal ---------- */
+  document.querySelectorAll('.pp-chip').forEach(function(ch){
+    ch.addEventListener('click',function(){
+      document.querySelectorAll('.pp-chip').forEach(function(x){x.classList.remove('on');});
+      ch.classList.add('on');
+      var kid=ch.dataset.kid;
+      document.getElementById('pp-miles').style.display=kid==='miles'?'':'none';
+      document.getElementById('pp-jackson').style.display=kid==='jackson'?'':'none';
+      document.getElementById('prefName').textContent=kid==='miles'?'Miles':'Jackson';
+    });
+  });
+  document.querySelectorAll('[data-toggle]').forEach(function(t){ t.addEventListener('click',function(){ t.classList.toggle('on'); }); });
+  var appr=document.getElementById('ppApprove');
+  if(appr) appr.addEventListener('click',function(){
+    appr.closest('.pp-row').innerHTML='<span class="pp-muted">✓ TURBO_T approved — they\'ll appear on the kids\' Friends page.</span>';
+  });
+
+  /* minutes-per-day mini charts */
+  function bars(id,vals){
+    var g=document.getElementById(id); if(!g) return;
+    var mx=Math.max.apply(null,vals), days=['M','T','W','T','F','S','S'];
+    vals.forEach(function(v,i){
+      var w=document.createElement('div'); w.className='mini-bar';
+      var lab=v===mx?'<span class="val">'+v+'</span>':'';
+      w.innerHTML=lab+'<i style="height:'+Math.round(v/mx*62)+'px"></i><b>'+days[i]+'</b>';
+      g.appendChild(w);
+    });
+  }
+  bars('mb-miles',[10,15,8,18,12,21,0]);
+  bars('mb-jackson',[12,20,10,15,25,20,0]);
+})();
+</script>
+</body>
+</html>

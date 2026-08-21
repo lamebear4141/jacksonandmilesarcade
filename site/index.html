@@ -192,7 +192,7 @@
         <div class="fd-ticker">
           <span class="fd-dot"></span>
           <span class="fd-ticker__label">NOW&nbsp;PLAYING</span>
-          <span id="fdTickerMsg">🕹️ 7 games inside…</span>
+          <span id="fdTickerMsg">🕹️ 8 games inside…</span>
         </div>
       </div>
     </div>
@@ -220,7 +220,17 @@
         </div>
         <input class="ac-input" id="authEmail" type="email" placeholder="Email" autocomplete="email">
         <input class="ac-input" id="authPassword" type="password" placeholder="Password" autocomplete="current-password">
+        <input class="ac-input hidden" id="authPasswordConfirm" type="password" placeholder="Confirm password" autocomplete="new-password">
         <button class="ac-btn" id="authSubmit" type="button">Sign In</button>
+        <div style="text-align:center;margin-top:10px">
+          <button class="ac-btn--ghost" id="forgotLink" type="button">Forgot password?</button>
+        </div>
+        <div id="resetBox" class="hidden" style="margin-top:12px">
+          <label class="ac-label" for="resetEmail">We'll email you a link to set a new password</label>
+          <input class="ac-input" id="resetEmail" type="email" placeholder="Email" autocomplete="email">
+          <button class="ac-btn ac-btn--blue" id="resetSend" type="button">Send reset link</button>
+          <p class="ac-sub" id="resetMsg" style="margin:10px 0 0;text-align:center"></p>
+        </div>
         <div class="ac-divider">or</div>
         <button class="ac-btn--google" id="googleBtn" type="button">
           <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -318,7 +328,7 @@ import {
   onParentChange, signUpParent, signInParent, signOutParent, signInParentWithGoogle,
   addChild, updateChild, listChildren, getCurrentKid, setCurrentKid, clearCurrentKid,
   isGuestKid, listLocalGuests, addLocalGuest,
-  getTopScores,
+  getTopScores, sendPasswordReset,
 } from './firebase-config.js';
 import { mountHome } from './assets/home.js';
 import { GAMES } from './assets/catalog.js';
@@ -410,6 +420,10 @@ function setAuthMode(mode) {
   $('tabSignup').classList.toggle('is-active', mode === 'signup');
   $('authSubmit').textContent = mode === 'signin' ? 'Sign In' : 'Create Family Account';
   $('authPassword').autocomplete = mode === 'signin' ? 'current-password' : 'new-password';
+  // Sign-up asks for the password twice; forgot-password is sign-in only.
+  $('authPasswordConfirm').classList.toggle('hidden', mode !== 'signup');
+  $('forgotLink').parentElement.classList.toggle('hidden', mode !== 'signin');
+  if (mode !== 'signin') $('resetBox').classList.add('hidden');
   $('authError').classList.add('hidden');
 }
 $('tabSignin').addEventListener('click', () => setAuthMode('signin'));
@@ -434,6 +448,12 @@ $('authSubmit').addEventListener('click', async () => {
   const password = $('authPassword').value;
   const err = $('authError');
   err.classList.add('hidden');
+  // Sign-up: the two password fields must agree before anything is sent.
+  if (authMode === 'signup' && password !== $('authPasswordConfirm').value) {
+    err.textContent = "Those passwords don't match — type the same one in both boxes.";
+    err.classList.remove('hidden');
+    return;
+  }
   try {
     if (authMode === 'signin') await signInParent(email, password);
     else await signUpParent(email, password);
@@ -441,6 +461,38 @@ $('authSubmit').addEventListener('click', async () => {
     err.textContent = friendlyAuthError(e);
     err.classList.remove('hidden');
   }
+});
+
+/* ---------------------------------------------------------------- forgot password */
+$('forgotLink').addEventListener('click', () => {
+  $('resetBox').classList.toggle('hidden');
+  $('resetMsg').textContent = '';
+  if (!$('resetEmail').value) $('resetEmail').value = $('authEmail').value.trim();
+});
+
+$('resetSend').addEventListener('click', async () => {
+  const email = $('resetEmail').value.trim();
+  const msg = $('resetMsg');
+  if (!email) { msg.textContent = 'Type your email first.'; return; }
+  $('resetSend').disabled = true;
+  msg.textContent = 'Sending…';
+  try {
+    await sendPasswordReset(email);
+    msg.textContent = 'Check your email — if that address has a family account, a reset link is on its way.';
+  } catch (e) {
+    // Deliberately the SAME message for an unknown email, so this screen
+    // never reveals which addresses are registered.
+    if (e.code === 'auth/user-not-found') {
+      msg.textContent = 'Check your email — if that address has a family account, a reset link is on its way.';
+    } else if (e.code === 'auth/invalid-email') {
+      msg.textContent = "That doesn't look like a valid email.";
+    } else if (e.code === 'auth/too-many-requests') {
+      msg.textContent = 'Too many tries — wait a few minutes and try again.';
+    } else {
+      msg.textContent = "Couldn't send the link — check the internet and try again.";
+    }
+  }
+  $('resetSend').disabled = false;
 });
 
 $('googleBtn').addEventListener('click', async () => {
@@ -707,7 +759,7 @@ setInterval(() => {
    Only ever shows what's already in the public high_scores collection:
    nickname + score + game. Falls back to static lines while loading. */
 const tickerMsgs = [
-  '🕹️ 7 games inside…',
+  '🕹️ 8 games inside…',
   '⚡ Practice games earn 4× coins!',
   '🪂 Collect all 60 sprites!',
 ];

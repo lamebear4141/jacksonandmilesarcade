@@ -3,230 +3,1471 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Multiverse Collector</title>
+<title>Raining Cats and Dogs</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/arcade.css">
 <style>
-  :root{
-    --sky-top:#d9baff;
-    --sky-bottom:#a679e0;
-    --ground:#2d1b4e;
-    --accent-mine:#5cb85c;
-    --accent-mario:#e33e3e;
-    --accent-poke:#f5c518;
-    --accent-hockey:#4fc3f7;
-    --panel:#241640;
-    --ink:#f4f0ff;
-  }
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html,body{
-    margin:0; height:100%; overflow:hidden;
-    background: linear-gradient(180deg,var(--sky-top),var(--sky-bottom));
-    font-family: 'Trebuchet MS', 'Arial Rounded MT Bold', sans-serif;
-    touch-action: manipulation;
-    user-select:none;
-  }
-  #wrap{ position:relative; width:100vw; height:100vh; display:flex; flex-direction:column; align-items:center; }
+  /* Game-only styles. The shared chrome (bar, buttons, cards, modals)
+     comes from arcade.css; everything here is the play area itself. */
+  html, body { margin:0; min-height:100%; }
+  body { touch-action:manipulation; user-select:none; -webkit-user-select:none; }
 
-  #topbar{
-    width:100%; max-width:900px; display:flex; justify-content:space-between; align-items:center;
-    padding:10px 16px; color:var(--ink); font-weight:800; font-size:18px; letter-spacing:0.5px;
-    text-shadow:0 2px 0 rgba(0,0,0,0.3);
-  }
-  #topbar span.label{ opacity:0.7; font-weight:600; font-size:13px; display:block; }
+  #wrap{ max-width:960px; margin:0 auto; padding:0 12px 20px; }
 
-  canvas{
-    background: linear-gradient(180deg, #4fc3f7 0%, #1c7fd6 55%, #2d1b4e 55%, #2d1b4e 100%);
-    border-radius: 18px;
-    box-shadow: 0 0 0 4px #4a3080, 0 10px 30px rgba(0,0,0,0.5);
-    max-width: 96vw;
-    max-height: 60vh;
-    touch-action:none;
+  /* ---- ready screen (no character select — straight to PLAY) ---- */
+  #ready{ text-align:center; padding-top:6px; }
+  #ready .ac-card{ max-width:560px; text-align:center; }
+  .mc-howto{
+    font-size:clamp(22px,4vw,30px); font-weight:800; margin:14px 0 20px;
+    letter-spacing:2px;
   }
 
-  #picker{
-    width:100%; max-width:900px; text-align:center; padding:14px 10px;
-  }
-  #picker h1{
-    color:var(--ink); font-size:22px; margin:0 0 4px; text-shadow:0 2px 0 rgba(0,0,0,0.3);
-  }
-  #picker p{ color:#c9bfe8; margin:0 0 14px; font-size:14px; }
-  .chars{ display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
-  .char-btn{
-    background:var(--panel); border:3px solid transparent; border-radius:16px;
-    padding:14px 16px; font-size:34px; cursor:pointer; color:var(--ink);
-    display:flex; flex-direction:column; align-items:center; gap:6px;
-    transition: transform 0.12s ease, border-color 0.12s ease;
-    min-width:84px;
-  }
-  .char-btn span.name{ font-size:12px; font-weight:700; opacity:0.8; }
-  .char-btn:active{ transform: scale(0.94); }
-  .char-btn.selected{ border-color:var(--accent-poke); transform: translateY(-3px); }
-
-  #startBtn{
-    margin-top:16px; background:linear-gradient(180deg,#ffd23f,#e8a90c); color:#3a2400;
-    border:none; padding:14px 32px; border-radius:999px; font-weight:900; font-size:17px;
-    box-shadow:0 5px 0 #a97600; cursor:pointer; letter-spacing:0.5px;
-  }
-  #startBtn:active{ box-shadow:0 2px 0 #a97600; transform: translateY(3px); }
-
-  #controls{
-    width:100%; max-width:900px; display:flex; justify-content:center; gap:20px; padding:14px;
-  }
-  .ctrl-btn{
-    width:76px; height:76px; border-radius:20px; border:none;
-    background:var(--panel); color:var(--ink); font-size:30px; font-weight:900;
-    box-shadow:0 5px 0 #140a28; cursor:pointer;
-  }
-  .ctrl-btn:active{ box-shadow:0 2px 0 #140a28; transform: translateY(3px); }
-
-  #jumpBtn{ background: linear-gradient(180deg,#ff7a5c,#e33e3e); box-shadow:0 5px 0 #9c1f1f; width:96px;}
-  #jumpBtn:active{ box-shadow:0 2px 0 #9c1f1f; }
-
-  .hidden{ display:none !important; }
-
-  #gameover{
-    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-    flex-direction:column; background:rgba(20,10,40,0.92); color:var(--ink); text-align:center; padding:20px;
-    border-radius:18px; z-index:10;
-  }
-  #gameover h2{ font-size:28px; margin:0 0 6px; }
-  #gameover p{ margin:2px 0; font-size:16px; color:#d9cfff; }
-  #playAgain{
-    margin-top:16px; background:linear-gradient(180deg,#7ee0a8,#3fb96f); color:#06301a;
-    border:none; padding:12px 26px; border-radius:999px; font-weight:900; font-size:16px;
-    box-shadow:0 5px 0 #1c7a45; cursor:pointer;
+  /* ---- the play stage: canvas + HTML HUD floated over it ---- */
+  #stage{ position:relative; margin:0 auto; width:min(900px, 96vw); }
+  #gameCanvas{
+    display:block; width:100%; height:auto;
+    border:4px solid var(--ac-edge); border-radius:20px;
+    box-shadow:0 7px 0 var(--ac-edge), 0 14px 16px rgba(30,43,99,0.25);
   }
 
-  #celebration{
-    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%) scale(0.5);
-    font-size:36px; font-weight:900; color:#ffd23f; text-shadow:0 0 12px #ff9d00, 0 2px 0 rgba(0,0,0,0.5);
-    white-space:nowrap; pointer-events:none; opacity:0; z-index:20;
-    transition: opacity 0.15s ease, transform 0.15s ease;
+  .mc-hud{
+    position:absolute; top:10px; left:0; right:0;
+    display:flex; justify-content:space-between; align-items:flex-start;
+    padding:0 12px; pointer-events:none; gap:8px;
   }
-  #celebration.show{ opacity:1; transform:translate(-50%,-50%) scale(1); }
+  .mc-pill{
+    background:var(--ac-panel); border:4px solid var(--ac-edge); border-radius:999px;
+    padding:6px 14px; font-weight:800; font-size:clamp(13px,2.4vw,17px);
+    color:var(--ac-text); box-shadow:0 5px 0 var(--ac-edge); white-space:nowrap;
+  }
+  .mc-hud__left, .mc-hud__right{ display:flex; flex-direction:column; gap:6px; align-items:flex-start; }
+  .mc-hud__right{ align-items:flex-end; }
+  .mc-hud__center{ display:flex; flex-direction:column; align-items:center; gap:6px; }
 
-  #lockedScreen{
-    width:100%; max-width:520px; text-align:center; padding:60px 20px; color:var(--ink);
+  #timerPill{
+    min-width:76px; text-align:center; font-size:clamp(17px,3vw,22px);
+    border-radius:999px; padding:8px 16px;
   }
-  #lockedScreen .lockEmoji{ font-size:52px; display:block; margin-bottom:10px; }
-  #lockedScreen h2{ margin:0 0 8px; font-size:22px; }
-  #lockedScreen p{ color:#c9bfe8; margin:0 0 20px; font-size:14px; }
-  #lockedScreen a{
-    display:inline-block; color:#1a1030; background:var(--accent-poke,#f5c518);
-    font-weight:900; text-decoration:none; padding:12px 24px; border-radius:999px;
-    box-shadow:0 5px 0 #a97600;
+  #timerPill.is-storm{
+    background:var(--ac-yellow); color:var(--ac-edge);
+    animation:mc-pulse 0.7s ease-in-out infinite;
+  }
+  @keyframes mc-pulse{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.09); } }
+
+  #comboPill{
+    background:var(--ac-purple); color:#fff; font-size:12px; padding:3px 10px;
+    border-width:3px; box-shadow:0 3px 0 var(--ac-edge);
+    transition:transform 0.12s cubic-bezier(0.34,1.8,0.64,1);
+  }
+  #comboPill.pop{ transform:scale(1.35); }
+
+  #powerPill{ display:flex; flex-direction:column; gap:3px; align-items:center; padding:6px 14px 8px; font-size:12px; }
+  #powerBar{ width:80px; height:7px; border-radius:999px; background:var(--ac-line); overflow:hidden; border:2px solid var(--ac-edge); }
+  #powerBarFill{ height:100%; background:var(--ac-yellow); border-radius:999px; }
+
+  /* the "💰 COIN STORM!" banner slides in once */
+  #stormBanner{
+    position:absolute; top:26%; left:50%; transform:translate(-50%,-50%) scale(0);
+    background:var(--ac-yellow); color:var(--ac-edge);
+    border:4px solid var(--ac-edge); border-radius:999px; box-shadow:0 6px 0 var(--ac-edge);
+    padding:12px 26px; font-weight:800; font-size:clamp(18px,3.4vw,26px);
+    pointer-events:none; z-index:5;
+  }
+  #stormBanner.show{ animation:mc-banner 2.4s ease forwards; }
+  @keyframes mc-banner{
+    0%{ transform:translate(-50%,-50%) scale(0); }
+    12%{ transform:translate(-50%,-50%) scale(1.15); }
+    20%{ transform:translate(-50%,-50%) scale(1); }
+    80%{ transform:translate(-50%,-50%) scale(1); opacity:1; }
+    100%{ transform:translate(-50%,-50%) scale(0.8); opacity:0; }
   }
 
-  #playingAsLabel{ font-weight:800; color:#ffd23f; margin:0 0 4px; font-size:13px; }
-  #switchProfileLink{
-    background:none; border:none; padding:0; font:inherit; font-size:12px; font-weight:700;
-    color:#c9bfe8; text-decoration:underline; cursor:pointer; margin:0 0 10px;
+  /* big 67 celebration */
+  #bigMoment{
+    position:absolute; top:40%; left:50%; transform:translate(-50%,-50%) scale(0.4);
+    font-weight:800; font-size:clamp(22px,4.4vw,34px); color:var(--ac-yellow);
+    -webkit-text-stroke:2px var(--ac-edge); paint-order:stroke fill;
+    text-shadow:0 4px 0 rgba(30,43,99,0.3); white-space:nowrap;
+    pointer-events:none; opacity:0; z-index:6;
+    transition:opacity 0.15s ease, transform 0.15s ease;
+    font-family:var(--ac-font);
+  }
+  #bigMoment.show{ opacity:1; transform:translate(-50%,-50%) scale(1); }
+
+  /* ---- touch pads: chunky, 1st-grade-thumb sized, corners only ---- */
+  #pads{ display:none; }
+  @media (pointer: coarse){
+    #pads{ display:block; }
+  }
+  .mc-pad{
+    position:fixed; bottom:14px; z-index:20;
+    width:76px; height:76px; border-radius:22px;
+    background:linear-gradient(180deg,var(--ac-blue),var(--ac-blue-deep));
+    color:#fff; font-size:30px; font-weight:900; font-family:inherit;
+    border:4px solid var(--ac-edge); box-shadow:0 6px 0 var(--ac-edge);
+    cursor:pointer; touch-action:none;
+  }
+  .mc-pad:active{ transform:translateY(6px); box-shadow:0 0 0 var(--ac-edge); }
+  #padLeft{ left:12px; }
+  #padRight{ left:98px; }
+  #padJump{
+    right:12px; width:96px;
+    background:linear-gradient(180deg,var(--ac-red),var(--ac-red-deep));
   }
 
-  #leaderboard{ margin:14px 0; text-align:left; max-width:220px; margin-left:auto; margin-right:auto; }
-  .lbTitle{ font-size:13px; font-weight:800; text-align:center; margin:0 0 6px; color:#ffd23f; }
-  #leaderboardList{ margin:0; padding-left:20px; font-size:13px; color:#d9cfff; }
+  /* ---- results ---- */
+  #results .ac-modal__card{ width:min(360px, 92vw); }
+  #results h2{ margin:0 0 8px; font-size:24px; }
+  .mc-results-line{ font-size:15px; font-weight:800; margin:4px 0; }
+  .mc-results-divider{ border-top:3px dashed var(--ac-line); margin:12px 0; }
+  #awardLine{ color:var(--ac-purple-deep); font-weight:800; min-height:1.2em; margin:6px 0; font-size:14px; }
+  #leaderboard{ margin:10px 0 4px; text-align:left; }
+  .lbTitle{ font-size:13px; font-weight:800; text-align:center; margin:0 0 6px; color:var(--ac-text-dim); }
+  #leaderboardList{ margin:0; padding-left:24px; font-size:13px; color:var(--ac-text-dim); font-weight:700; }
   #leaderboardList li{ margin-bottom:2px; }
+  .mc-results-btns{ display:flex; flex-direction:column; gap:10px; margin-top:8px; }
+  .mc-results-headline{ font-size:21px; margin:2px 0 4px; }
+  .mc-chips{ display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin:2px 0 4px; }
+  .mc-chip{
+    display:flex; align-items:center; gap:5px;
+    background:var(--ac-panel-2); border:3px solid var(--ac-line); border-radius:999px;
+    padding:3px 11px; font-size:11px; font-weight:800; color:var(--ac-text);
+  }
+  .mc-chip__new{ color:var(--ac-red-deep); }
+  .mc-chip__dupe{ color:var(--ac-text-dim); }
+  #capLine{ font-size:13px; font-weight:800; color:var(--ac-text-dim); margin:4px 0 0; }
+
+  @media (prefers-reduced-motion: reduce){
+    #timerPill.is-storm{ animation:none; }
+    #stormBanner.show{ animation:none; transform:translate(-50%,-50%) scale(1); opacity:1; }
+  }
 </style>
 </head>
-<body>
+<body class="ac-page">
 <div id="wrap">
 
-  <div id="lockedScreen" class="hidden">
-    <span class="lockEmoji">🔒</span>
-    <h2>Pick a player first!</h2>
-    <p>Head back to the arcade, then sign in or tap "Just play for fun."</p>
-    <a href="../index.html">&larr; Back to the Arcade</a>
-  </div>
-
-  <div id="picker" class="hidden">
-    <h1>Multiverse Collector</h1>
-    <p id="playingAsLabel"></p>
-    <button id="switchProfileLink" type="button">Switch profile</button>
-    <p>Pick your hero, then catch the good stuff and dodge the bad stuff!</p>
-    <div class="chars" id="charChoices">
-      <button class="char-btn selected" data-emoji="🟩" data-name="Blocky">🟩<span class="name">Blocky</span></button>
-      <button class="char-btn" data-emoji="🍄" data-name="Shroom">🍄<span class="name">Shroom</span></button>
-      <button class="char-btn" data-emoji="⚡" data-name="Sparky">⚡<span class="name">Sparky</span></button>
-      <button class="char-btn" data-emoji="🏒" data-name="Puckster">🏒<span class="name">Puckster</span></button>
+  <!-- ready screen: one card, one button, straight into the rain -->
+  <div id="ready" class="hidden">
+    <div class="ac-card">
+      <h2>🌧️ Raining Cats and Dogs</h2>
+      <p class="ac-sub">Grab your trampoline and bounce every pet up to the Safe Cloud. You can never lose!</p>
+      <p class="mc-howto">🐶 → 🛝 → ☁️<br>Bounce them home!</p>
+      <button class="ac-btn ac-btn--xl" id="playBtn" type="button">▶ PLAY</button>
     </div>
-    <button id="startBtn">Start Game</button>
   </div>
 
-  <div id="topbar" class="hidden">
-    <div><span class="label">SCORE</span><span id="scoreVal">0</span></div>
-    <div><span class="label">LIVES</span><span id="livesVal">❤️❤️❤️</span></div>
+  <!-- the run -->
+  <div id="stage" class="hidden">
+    <canvas id="gameCanvas" width="960" height="720"></canvas>
+    <div class="mc-hud">
+      <div class="mc-hud__left">
+        <span class="mc-pill" id="scorePill">⭐ 0</span>
+        <span class="mc-pill hidden" id="comboPill">×2</span>
+      </div>
+      <div class="mc-hud__center">
+        <span class="mc-pill" id="timerPill">90</span>
+        <span class="mc-pill hidden" id="powerPill">
+          <span id="powerName">🧲 Magnet</span>
+          <span id="powerBar"><span id="powerBarFill" style="width:100%"></span></span>
+        </span>
+      </div>
+      <div class="mc-hud__right">
+        <span class="mc-pill" id="bagPill">💰 0</span>
+        <span class="mc-pill" id="spritePill">✨ 0</span>
+      </div>
+    </div>
+    <div id="stormBanner">💰 COIN STORM!</div>
+    <div id="bigMoment">🎉 67! +1000 🎉</div>
   </div>
 
-  <div style="position:relative;">
-    <canvas id="game" width="640" height="380" class="hidden"></canvas>
-    <div id="celebration">🎉 67! +1000 🎉</div>
-    <div id="gameover" class="hidden">
-      <h2>Game Over!</h2>
-      <p id="finalScore">Score: 0</p>
-      <p id="highScore">Best: 0</p>
-      <p id="awardLine" style="color:#ffd23f;font-weight:800;min-height:1.2em;"></p>
+  <!-- touch pads (coarse pointers only) -->
+  <div id="pads">
+    <button class="mc-pad" id="padLeft" type="button">◀</button>
+    <button class="mc-pad" id="padRight" type="button">▶</button>
+    <button class="mc-pad" id="padJump" type="button">⬆</button>
+  </div>
+
+  <!-- results (replaces "game over" — there is no losing) -->
+  <div id="results" class="ac-modal hidden">
+    <div class="ac-modal__card">
+      <h2 id="resultsTitle">🎉 TIME!</h2>
+      <p class="mc-results-line mc-results-headline" id="resultsPets">🐾 0 pets safe!</p>
+      <p><span class="ac-badge ac-badge--hot hidden" id="bestBadge">NEW BEST!</span></p>
+      <p class="mc-results-line" id="resultsScore">⭐ 0 points</p>
+      <p class="mc-results-line" id="resultsCombo">🛝 Best combo ×1</p>
+      <div class="mc-results-divider"></div>
+      <p class="mc-results-line" id="resultsBags">💰 0 coin bags</p>
+      <p class="mc-results-line" id="resultsSpritesLabel"></p>
+      <div class="mc-chips" id="resultsSprites"></div>
+      <div class="mc-results-divider"></div>
+      <p id="awardLine"></p>
+      <p id="capLine" class="hidden"></p>
       <div id="leaderboard">
         <p class="lbTitle">🏆 Top Scores</p>
         <ol id="leaderboardList"></ol>
       </div>
-      <button id="playAgain">Play Again</button>
+      <div class="mc-results-btns">
+        <button class="ac-btn ac-btn--xl" id="playAgain" type="button">▶ PLAY AGAIN</button>
+        <button class="ac-btn ac-btn--blue" id="myCharacterBtn" type="button">🏠 My Character</button>
+      </div>
     </div>
   </div>
 
-  <div id="controls" class="hidden">
-    <button class="ctrl-btn" id="leftBtn">◀</button>
-    <button class="ctrl-btn" id="rightBtn">▶</button>
-    <button class="ctrl-btn" id="jumpBtn">⬆</button>
-  </div>
 </div>
 
 <script type="module">
 import {
-  onParentChange, getCurrentKid, clearCurrentKid, saveHighScore, getTopScores, getLocalTopScores,
-  isGuestKid, saveChildProgress, loadChildProgress,
+  saveHighScore, getTopScores, getLocalTopScores,
+  saveChildProgress, loadChildProgress,
 } from '../firebase-config.js';
-import { mountBar, finishRun, celebrateLevelUp, describeAward } from '../assets/arcade-shell.js';
+import {
+  mountBar, requireKid, finishRun, celebrateLevelUp, describeAward,
+  sfx, confetti, confettiRain, celebrate, isGuestKid, loadCharacter,
+} from '../assets/arcade-shell.js';
+import { SPRITES, RARITY, spriteId, SKINS, PETS } from '../assets/catalog.js';
 
 const GAME_ID = 'multiverse-collector';
-let currentKid = null;
 
-// Switching who's playing always routes back through the arcade's picker —
-// never silently, and a real kid has to re-enter their own PIN there.
-document.getElementById('switchProfileLink').addEventListener('click', () => {
-  clearCurrentKid();
-  window.location.href = '../index.html';
-});
+/* =====================================================================
+   CONFIG — every tunable number in the game, in plain language.
+   Retune the whole feel from this block without reading the game code.
+   ===================================================================== */
+const CONFIG = {
+  runSeconds: 45,                  // how long one run lasts
 
-onParentChange(async (user) => {
-  const kid = getCurrentKid();
-  const guest = kid && isGuestKid(kid.id);
-  currentKid = (guest || user) ? kid : null;
-  if (!currentKid) {
-    document.getElementById('picker').classList.add('hidden');
-    document.getElementById('lockedScreen').classList.remove('hidden');
+  // Intensity ramp — ONLY count and frequency change, never speed.
+  spawnEveryMs:   { start: 850, end: 330 },   // time between drops; ramps fast now the run is short
+  maxOnScreen:    { start: 4,   end: 9  },    // how many items can be falling at once
+
+  // Constant fall speeds (px/sec on the 720px-tall canvas). Used as-is from
+  // second 0 to the last second — NOTHING in the game scales these.
+  fallSpeed: { pet: 250, coinBag: 230, sprite: 210, bad: 300, power: 240 },
+
+  // Where things come from: most simply fall out of the sky, the rest are
+  // lobbed in from a rain cloud parked at the left or right edge.
+  entry: {
+    topWeight: 0.65,         // fraction of drops that fall from a random x up top
+    sideWeight: 0.35,        // the rest are LOBBED in from off-screen left or right
+    sideSpeedX: { min: 140, max: 260 },    // horizontal speed for lobbed items (px/s)
+    sideLaunchY: { min: 0.05, max: 0.35 }, // entry height as a fraction of canvas height
+    gravity: 520,            // px/s² on lobbed items only, so they arc instead of gliding
+    topSpread: 'uniform',    // random x across the full width, min 40px from the edges
+    noRepeatX: 90,           // the next top drop must be this far from the last one
+  },
+
+  // Spawn weights (relative chances) — what comes down out of the rain
+  weights: { pet: 58, coinBag: 8, bad: 12, sprite: 6, power: 4 },
+  petPurseChance: 0.2,             // this many pets wear a coin purse (pet + coin bag in one)
+
+  // Bad-item legibility: warn before they enter, keep them away from pets
+  badWarning: {
+    leadMs: 400,                   // the red ▼ marker shows this long before the item enters
+    minDistFromPetPx: 60,          // never spawn a bad item this close to a high-up pet's x
+  },
+
+  // Final stretch
+  coinStormLastSeconds: 10,        // last 10s: coin bag weight ×3, timer pulses gold
+  sixtySevenChance: 0.004,         // per spawn — the rare 🦙 67 easter egg stays
+
+  // Scoring
+  points: { pet: 10, coinBag: 25, sprite: 50, sixtySeven: 1000 },
+  badItemPenalty: 15,              // score only, floors at 0 — never a life, never a game over
+  stunMs: 700,                     // floppy trampoline: can't bounce for this long
+  comboStep: 5,                    // every 5 clean catches raises the multiplier…
+  comboMax: 4,                     // …up to ×4; a bad item resets it to ×1
+  rushCombo: 12,                   // 12 clean catches → RAINBOW RUSH
+  rushSeconds: 4,                  // …4s of pets + coin bags only, ×2 points
+
+  // Power-ups (timed, one active at a time; a new one replaces the old)
+  power: { magnetSeconds: 6, magnetRadius: 160, bigBagSeconds: 7, bigBagScale: 1.6,
+           doubleCoinSeconds: 8 },   // bigBag = 🛝 Big Trampoline
+
+  // Sprite rarity odds for this game (fun game = common-heavy; mythic never drops here)
+  spriteOdds: { common: 0.80, rare: 0.15, epic: 0.045, legendary: 0.005 },
+  maxSpritesPerRun: 3,             // cap so this can't out-farm the practice games
+
+  // Rewards → finishRun units: 1 unit per coin bag, 2 per sprite, 1 per 150 score
+  unitsPer: { coinBag: 1, sprite: 2, scorePer: 150 },
+
+  // Hero feel (px/sec on the 720px-tall canvas). The trampoline is the
+  // catch surface — wider than the kid on purpose.
+  hero: { speed: 420, jumpVelocity: 620, trampolineWidth: 120,
+          gravity: 2100, width: 40, height: 66 },
+
+  // End-of-run grace: items already falling can still be caught this long
+  catchUpSeconds: 1.5,
+};
+
+// Testing knob: open the page with ?t=10 for a 10-second run.
+{
+  const t = Number(new URLSearchParams(location.search).get('t'));
+  if (Number.isFinite(t) && t >= 5 && t <= 600) CONFIG.runSeconds = t;
+}
+
+/* ---------------- casts ---------------- */
+const FALLING_PETS = ['🐶', '🐱', '🐰', '🐹', '🐢'];
+const PET_TOKEN_COLORS = ['#FFF4DA', '#FFDDE7', '#D6EBFF'];   // cream / pink / baby blue
+const BAD_ITEMS = [
+  { emoji: '🪨', cloud: false },
+  { emoji: '⚓', cloud: false },
+  { emoji: '🌵', cloud: false },
+  { emoji: '⛈️', cloud: true },   // the one gray bad item: red ring + spin + flicker carry it
+];
+
+const NAVY = '#1E2B63';
+const BAD_RED = '#FF4D4D';
+const FONT = '"Baloo 2","Arial Rounded MT Bold",sans-serif';
+const reducedMotion = () =>
+  window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* =====================================================================
+   BOOT — profile gate, top bar, equipped skin + pet
+   ===================================================================== */
+let kid = null;
+let kidFace = '🙂';        // the kid under the trampoline wears the equipped skin's face
+let cheerPet = '';         // equipped pet cheers from the grass (cosmetic only)
+let best = 0;         // best score
+let bestPets = 0;     // best "pets safe" — the stat the results screen leads on
+let preCounts = {};   // the collection as it stood before this run, for NEW! / ×N
+
+kid = await requireKid({ gameName: 'Raining Cats and Dogs' });
+if (kid) {
+  mountBar({ title: 'Raining Cats and Dogs', mount: document.getElementById('wrap') });
+  document.getElementById('ready').classList.remove('hidden');
+  loadChildProgress(kid.id, GAME_ID).then((p) => {
+    best = p?.best || 0;
+    bestPets = p?.bestPets || 0;
+  }).catch(() => {});
+  loadCharacter(kid.id).then((c) => {
+    const skin = SKINS.find((s) => s.id === c?.skin);
+    if (skin && skin.g) kidFace = skin.g;
+    const pet = PETS.find((p) => p.id === c?.pet);
+    if (pet && pet.g) cheerPet = pet.g;
+  }).catch(() => {});
+}
+
+/* =====================================================================
+   DOM handles
+   ===================================================================== */
+const $ = (id) => document.getElementById(id);
+const canvas = $('gameCanvas');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+
+/* =====================================================================
+   GAME STATE
+   All timing runs on "game time" — a clock that only advances while the
+   run loop is actually running, so a hidden tab never eats run time.
+   ===================================================================== */
+let state = 'ready';          // ready | countdown | playing | catchup | stamp | results
+let gt = 0;                   // game time, seconds
+let lastFrame = 0;
+let rafId = null;
+
+let hero, items, particles, floaters, flyers, runners, warnings, bushes, rainClouds, edgePuff;
+let score, petsSaved, cloudCount, bagsCaught, bagUnits, spritesWon, cleanCatches, bestCombo;
+let spawnClock, stunUntil, rushUntil, power, stormStarted, sixtySevenHits, lastSpawnX;
+let cloudPuffUntil = 0, happyUntil = 0, happyFace = '🐶';
+let phaseUntil = 0;
+let countdownStep = 0;
+
+const BUSH_XS = [70, 225, 385, 545, 705, 880];
+
+function resetRun() {
+  gt = 0; lastFrame = 0;
+  const h = CONFIG.hero;
+  hero = {
+    x: W / 2 - h.width / 2, y: 0, w: h.width, h: h.height,
+    vy: 0, onGround: true, dir: 1, moving: false,
+    squashUntil: 0, catchAt: -9, travel: 0, petX: W / 2 - 60,
+  };
+  hero.y = groundY() - hero.h;
+  items = []; particles = []; floaters = []; flyers = []; runners = []; warnings = [];
+  bushes = BUSH_XS.map((x) => ({ x, squashUntil: 0 }));
+  // Scenery that matches the ramp: 1 cloud at the start, 3 by the end.
+  rainClouds = [
+    { x: W * 0.28, y: 96,  vx: 14, appearedAt: -1 },
+    { x: W * 0.66, y: 138, vx: 10, appearedAt: -1 },
+    { x: W * 0.46, y: 66,  vx: 18, appearedAt: -1 },
+  ];
+  edgePuff = { left: -9, right: -9 };
+  score = 0; petsSaved = 0; cloudCount = 0; bagsCaught = 0; bagUnits = 0;
+  spritesWon = []; cleanCatches = 0; bestCombo = 1;
+  spawnClock = 0; stunUntil = 0; rushUntil = 0; power = null;
+  stormStarted = false; sixtySevenHits = 0; lastSpawnX = -999;
+  cloudPuffUntil = 0; happyUntil = 0;
+  updateHud(true);
+}
+
+/* ---------------- geometry helpers ---------------- */
+function groundY(){ return H - 90; }              // where the kid's feet sit
+const SPAWN_Y = 40;                                // where falling things enter
+const CLOUD = { x: 96, y: 158, doorX: 148, doorY: 158 };   // the Safe Cloud, top-left
+
+const lerp = (a, b, t) => a + (b - a) * Math.max(0, Math.min(1, t));
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function progress(){ return gt / CONFIG.runSeconds; }
+function remaining(){ return Math.max(0, CONFIG.runSeconds - gt); }
+function inRush(){ return gt < rushUntil; }
+function inStorm(){ return state === 'playing' && remaining() <= CONFIG.coinStormLastSeconds; }
+function stunned(){ return gt < stunUntil; }
+function comboMult(){ return Math.min(CONFIG.comboMax, 1 + Math.floor(cleanCatches / CONFIG.comboStep)); }
+
+/* =====================================================================
+   SOUND — the shared sfx palette, plus one local "whoosh" for bad-item
+   entries (nope-flavored but quieter; respects the shared mute).
+   ===================================================================== */
+let whooshCtx = null;
+function whoosh(){
+  if (sfx.isMuted()) return;
+  try {
+    whooshCtx = whooshCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (whooshCtx.state === 'suspended') whooshCtx.resume().catch(() => {});
+    const t0 = whooshCtx.currentTime;
+    const osc = whooshCtx.createOscillator();
+    const gain = whooshCtx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(340, t0);
+    osc.frequency.exponentialRampToValueAtTime(110, t0 + 0.22);
+    gain.gain.setValueAtTime(0.035, t0);
+    gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.22);
+    osc.connect(gain).connect(whooshCtx.destination);
+    osc.start(t0); osc.stop(t0 + 0.25);
+  } catch { /* sound is never worth an error */ }
+}
+
+/* =====================================================================
+   SPAWNING — what comes down out of the rain
+   ===================================================================== */
+function rollSpriteRarity(){
+  const odds = CONFIG.spriteOdds;
+  let x = Math.random();
+  for (const r of ['legendary', 'epic', 'rare']) {
+    if (x < odds[r]) return r;
+    x -= odds[r];
+  }
+  return 'common';
+}
+
+function rollType(){
+  const w = { ...CONFIG.weights };
+  if (inRush()) { w.bad = 0; w.sprite = 0; w.power = 0; }
+  if (inStorm()) w.coinBag *= 3;
+  const fallingSprites = items.filter((it) => it.type === 'sprite').length;
+  if (spritesWon.length + fallingSprites >= CONFIG.maxSpritesPerRun) w.sprite = 0;
+  const total = Object.values(w).reduce((s, v) => s + v, 0);
+  let x = Math.random() * total;
+  for (const [type, weight] of Object.entries(w)) { x -= weight; if (x <= 0) return type; }
+  return 'pet';
+}
+
+function spawnX(){
+  // anywhere across the sky, but never twice in the same column
+  const span = W - 80;                       // stay 40px clear of each edge
+  for (let tries = 0; tries < 10; tries++) {
+    const x = 40 + Math.random() * span;
+    if (Math.abs(x - lastSpawnX) >= CONFIG.entry.noRepeatX) { lastSpawnX = x; return x; }
+  }
+  lastSpawnX = 40 + Math.random() * span;
+  return lastSpawnX;
+}
+
+/** Straight down out of the sky, or lobbed in from an edge cloud?
+    A lob starts just off-screen and arcs under `entry.gravity`. */
+function rollEntry(type){
+  const e = CONFIG.entry;
+  const speed = CONFIG.fallSpeed[type] || CONFIG.fallSpeed.pet;
+  if (Math.random() >= e.sideWeight / (e.topWeight + e.sideWeight)) {
+    return { mode: 'top', x: spawnX() };
+  }
+  const fromLeft = Math.random() < 0.5;
+  const y = H * (e.sideLaunchY.min + Math.random() * (e.sideLaunchY.max - e.sideLaunchY.min));
+  let vx = e.sideSpeedX.min + Math.random() * (e.sideSpeedX.max - e.sideSpeedX.min);
+  const vy = speed * 0.4;                    // gravity takes over from here
+  // Clamp so it can never sail off the far side before reaching the ground.
+  const fall = Math.max(1, groundY() - 14 - y);
+  const t = (Math.sqrt(vy * vy + 2 * e.gravity * fall) - vy) / e.gravity;
+  const room = W - 60;
+  if (vx * t > room) vx = room / t;
+  return { mode: 'side', x: fromLeft ? -30 : W + 30, y, vx: fromLeft ? vx : -vx, vy, side: fromLeft ? 'left' : 'right' };
+}
+
+/** Put a built item into the sky along its entry path. */
+function launch(it, entry){
+  it.x = entry.x;
+  if (entry.mode === 'side') {
+    it.y = entry.y; it.vx = entry.vx; it.vy = entry.vy;
+    it.lobbed = true;                         // arcs in; see update()
+    edgePuff[entry.side] = gt;                // its cloud puffs as it throws
+  } else {
+    it.y = SPAWN_Y; it.vx = 0;
+    it.vy = CONFIG.fallSpeed[it.type] || CONFIG.fallSpeed.pet;   // constant, all run
+    it.lobbed = false;
+  }
+  items.push(it);
+}
+
+const GOOD_TYPES = ['pet', 'coinBag', 'sprite', 'power', 'sixtyseven'];
+// The magnet pulls the things worth saving — not power-ups, never bad items.
+const MAGNET_TYPES = ['pet', 'coinBag', 'sprite'];
+
+function badXIsClear(x){
+  // legibility guard: a bad item never starts near a pet that's still
+  // high in the sky, so the two families don't overlap mid-air
+  return !items.some((it) =>
+    GOOD_TYPES.includes(it.type) && it.y < H * 0.4 &&
+    Math.abs(it.x - x) < CONFIG.badWarning.minDistFromPetPx);
+}
+
+/** A bad item needs an entry that isn't stacked on top of a falling pet.
+    Side lobs always qualify — they start off-screen. */
+function findBadEntry(){
+  for (let tries = 0; tries < 8; tries++) {
+    const entry = rollEntry('bad');
+    if (entry.mode === 'side' || badXIsClear(entry.x)) return entry;
+  }
+  return null;
+}
+
+function spawnItem(){
+  // The 67 easter egg rolls first, independent of everything else.
+  if (Math.random() < CONFIG.sixtySevenChance) {
+    launch({ type: 'sixtyseven', size: 26, seed: Math.random() * 10, chute: 'gold' },
+           rollEntry('sixtyseven'));
     return;
   }
-  document.getElementById('lockedScreen').classList.add('hidden');
-  document.getElementById('picker').classList.remove('hidden');
-  if (!window.__barMounted) {
-    window.__barMounted = true;
-    mountBar({ title: 'Multiverse Collector', mount: document.getElementById('wrap') });
-  }
-  document.getElementById('playingAsLabel').textContent = guest
-    ? `Playing as ${currentKid.nickname} · this device only`
-    : `Playing as ${currentKid.nickname}`;
-  const progress = await loadChildProgress(currentKid.id, GAME_ID).catch(() => null);
-  best = progress?.best || 0;
-});
 
-async function renderLeaderboard() {
-  const list = document.getElementById('leaderboardList');
+  const type = rollType();
+
+  if (type === 'bad') {
+    const entry = findBadEntry();
+    if (!entry) {                           // nowhere clear for it — send a pet instead
+      launch(makeGood('pet'), rollEntry('pet'));
+      return;
+    }
+    // the red ▼ warns first; the item enters on that exact path when it expires
+    warnings.push({
+      entry,
+      markerX: entry.mode === 'side' ? (entry.x < 0 ? 26 : W - 26) : entry.x,
+      entryAt: gt + CONFIG.badWarning.leadMs / 1000,
+      def: pick(BAD_ITEMS),
+    });
+    return;
+  }
+
+  launch(makeGood(type), rollEntry(type));
+}
+
+/** Build a good item — launch() decides where it comes in. */
+function makeGood(type){
+  const it = { type, size: 26, seed: Math.random() * 10 };
+  if (type === 'pet') {
+    it.emoji = pick(FALLING_PETS);
+    it.tokenColor = pick(PET_TOKEN_COLORS);
+    it.chute = 'umbrella';
+    it.purse = Math.random() < CONFIG.petPurseChance;   // pet + coin bag in one
+  } else if (type === 'coinBag') {
+    // plain falling coin bag, no chute (it's heavy)
+  } else if (type === 'power') {
+    it.power = pick(['magnet', 'bigBag', 'doubleCoin']);
+  } else if (type === 'sprite') {
+    const rarity = rollSpriteRarity();
+    const pool = SPRITES.map((s, i) => ({ s, i })).filter((e) => e.s.r === rarity);
+    const chosen = pick(pool);
+    it.spriteIdx = chosen.i; it.rarity = rarity; it.emoji = chosen.s.g;
+    it.chute = 'rainbow';
+  }
+  return it;
+}
+
+function enterBadItem(w){
+  whoosh();
+  launch({ type: 'bad', size: 26, emoji: w.def.emoji, isCloud: w.def.cloud,
+           rot: 0, seed: Math.random() * 10 }, w.entry);
+}
+
+/* =====================================================================
+   CATCHING & MISSING
+   ===================================================================== */
+function bigScale(){ return (power && power.type === 'bigBag' && gt < power.until) ? CONFIG.power.bigBagScale : 1; }
+
+function heroHitbox(){
+  // the TRAMPOLINE is the catch surface, floating above the kid's head
+  const tw = CONFIG.hero.trampolineWidth * bigScale();
+  const cx = hero.x + hero.w / 2;
+  const ty = hero.y - 26;
+  return { x: cx - tw / 2, y: ty - 10, w: tw, h: 30 };
+}
+
+function addFloater(x, y, text, color){
+  floaters.push({ x, y, text, color: color || '#FFFFFF', age: 0 });
+}
+function burst(x, y, color, n = 10){
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, sp = 60 + Math.random() * 160;
+    particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 80, life: 0.6, color, size: 3 + Math.random() * 4 });
+  }
+}
+
+function earn(base){
+  const pts = Math.round(base * comboMult() * (inRush() ? 2 : 1));
+  score += pts;
+  return pts;
+}
+
+function onCleanCatch(){
+  const before = comboMult();
+  cleanCatches++;
+  bestCombo = Math.max(bestCombo, comboMult());
+  if (comboMult() > before) {
+    sfx.play('pop');
+    const pill = $('comboPill');
+    pill.classList.remove('pop'); void pill.offsetWidth; pill.classList.add('pop');
+  }
+  if (cleanCatches % CONFIG.rushCombo === 0 && !inRush()) startRush();
+}
+
+function startRush(){
+  rushUntil = gt + CONFIG.rushSeconds;
+  sfx.play('win');
+  confetti(window.innerWidth / 2, window.innerHeight / 2, 60);
+  addFloater(W / 2, H * 0.4, '🌈 RAINBOW RUSH!', '#FFC93C');
+}
+
+function activatePower(name){
+  const secs = { magnet: CONFIG.power.magnetSeconds, bigBag: CONFIG.power.bigBagSeconds, doubleCoin: CONFIG.power.doubleCoinSeconds }[name];
+  power = { type: name, until: gt + secs, total: secs };
+  sfx.play('pop');
+}
+
+/** Bounce something up to the Safe Cloud: the trampoline dips, the kid
+    hops, and the passenger flies off the top with a sparkle trail. */
+function bounceToCloud(emoji){
+  hero.catchAt = gt;
+  const hb = heroHitbox();
+  flyers.push({ emoji, t: 0, fx: hb.x + hb.w / 2, fy: hb.y });
+}
+
+function catchItem(it){
+  const cx = it.x, cy = it.y;
+  switch (it.type) {
+    case 'pet': {
+      petsSaved++;
+      let pts = earn(CONFIG.points.pet);
+      if (it.purse) {
+        bagsCaught++;
+        bagUnits += (power && power.type === 'doubleCoin' && gt < power.until) ? 2 : 1;
+        pts += earn(CONFIG.points.coinBag);
+        sfx.play('coin');
+        addFloater(cx, cy - 30, (power && power.type === 'doubleCoin' && gt < power.until ? '+2' : '+1') + ' 🪙', '#FFC93C');
+        burst(cx, cy, '#FFC93C', 10);
+      } else {
+        sfx.play('tap');
+      }
+      addFloater(cx, cy, 'Wheee! +' + pts);
+      bounceToCloud(it.emoji);
+      onCleanCatch();
+      break;
+    }
+    case 'coinBag': {
+      const double = power && power.type === 'doubleCoin' && gt < power.until;
+      bagsCaught++;
+      bagUnits += double ? 2 : 1;
+      const pts = earn(CONFIG.points.coinBag);
+      sfx.play('coin');
+      addFloater(cx, cy, (double ? '+2' : '+1') + ' 🪙', '#FFC93C');
+      addFloater(cx, cy - 30, '+' + pts);
+      burst(cx, cy, '#FFC93C', 12);
+      onCleanCatch();
+      break;
+    }
+    case 'sprite': {
+      spritesWon.push(it.spriteIdx);
+      const pts = earn(CONFIG.points.sprite);
+      sfx.play(it.rarity === 'legendary' ? 'win' : 'pop');
+      const sp = SPRITES[it.spriteIdx];
+      addFloater(cx, cy, `${sp.g} ${sp.n}!`, RARITY[it.rarity].color);
+      addFloater(cx, cy - 30, '+' + pts);
+      burst(cx, cy, RARITY[it.rarity].color, 14);
+      bounceToCloud(it.emoji);
+      onCleanCatch();
+      break;
+    }
+    case 'power': {
+      activatePower(it.power);
+      addFloater(cx, cy, { magnet: '🧲 Magnet!', bigBag: '🛝 Big Trampoline!', doubleCoin: '✨ Double Coins!' }[it.power], '#FFC93C');
+      onCleanCatch();
+      break;
+    }
+    case 'bad': {
+      score = Math.max(0, score - CONFIG.badItemPenalty);
+      cleanCatches = 0;
+      stunUntil = gt + CONFIG.stunMs / 1000;
+      sfx.play('nope');
+      addFloater(cx, cy, 'Whoa! Floppy trampoline!', '#FF8A8A');
+      break;
+    }
+    case 'sixtyseven': {
+      sixtySevenHits++;
+      score += CONFIG.points.sixtySeven;
+      sfx.play('win');
+      confettiRain(140);
+      if (!reducedMotion()) {
+        document.body.classList.add('shake');
+        setTimeout(() => document.body.classList.remove('shake'), 400);
+      }
+      const el = $('bigMoment');
+      el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 2000);
+      bounceToCloud('🦙');
+      onCleanCatch();
+      break;
+    }
+  }
+}
+
+/** A pet reaches the ground: it lands on a bouncy bush, pops up with a
+    little "!", and scampers off happily. Nothing is ever hurt or lost —
+    it just didn't add to the Safe Cloud. No penalty. */
+function missItem(it){
+  if (it.type === 'bad') {
+    burst(it.x, groundY(), '#9AA3B5', 6);     // a puff of dust, nothing more
+    return;
+  }
+  if (it.type === 'coinBag') {
+    burst(it.x, groundY(), '#E8C98A', 6);     // plain bags just plop
+    return;
+  }
+  // pets, sprites, and even the llama: bush bounce + run-off
+  let bush = bushes[0];
+  for (const b of bushes) if (Math.abs(b.x - it.x) < Math.abs(bush.x - it.x)) bush = b;
+  bush.squashUntil = gt + 0.3;
+  sfx.play('pop');
+  addFloater(it.x, groundY() - 60, 'Got away! 🙂', '#CFF6D9');
+  runners.push({
+    emoji: it.emoji || '🐶', x: bush.x, born: gt,
+    dir: bush.x < W / 2 ? -1 : 1,
+  });
+}
+
+/* =====================================================================
+   UPDATE
+   ===================================================================== */
+const keys = { left: false, right: false };
+
+function update(dt){
+  const inPlay = state === 'playing';
+
+  /* hero movement runs during play + catchup */
+  if (inPlay || state === 'catchup') {
+    const cfg = CONFIG.hero;
+    hero.moving = keys.left !== keys.right;
+    if (keys.left)  { hero.x -= cfg.speed * dt; hero.dir = -1; }
+    if (keys.right) { hero.x += cfg.speed * dt; hero.dir = 1; }
+    hero.x = Math.max(6, Math.min(W - hero.w - 6, hero.x));
+    if (hero.moving) hero.travel += cfg.speed * dt;
+
+    hero.vy += cfg.gravity * dt;
+    hero.y += hero.vy * dt;
+    const gy = groundY() - hero.h;
+    if (hero.y >= gy) {
+      if (!hero.onGround) hero.squashUntil = gt + 0.12;   // landing squash
+      hero.y = gy; hero.vy = 0; hero.onGround = true;
+    } else hero.onGround = false;
+
+    // the cheering pet trails along the grass beside the kid
+    const target = hero.x + (hero.dir < 0 ? hero.w + 34 : -34);
+    hero.petX += (target - hero.petX) * Math.min(1, dt * 4);
+  }
+
+  /* Rain clouds roll in one at a time — the "it's getting stormier" cue
+     that matches the ramp. Scenery only: they never touch fall speeds. */
+  if (inPlay || state === 'catchup') {
+    const activeClouds = Math.round(lerp(1, 3, progress()));
+    rainClouds.forEach((c, i) => {
+      if (i < activeClouds && c.appearedAt < 0) { c.appearedAt = gt; sfx.play('pop'); }
+      if (c.appearedAt < 0) return;
+      c.x += c.vx * dt;
+      if (c.x > W + 90) c.x = -90;
+    });
+  }
+
+  /* spawning — only while the clock runs */
+  if (inPlay) {
+    spawnClock += dt * 1000;
+    const every = lerp(CONFIG.spawnEveryMs.start, CONFIG.spawnEveryMs.end, progress());
+    const maxOn = Math.round(lerp(CONFIG.maxOnScreen.start, CONFIG.maxOnScreen.end, progress()));
+    if (spawnClock >= every) {
+      spawnClock = 0;
+      if (items.length < maxOn) spawnItem();
+    }
+    // Coin Storm kicks in once, in the final stretch
+    if (inStorm() && !stormStarted) {
+      stormStarted = true;
+      $('timerPill').classList.add('is-storm');
+      const b = $('stormBanner');
+      b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
+      [0, 90, 180].forEach((ms) => setTimeout(() => sfx.play('coin'), ms));
+    }
+  }
+
+  /* bad-item warnings become real items when the marker expires */
+  for (let i = warnings.length - 1; i >= 0; i--) {
+    if (gt >= warnings[i].entryAt) {
+      if (inPlay) enterBadItem(warnings[i]);
+      warnings.splice(i, 1);
+    }
+  }
+
+  /* items travel their entry path; the magnet curves the ones worth saving */
+  const magnetOn = power && power.type === 'magnet' && gt < power.until;
+  const hb = heroHitbox();
+  const hcx = hb.x + hb.w / 2, hcy = hb.y + hb.h / 2;
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i];
+    if (magnetOn && MAGNET_TYPES.includes(it.type)) {
+      // pulls its velocity — lobbed ones included; nothing ever teleports
+      const dx = hcx - it.x, dy = hcy - it.y;
+      const d = Math.hypot(dx, dy);
+      if (d < CONFIG.power.magnetRadius && d > 4) it.vx += (dx / d) * 900 * dt;
+    }
+    // Damping exists to soften the magnet's pull. A lobbed item must keep
+    // the horizontal speed it was thrown with, or its arc goes flat.
+    if (!it.lobbed) it.vx *= (1 - 2.4 * dt);
+    it.x += it.vx * dt;
+    // parachute items flutter ±18px; bad items fall dead straight (a tell)
+    if (it.chute) it.x += Math.cos(gt * 2.2 + it.seed) * 40 * dt;
+    // Gravity belongs to a lob's own arc and NOTHING else. No code path
+    // anywhere scales fallSpeed: a pet at second 44 falls exactly as fast
+    // as a pet at second 0.
+    if (it.lobbed) it.vy += CONFIG.entry.gravity * dt;
+    it.y += it.vy * dt;
+    if (it.type === 'bad') it.rot = (it.rot || 0) + (Math.PI * 2 / 0.8) * dt;   // spin / tumble
+
+    if (!stunned() &&
+        it.x > hb.x - it.size && it.x < hb.x + hb.w + it.size &&
+        it.y > hb.y - it.size && it.y < hb.y + hb.h + it.size) {
+      catchItem(it);
+      items.splice(i, 1);
+      continue;
+    }
+    if (it.x < -90 || it.x > W + 90) { items.splice(i, 1); continue; }   // a lob that sailed out
+    if (it.y > groundY() - 14) { missItem(it); items.splice(i, 1); }
+  }
+
+  /* bounced pets fly to the Safe Cloud */
+  for (let i = flyers.length - 1; i >= 0; i--) {
+    const f = flyers[i];
+    f.t += dt / 0.65;
+    if (Math.random() < 0.5) {
+      const p = flyerPos(f);
+      particles.push({ x: p.x, y: p.y + 10, vx: (Math.random() - 0.5) * 40, vy: 40, life: 0.4, color: '#FFF7C9', size: 3 });
+    }
+    if (f.t >= 1) {
+      flyers.splice(i, 1);
+      cloudCount++;
+      cloudPuffUntil = gt + 0.3;
+      happyUntil = gt + 0.4;
+      happyFace = f.emoji;
+    }
+  }
+
+  /* rescued runners scamper off the side, smiling */
+  for (let i = runners.length - 1; i >= 0; i--) {
+    const r = runners[i];
+    const age = gt - r.born;
+    if (age > 0.35) r.x += r.dir * 190 * dt;    // brief bush-bounce, then run!
+    if (r.x < -50 || r.x > W + 50) runners.splice(i, 1);
+  }
+
+  /* particles + floaters */
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.vy += 500 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+  for (let i = floaters.length - 1; i >= 0; i--) {
+    const f = floaters[i];
+    f.y -= 55 * dt; f.age += dt;
+    if (f.age > 1.1) floaters.splice(i, 1);
+  }
+
+  /* phase transitions */
+  if (state === 'playing' && remaining() <= 0) {
+    state = 'catchup';
+    phaseUntil = gt + CONFIG.catchUpSeconds;
+  } else if (state === 'catchup' && gt >= phaseUntil) {
+    state = 'stamp';
+    phaseUntil = gt + 0.9;
+  } else if (state === 'stamp' && gt >= phaseUntil) {
+    state = 'results';
+    showResults();
+  } else if (state === 'countdown' && gt >= phaseUntil) {
+    countdownStep++;
+    if (countdownStep >= 4) { state = 'playing'; gt = 0; }
+    else phaseUntil = gt + 0.7;
+  }
+}
+
+/** Where a flyer is along its arc from the trampoline up over the top
+    and into the Safe Cloud's door. */
+function flyerPos(f){
+  const t = Math.min(1, f.t);
+  // quadratic bezier: launch point → high above → cloud door
+  const mx = (f.fx + CLOUD.doorX) / 2, my = -120;
+  const x = (1 - t) * (1 - t) * f.fx + 2 * (1 - t) * t * mx + t * t * CLOUD.doorX;
+  const y = (1 - t) * (1 - t) * f.fy + 2 * (1 - t) * t * my + t * t * CLOUD.doorY;
+  return { x, y };
+}
+
+/* =====================================================================
+   DRAWING — chunky rounded shapes, 3px navy outlines, like the site
+   ===================================================================== */
+function rr(x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function drawSky(){
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#79D2FF'); g.addColorStop(0.55, '#A8E4FF'); g.addColorStop(1, '#D6F3FF');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function drawGround(){
+  ctx.lineWidth = 5; ctx.strokeStyle = NAVY;
+  // back hill
+  ctx.fillStyle = '#5FD963';
+  ctx.beginPath();
+  ctx.moveTo(-10, H - 68);
+  ctx.quadraticCurveTo(W * 0.25, H - 108, W * 0.55, H - 74);
+  ctx.quadraticCurveTo(W * 0.8, H - 46, W + 10, H - 82);
+  ctx.lineTo(W + 10, H + 10); ctx.lineTo(-10, H + 10); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  // front hill
+  ctx.fillStyle = '#31A84A';
+  ctx.beginPath();
+  ctx.moveTo(-10, H - 40);
+  ctx.quadraticCurveTo(W * 0.35, H - 72, W * 0.7, H - 44);
+  ctx.quadraticCurveTo(W * 0.9, H - 28, W + 10, H - 46);
+  ctx.lineTo(W + 10, H + 10); ctx.lineTo(-10, H + 10); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+}
+
+function drawBushes(){
+  for (const b of bushes) {
+    const squash = gt < b.squashUntil ? 0.62 : 1;
+    ctx.save();
+    ctx.translate(b.x, groundY() + 26);
+    ctx.scale(1 + (1 - squash) * 0.5, squash);
+    ctx.fillStyle = '#4CC763';
+    ctx.lineWidth = 4; ctx.strokeStyle = NAVY;
+    ctx.beginPath();
+    ctx.arc(-20, 0, 20, 0, Math.PI * 2);
+    ctx.arc(0, -10, 24, 0, Math.PI * 2);
+    ctx.arc(22, 0, 19, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+}
+
+/** The storm overhead: 1 cloud at the start, 3 by the end, drifting. */
+function drawRainClouds(){
+  for (const c of rainClouds) {
+    if (c.appearedAt < 0) continue;
+    const grow = Math.min(1, (gt - c.appearedAt) / 0.5);
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.scale(grow, grow);
+    ctx.fillStyle = '#C9D6EA';
+    ctx.lineWidth = 5; ctx.strokeStyle = NAVY; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.arc(-30, 4, 22, 0, Math.PI * 2);
+    ctx.arc(0, -10, 27, 0, Math.PI * 2);
+    ctx.arc(28, 2, 22, 0, Math.PI * 2);
+    ctx.arc(0, 12, 26, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#8FB8E8'; ctx.lineWidth = 3;
+    for (let i = -2; i <= 2; i++) {
+      const off = (gt * 90 + i * 23) % 34;
+      ctx.beginPath();
+      ctx.moveTo(i * 14, 30 + off); ctx.lineTo(i * 14 - 3, 42 + off);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+/** The two clouds parked at the edges — where the lobbed drops come from.
+    They puff at the moment they throw one in. */
+function drawEdgeClouds(){
+  const band = H * 0.20;
+  [['left', -10, 1], ['right', W + 10, -1]].forEach(([key, x, flip]) => {
+    const puff = gt - edgePuff[key] < 0.25 ? 1.14 : 1;
+    ctx.save();
+    ctx.translate(x, band);
+    ctx.scale(flip * puff, puff);
+    ctx.fillStyle = '#B9C8E0';
+    ctx.lineWidth = 5; ctx.strokeStyle = NAVY; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.arc(-16, 0, 26, 0, Math.PI * 2);
+    ctx.arc(14, -14, 30, 0, Math.PI * 2);
+    ctx.arc(20, 14, 26, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+  });
+}
+
+function drawSafeCloud(){
+  const puff = gt < cloudPuffUntil ? 1.12 : 1;
+  ctx.save();
+  ctx.translate(CLOUD.x, CLOUD.y);
+  ctx.scale(puff, puff);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.lineWidth = 5; ctx.strokeStyle = NAVY; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.arc(-34, 6, 24, 0, Math.PI * 2);
+  ctx.arc(-4, -14, 30, 0, Math.PI * 2);
+  ctx.arc(28, 2, 26, 0, Math.PI * 2);
+  ctx.arc(0, 16, 30, 0, Math.PI * 2);
+  ctx.fill(); ctx.stroke();
+  // the little open door
+  rr(34, -12, 22, 28, 8);
+  ctx.fillStyle = '#B9DFFF'; ctx.fill(); ctx.stroke();
+  // a happy face pops out when someone arrives
+  if (gt < happyUntil) {
+    ctx.font = '20px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(happyFace, 45, 2);
+  }
+  ctx.restore();
+
+  // the run's main stat, painted under the cloud
+  const label = `🐾 ${cloudCount} safe`;
+  ctx.font = `800 20px ${FONT}`;
+  const wd = ctx.measureText(label).width + 26;
+  rr(CLOUD.x - wd / 2, CLOUD.y + 46, wd, 32, 16);
+  ctx.fillStyle = '#FFFFFF'; ctx.fill();
+  ctx.lineWidth = 4; ctx.strokeStyle = NAVY; ctx.stroke();
+  ctx.fillStyle = NAVY; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(label, CLOUD.x, CLOUD.y + 63);
+}
+
+function drawChute(it){
+  const sway = Math.sin(gt * 3 + it.seed) * 0.18;
+  const cx = it.x, cy = it.y - 40;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(sway);
+  if (it.chute === 'umbrella') {
+    ctx.font = '22px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('☂️', 0, 0);
+  } else {
+    // drawn canopy: rainbow for sprites, gold for the llama
+    const bands = it.chute === 'gold'
+      ? ['#FFC93C', '#FFB020', '#E39B00']
+      : ['#FF5A5A', '#FFC93C', '#5FD963', '#4C9BFF', '#A971F5'];
+    const R = 22;
+    for (let i = 0; i < bands.length; i++) {
+      const r = R * (1 - i / bands.length);
+      ctx.beginPath();
+      ctx.arc(0, 4, r, Math.PI, 0);
+      ctx.closePath();
+      ctx.fillStyle = bands[i]; ctx.fill();
+    }
+    ctx.beginPath(); ctx.arc(0, 4, R, Math.PI, 0); ctx.closePath();
+    ctx.lineWidth = 3; ctx.strokeStyle = NAVY; ctx.stroke();
+    // strings down to the token
+    ctx.beginPath();
+    ctx.moveTo(-R + 3, 4); ctx.lineTo(it.x - cx, 24);
+    ctx.moveTo(R - 3, 4); ctx.lineTo(it.x - cx, 24);
+    ctx.lineWidth = 2; ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawToken(it){
+  const { x, y } = it;
+  ctx.save();
+  ctx.lineWidth = 3; ctx.strokeStyle = NAVY;
+
+  if (it.chute) drawChute(it);
+
+  if (it.type === 'pet') {
+    // soft round pastel token — the friendly family
+    ctx.beginPath(); ctx.arc(x, y, 24, 0, Math.PI * 2);
+    ctx.fillStyle = it.tokenColor; ctx.fill(); ctx.stroke();
+    ctx.font = '24px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(it.emoji, x, y + 1);
+    if (it.purse) {
+      // little gold coin purse riding along
+      ctx.beginPath(); ctx.arc(x + 16, y + 14, 9, 0, Math.PI * 2);
+      ctx.fillStyle = '#FFC93C'; ctx.fill();
+      ctx.lineWidth = 2.5; ctx.stroke();
+      ctx.font = '11px serif';
+      ctx.fillText('🪙', x + 16, y + 15);
+    }
+  } else if (it.type === 'coinBag') {
+    // tan sack, tied neck, 🪙 badge
+    ctx.fillStyle = '#E8C98A';
+    ctx.beginPath();
+    ctx.moveTo(x - 10, y - 16);
+    ctx.quadraticCurveTo(x - 26, y - 4, x - 20, y + 12);
+    ctx.quadraticCurveTo(x - 12, y + 24, x, y + 24);
+    ctx.quadraticCurveTo(x + 12, y + 24, x + 20, y + 12);
+    ctx.quadraticCurveTo(x + 26, y - 4, x + 10, y - 16);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    rr(x - 8, y - 24, 16, 10, 4);
+    ctx.fillStyle = '#D3AF6C'; ctx.fill(); ctx.stroke();
+    ctx.font = '17px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('🪙', x, y + 6);
+  } else if (it.type === 'power') {
+    // yellow star-burst with the icon inside
+    ctx.fillStyle = '#FFC93C';
+    ctx.beginPath();
+    for (let i = 0; i < 16; i++) {
+      const ang = (i / 16) * Math.PI * 2 - Math.PI / 2;
+      const rad = i % 2 === 0 ? 27 : 15;
+      const px = x + Math.cos(ang) * rad, py = y + Math.sin(ang) * rad;
+      i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.font = '18px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText({ magnet: '🧲', bigBag: '🛝', doubleCoin: '✨' }[it.power], x, y + 1);
+  } else if (it.type === 'sprite') {
+    const col = RARITY[it.rarity].color;
+    if (it.rarity !== 'common' && Math.random() < 0.3) {   // soft trailing sparkle
+      particles.push({ x: x + (Math.random() - 0.5) * 30, y: y - 14, vx: 0, vy: -30, life: 0.5, color: col, size: 3 });
+    }
+    if (it.rarity === 'legendary') { ctx.shadowColor = RARITY.legendary.glow; ctx.shadowBlur = 20; }
+    ctx.beginPath(); ctx.arc(x, y, 24, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFFFFF'; ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = NAVY; ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.beginPath(); ctx.arc(x, y, 20, 0, Math.PI * 2);
+    ctx.lineWidth = 4; ctx.strokeStyle = col; ctx.stroke();
+    ctx.font = '22px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(it.emoji, x, y + 1);
+  } else if (it.type === 'sixtyseven') {
+    // the legend itself: glowing gold llama-67
+    ctx.shadowColor = '#FFC93C'; ctx.shadowBlur = 22;
+    ctx.beginPath(); ctx.arc(x, y, 26, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFC93C'; ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = NAVY; ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.font = '20px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('🦙', x, y - 7);
+    ctx.font = `800 15px ${FONT}`;
+    ctx.fillStyle = NAVY;
+    ctx.fillText('67', x, y + 13);
+  } else if (it.type === 'bad') {
+    // a different family entirely: angular, dark, red-ringed, spinning
+    const pulse = 0.5 + 0.5 * Math.sin(gt * 8 + it.seed);
+    ctx.save();
+    ctx.strokeStyle = BAD_RED;
+    ctx.globalAlpha = 0.45 + 0.4 * pulse;
+    ctx.setLineDash([7, 7]);
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x, y, 34, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(it.rot || 0);
+    ctx.beginPath();
+    for (let i = 0; i < 14; i++) {                 // spiky silhouette
+      const ang = (i / 14) * Math.PI * 2;
+      const rad = i % 2 === 0 ? 26 : 17;
+      const px = Math.cos(ang) * rad, py = Math.sin(ang) * rad;
+      i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fillStyle = it.isCloud ? '#9AA3B5' : '#3A3F55';
+    ctx.fill();
+    ctx.lineWidth = 4; ctx.strokeStyle = BAD_RED; ctx.lineJoin = 'round'; ctx.stroke();
+    ctx.font = '20px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(it.emoji, 0, 1);
+    ctx.restore();
+
+    // the thundercloud flickers lightning — its extra "I'm bad" tell
+    if (it.isCloud && Math.sin(gt * 11 + it.seed) > 0.75) {
+      ctx.font = '18px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('⚡', x + 20, y + 22);
+    }
+  }
+  ctx.restore();
+}
+
+function drawWarnings(){
+  // the red ▼ that says "something nasty is about to drop HERE"
+  for (const w of warnings) {
+    const blink = 0.55 + 0.45 * Math.sin(gt * 18);
+    ctx.save();
+    ctx.globalAlpha = blink;
+    ctx.fillStyle = BAD_RED;
+    ctx.lineWidth = 3; ctx.strokeStyle = NAVY; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(w.markerX - 14, 10); ctx.lineTo(w.markerX + 14, 10); ctx.lineTo(w.markerX, 34);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawHero(){
+  const cfg = CONFIG.hero;
+  const s = bigScale();
+  const tw = cfg.trampolineWidth * s;
+  const w = hero.w, h = hero.h;
+  const cx = hero.x + w / 2;
+  let y = hero.y;
+
+  // 2-frame run bob
+  const bob = hero.moving && hero.onGround ? (Math.floor(hero.travel / 34) % 2 === 0 ? 0 : -4) : 0;
+
+  // catch hop + trampoline dip/snap
+  const ct = (gt - hero.catchAt) / 0.28;
+  let sag = 6, hop = 0;
+  if (ct >= 0 && ct < 1) {
+    sag = ct < 0.4 ? lerp(6, 22, ct / 0.4) : lerp(22, -6, (ct - 0.4) / 0.6);
+    hop = -7 * Math.sin(Math.PI * ct);
+  }
+  if (stunned()) sag = 30 + Math.sin(gt * 30) * 4;     // floppy trampoline
+
+  // stun wobble
+  const wob = stunned() ? Math.sin(gt * 45) * 6 : 0;
+
+  // the cheering pet on the grass (cosmetic only)
+  if (cheerPet) {
+    ctx.font = '26px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(cheerPet, hero.petX, groundY() - 12 + Math.sin(gt * 6) * 4);
+    if (Math.sin(gt * 2.5) > 0.85) {
+      ctx.font = '14px serif';
+      ctx.fillText('🎉', hero.petX + 16, groundY() - 34);
+    }
+  }
+
+  ctx.save();
+  if (stunned()) ctx.filter = 'grayscale(0.9)';
+  ctx.translate(cx + wob, y + hop + bob);
+
+  // landing squash
+  if (gt < hero.squashUntil) { ctx.translate(0, h); ctx.scale(1.12, 0.82); ctx.translate(0, -h); }
+
+  ctx.lineWidth = 3; ctx.strokeStyle = NAVY; ctx.lineJoin = 'round';
+
+  // legs
+  ctx.fillStyle = NAVY;
+  rr(-w * 0.32, h - 8, w * 0.26, 10, 4); ctx.fill();
+  rr(w * 0.06, h - 8, w * 0.26, 10, 4); ctx.fill();
+  // body (bright shirt)
+  rr(-w * 0.42, h * 0.42, w * 0.84, h * 0.5, 10);
+  ctx.fillStyle = '#FF8A65'; ctx.fill(); ctx.stroke();
+  // head with the equipped skin's face
+  ctx.beginPath(); ctx.arc(0, h * 0.26, w * 0.42, 0, Math.PI * 2);
+  ctx.fillStyle = '#FFE9C9'; ctx.fill(); ctx.stroke();
+  ctx.font = `${Math.round(w * 0.6)}px serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(kidFace, 0, h * 0.26);
+
+  // arms up to the trampoline rim
+  const ty = -26;
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.34, h * 0.5); ctx.lineTo(-tw * 0.32, ty + 6);
+  ctx.moveTo(w * 0.34, h * 0.5); ctx.lineTo(tw * 0.32, ty + 6);
+  ctx.stroke();
+
+  // trampoline: springy blue fabric + yellow rim, navy outline
+  ctx.beginPath();
+  ctx.moveTo(-tw / 2, ty);
+  ctx.quadraticCurveTo(0, ty + sag, tw / 2, ty);
+  ctx.lineTo(tw / 2, ty + 6);
+  ctx.quadraticCurveTo(0, ty + sag + 6, -tw / 2, ty + 6);
+  ctx.closePath();
+  ctx.fillStyle = '#4C9BFF'; ctx.fill();
+  ctx.lineWidth = 3; ctx.stroke();
+  rr(-tw / 2 - 5, ty - 5, 12, 14, 6);
+  ctx.fillStyle = '#FFC93C'; ctx.fill(); ctx.stroke();
+  rr(tw / 2 - 7, ty - 5, 12, 14, 6);
+  ctx.fillStyle = '#FFC93C'; ctx.fill(); ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawFlyers(){
+  ctx.font = '26px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const f of flyers) {
+    const p = flyerPos(f);
+    ctx.fillText(f.emoji, p.x, p.y);
+  }
+}
+
+function drawRunners(){
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const r of runners) {
+    const age = gt - r.born;
+    const hopY = age < 0.35
+      ? -34 * Math.sin(Math.PI * age / 0.35)             // the bush bounce
+      : -Math.abs(Math.sin(gt * 11)) * 6;                // happy scamper
+    ctx.font = '26px serif';
+    ctx.fillText(r.emoji, r.x, groundY() - 10 + hopY);
+    if (age < 0.4) {
+      ctx.font = `800 20px ${FONT}`;
+      ctx.lineWidth = 4; ctx.strokeStyle = NAVY;
+      ctx.strokeText('!', r.x + 18, groundY() - 44 + hopY);
+      ctx.fillStyle = '#FFC93C';
+      ctx.fillText('!', r.x + 18, groundY() - 44 + hopY);
+    }
+  }
+}
+
+function drawParticles(){
+  for (const p of particles) {
+    ctx.globalAlpha = Math.max(0, p.life / 0.6);
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawFloaters(){
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const f of floaters) {
+    ctx.globalAlpha = Math.max(0, 1 - f.age / 1.1);
+    ctx.font = `800 26px ${FONT}`;
+    ctx.lineWidth = 5; ctx.strokeStyle = NAVY; ctx.lineJoin = 'round';
+    ctx.strokeText(f.text, f.x, f.y);
+    ctx.fillStyle = f.color;
+    ctx.fillText(f.text, f.x, f.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawOverlays(){
+  // rainbow wash during RAINBOW RUSH
+  if (inRush() && !reducedMotion()) {
+    const g = ctx.createLinearGradient(0, 0, W, 0);
+    ['#FF5A5A', '#FFC93C', '#5FD963', '#4C9BFF', '#A971F5'].forEach((c, i, arr) =>
+      g.addColorStop(i / (arr.length - 1), c));
+    ctx.globalAlpha = 0.14;
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = 1;
+  }
+
+  if (state === 'countdown') {
+    const t = 1 - (phaseUntil - gt) / 0.7;                     // 0..1 through this step
+    const label = ['3', '2', '1', 'GO!'][countdownStep] || '';
+    const hop = Math.sin(Math.min(1, t) * Math.PI) * 40;
+    ctx.save();
+    ctx.translate(W / 2, H * 0.45 - hop);
+    const sc = 0.7 + 0.5 * Math.min(1, t * 2);
+    ctx.scale(sc, sc);
+    ctx.font = `800 130px ${FONT}`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 12; ctx.strokeStyle = NAVY; ctx.lineJoin = 'round';
+    ctx.strokeText(label, 0, 0);
+    ctx.fillStyle = countdownStep === 3 ? '#5FD963' : '#FFC93C';
+    ctx.fillText(label, 0, 0);
+    ctx.restore();
+  }
+
+  if (state === 'stamp') {
+    ctx.save();
+    ctx.translate(W / 2, H * 0.42);
+    ctx.rotate(-0.06);
+    ctx.font = `800 96px ${FONT}`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 12; ctx.strokeStyle = NAVY; ctx.lineJoin = 'round';
+    ctx.strokeText('TIME!', 0, 0);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText('TIME!', 0, 0);
+    ctx.restore();
+  }
+}
+
+function draw(){
+  drawSky();
+  drawRainClouds();
+  drawEdgeClouds();
+  drawSafeCloud();
+  drawWarnings();
+  drawGround();
+  drawBushes();
+  items.forEach(drawToken);
+  drawHero();
+  drawFlyers();
+  drawRunners();
+  drawParticles();
+  drawFloaters();
+  drawOverlays();
+}
+
+/* =====================================================================
+   HUD
+   ===================================================================== */
+let hudCache = {};
+function setText(id, text){
+  if (hudCache[id] === text) return;
+  hudCache[id] = text;
+  $(id).textContent = text;
+}
+
+function updateHud(force){
+  if (force) hudCache = {};
+  setText('scorePill', '⭐ ' + score.toLocaleString());
+  setText('timerPill', String(Math.ceil(remaining())));
+  setText('bagPill', '💰 ' + bagsCaught);
+  setText('spritePill', '✨ ' + spritesWon.length);
+
+  const mult = comboMult();
+  const comboPill = $('comboPill');
+  if (mult > 1) { comboPill.classList.remove('hidden'); setText('comboPill', '×' + mult); }
+  else comboPill.classList.add('hidden');
+
+  const powerPill = $('powerPill');
+  if (power && gt < power.until) {
+    powerPill.classList.remove('hidden');
+    setText('powerName', { magnet: '🧲 Magnet', bigBag: '🛝 Big Trampoline', doubleCoin: '✨ Double Coins' }[power.type]);
+    $('powerBarFill').style.width = Math.max(0, ((power.until - gt) / power.total) * 100) + '%';
+  } else powerPill.classList.add('hidden');
+
+  if (!inStorm() && state === 'playing') $('timerPill').classList.remove('is-storm');
+}
+
+/* =====================================================================
+   LOOP
+   ===================================================================== */
+function frame(ts){
+  if (state === 'results' || state === 'ready') { rafId = null; return; }
+  if (!lastFrame) lastFrame = ts;
+  // dt capped: a hidden tab or long hitch can never fast-forward the run
+  const dt = Math.min(0.05, (ts - lastFrame) / 1000);
+  lastFrame = ts;
+  gt += dt;
+  update(dt);
+  draw();
+  updateHud();
+  rafId = requestAnimationFrame(frame);
+}
+
+/* =====================================================================
+   RESULTS — always a celebration, never a game over
+   ===================================================================== */
+async function renderLeaderboard(){
+  const list = $('leaderboardList');
   const title = document.querySelector('.lbTitle');
-  const guest = currentKid && isGuestKid(currentKid.id);
+  const guest = kid && isGuestKid(kid.id);
   if (title) title.textContent = guest ? '🏆 Your Best (this device)' : '🏆 Top Scores';
   try {
     const top = guest ? await getLocalTopScores(GAME_ID, 5) : await getTopScores(GAME_ID, 5);
@@ -242,257 +1483,139 @@ async function renderLeaderboard() {
       li.textContent = `${row.nickname} — ${row.score}`;
       list.appendChild(li);
     });
-  } catch (e) {
-    list.innerHTML = '';
-  }
+  } catch { list.innerHTML = ''; }
 }
 
-// ---------- Setup ----------
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
-const W = canvas.width, H = canvas.height;
+async function showResults(){
+  if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
 
-let hero = { emoji: '🟩', name: 'Blocky' };
-document.querySelectorAll('.char-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.char-btn').forEach(b => b.classList.remove('selected'));
-    btn.classList.add('selected');
-    hero = { emoji: btn.dataset.emoji, name: btn.dataset.name };
-  });
-});
+  $('resultsTitle').textContent = `🎉 TIME!  Nice run, ${(kid?.nickname || 'friend').toUpperCase()}!`;
+  $('resultsPets').textContent = `🐾 ${petsSaved} pet${petsSaved === 1 ? '' : 's'} safe!`;
+  $('resultsScore').textContent = `⭐ ${score.toLocaleString()} points`;
+  $('resultsCombo').textContent = `🛝 Best combo ×${bestCombo}`;
+  $('resultsBags').textContent = `💰 ${bagsCaught} coin bag${bagsCaught === 1 ? '' : 's'}`;
 
-// Good items = his interests. Bad items = things to dodge.
-const FORTNITE = ['🪂','🕺'];
-const GOOD = ['⛏️','🍄','🎮','🥍','🧱','🏒','🏆','🔷','🦙', ...FORTNITE];
-const BAD  = ['💣','🧊','⛈️'];
-const RARE = '67';
-const RARE_CHANCE = 0.015;
-const FORTNITE_SPEEDUP = 0.08;
-const HOCKEY_STICK = '🏒';
-const SHOWER_INTERVAL_MS = 250;
-const DEATH = '☠️';
-const DEATH_CHANCE = 0.02;
+  // A personal best on the stat the screen leads on.
+  const newBest = petsSaved > bestPets && petsSaved > 0;
+  $('bestBadge').classList.toggle('hidden', !newBest);
+  bestPets = Math.max(bestPets, petsSaved);
 
-let player, items, keys, score, lives, running, spawnTimer, speedMultiplier, showerInterval, best = 0;
-let captured = 0, runStart = 0;   // creatures caught + clock, for the character award
-
-function resetGame() {
-  player = { x: W/2 - 24, y: H - 70, w: 48, h: 48, vy: 0, speed: 6, onGround: true };
-  items = [];
-  keys = { left:false, right:false };
-  score = 0;
-  lives = 3;
-  running = true;
-  spawnTimer = 0;
-  speedMultiplier = 1;
-  captured = 0; runStart = Date.now();
-  stopShower();
-  updateHud();
-}
-
-function updateHud() {
-  document.getElementById('scoreVal').textContent = score;
-  document.getElementById('livesVal').textContent = '❤️'.repeat(Math.max(lives,0));
-}
-
-function spawnItem() {
-  const isRare = Math.random() < RARE_CHANCE;
-  const isDeath = !isRare && Math.random() < DEATH_CHANCE;
-  const isBad = !isRare && !isDeath && Math.random() < 0.22;
-  const pool = isBad ? BAD : GOOD;
-  const emoji = isRare ? RARE : isDeath ? DEATH : pool[Math.floor(Math.random()*pool.length)];
-  items.push({
-    x: Math.random() * (W - 40) + 20,
-    y: -30,
-    vy: (2.2 + Math.random()*2 + score*0.01) * speedMultiplier,
-    emoji,
-    bad: isBad || isDeath,
-    rare: isRare,
-    death: isDeath,
-    fortnite: !isBad && !isRare && !isDeath && FORTNITE.includes(emoji),
-    stick: !isBad && !isRare && !isDeath && emoji === HOCKEY_STICK,
-    size: 34
-  });
-}
-
-function rectsOverlap(ax,ay,aw,ah,bx,by,bw,bh){
-  return ax < bx+bw && ax+aw > bx && ay < by+bh && ay+ah > by;
-}
-
-function update() {
-  if (!running) return;
-
-  // horizontal movement
-  if (keys.left) player.x -= player.speed;
-  if (keys.right) player.x += player.speed;
-  player.x = Math.max(0, Math.min(W - player.w, player.x));
-
-  // gravity / jump
-  player.vy += 0.6;
-  player.y += player.vy;
-  const groundY = H - 70;
-  if (player.y >= groundY) { player.y = groundY; player.vy = 0; player.onGround = true; }
-  else player.onGround = false;
-
-  // spawn
-  spawnTimer++;
-  const spawnRate = Math.max(28, 55 - Math.floor(score/5));
-  if (spawnTimer > spawnRate) { spawnItem(); spawnTimer = 0; }
-
-  // move items + collide
-  for (let i = items.length - 1; i >= 0; i--) {
-    const it = items[i];
-    it.y += it.vy;
-
-    if (rectsOverlap(player.x, player.y, player.w, player.h, it.x - it.size/2, it.y - it.size/2, it.size, it.size)) {
-      if (it.death) { lives = 0; flashScreen('#ff0000', 0.6); stopShower(); }
-      else if (it.bad) { lives--; flashScreen('#e33e3e'); stopShower(); }
-      else if (it.rare) { captured++; score += 1000; flashScreen('#ffd23f', 0.5); celebrate(); stopShower(); }
-      else if (it.stick) { captured++; score += 10; flashScreen('#4fc3f7', 0.3); startShower(); }
-      else if (it.fortnite) { captured++; score += 10; speedMultiplier += FORTNITE_SPEEDUP; flashScreen('#4fc3f7', 0.25); stopShower(); }
-      else { captured++; score += 10; flashScreen('#ffd23f', 0.15); stopShower(); }
-      items.splice(i,1);
-      updateHud();
-      if (lives <= 0) endGame();
-      continue;
-    }
-    if (it.y > H + 30) items.splice(i,1);
-  }
-}
-
-let flash = null;
-function flashScreen(color, alpha=0.35){ flash = {color, alpha}; }
-
-function startShower() {
-  if (showerInterval) return;
-  showerInterval = setInterval(() => {
-    if (!running) { stopShower(); return; }
-    score += 1000;
-    celebrate();
-    updateHud();
-  }, SHOWER_INTERVAL_MS);
-}
-
-function stopShower() {
-  if (showerInterval) {
-    clearInterval(showerInterval);
-    showerInterval = null;
-  }
-}
-
-let celebrationTimer = null;
-function celebrate() {
-  const el = document.getElementById('celebration');
-  el.classList.remove('show');
-  void el.offsetWidth; // restart animation if triggered again quickly
-  el.classList.add('show');
-  clearTimeout(celebrationTimer);
-  celebrationTimer = setTimeout(() => el.classList.remove('show'), 2000);
-}
-
-function draw() {
-  ctx.clearRect(0,0,W,H);
-
-  // ground strip
-  ctx.fillStyle = '#1c1030';
-  ctx.fillRect(0, H-40, W, 40);
-  ctx.fillStyle = '#3a2668';
-  for (let gx = 0; gx < W; gx += 40) ctx.fillRect(gx, H-40, 20, 6);
-
-  // items
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  items.forEach(it => {
-    if (it.rare) {
-      ctx.save();
-      ctx.font = '900 32px "Trebuchet MS", sans-serif';
-      ctx.shadowColor = '#ffd23f';
-      ctx.shadowBlur = 16;
-      ctx.fillStyle = '#ffd23f';
-      ctx.fillText(it.emoji, it.x, it.y);
-      ctx.restore();
-    } else {
-      ctx.font = '30px serif';
-      ctx.fillText(it.emoji, it.x, it.y);
-    }
+  // Sprite chips: NEW! the first time one lands, ×N for a duplicate.
+  const chips = $('resultsSprites');
+  chips.innerHTML = '';
+  $('resultsSpritesLabel').textContent = spritesWon.length
+    ? '✨ Special visitors:'
+    : '✨ No special visitors this time — the clouds are shy!';
+  const seenThisRun = {};
+  spritesWon.forEach((i) => {
+    const sp = SPRITES[i];
+    const id = spriteId(i);
+    seenThisRun[id] = (seenThisRun[id] || 0) + 1;
+    const total = (preCounts[id] || 0) + seenThisRun[id];
+    const chip = document.createElement('span');
+    chip.className = 'mc-chip';
+    chip.style.borderColor = RARITY[sp.r].color;
+    const face = document.createElement('span');
+    face.textContent = `${sp.g} ${sp.n}`;
+    const tag = document.createElement('span');
+    if (total <= 1) { tag.className = 'mc-chip__new'; tag.textContent = 'NEW!'; }
+    else { tag.className = 'mc-chip__dupe'; tag.textContent = `×${total} — tradeable`; }
+    chip.append(face, tag);
+    chips.appendChild(chip);
   });
 
-  // player
-  ctx.font = '44px serif';
-  ctx.fillText(hero.emoji, player.x + player.w/2, player.y + player.h/2 - 4);
+  $('results').classList.remove('hidden');
+  sfx.play('win');
+  confetti(window.innerWidth / 2, window.innerHeight / 2, 70);
 
-  if (flash) {
-    ctx.fillStyle = flash.color;
-    ctx.globalAlpha = flash.alpha;
-    ctx.fillRect(0,0,W,H);
-    ctx.globalAlpha = 1;
-    flash.alpha -= 0.02;
-    if (flash.alpha <= 0) flash = null;
-  }
-}
-
-function loop() {
-  update();
-  draw();
-  if (running) requestAnimationFrame(loop);
-}
-
-async function endGame() {
-  running = false;
   best = Math.max(best, score);
-  document.getElementById('finalScore').textContent = 'Score: ' + score;
-  document.getElementById('highScore').textContent = 'Best: ' + best;
-  document.getElementById('gameover').classList.remove('hidden');
-  if (currentKid) {
-    saveHighScore(GAME_ID, currentKid.nickname, score, currentKid.id).catch(() => {});
-    saveChildProgress(currentKid.id, GAME_ID, { best }).catch(() => {});
+  if (kid) {
+    saveHighScore(GAME_ID, kid.nickname, score, kid.id).catch(() => {});
+    // one write, both bests — the guest path replaces this game's whole entry
+    saveChildProgress(kid.id, GAME_ID, { best, bestPets }).catch(() => {});
   }
   renderLeaderboard();
-  // The character award: creatures caught are the milestones.
-  const seconds = Math.round((Date.now() - runStart) / 1000);
-  const award = document.getElementById('awardLine');
-  award.textContent = 'Saving…';
-  const outcome = await finishRun(GAME_ID, { units: captured, seconds, score });
-  award.textContent = describeAward(outcome);
+
+  // The character award: bags + sprites + score turn into units
+  const units = bagUnits * CONFIG.unitsPer.coinBag
+              + spritesWon.length * CONFIG.unitsPer.sprite
+              + Math.floor(score / CONFIG.unitsPer.scorePer);
+  const seconds = Math.round(CONFIG.runSeconds);
+  $('awardLine').textContent = 'Saving…';
+  const outcome = await finishRun(GAME_ID, {
+    asked: 0, correct: 0, seconds, score, units,
+    sprites: spritesWon.map((i) => spriteId(i)),
+  });
+  $('awardLine').textContent = describeAward(outcome);
+  // Hitting the daily fun budget is good news about how much they've played,
+  // never a telling-off.
+  const cap = $('capLine');
+  cap.classList.toggle('hidden', !outcome?.cappedByDailyFun);
+  if (outcome?.cappedByDailyFun) {
+    cap.textContent = "You've earned today's fun-game coins! Practice games still pay 4× 🚀";
+  }
   celebrateLevelUp(outcome);
 }
 
-// ---------- Controls ----------
-document.addEventListener('keydown', e => {
+/* =====================================================================
+   CONTROLS
+   ===================================================================== */
+document.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowLeft') keys.left = true;
   if (e.key === 'ArrowRight') keys.right = true;
-  if (e.key === ' ' || e.key === 'ArrowUp') doJump();
+  if (e.key === ' ' || e.key === 'ArrowUp') { e.preventDefault(); doJump(); }
 });
-document.addEventListener('keyup', e => {
+document.addEventListener('keyup', (e) => {
   if (e.key === 'ArrowLeft') keys.left = false;
   if (e.key === 'ArrowRight') keys.right = false;
 });
-function doJump(){ if (player && player.onGround) player.vy = -13; }
-
-function bindHold(btn, onDown, onUp) {
-  btn.addEventListener('touchstart', e => { e.preventDefault(); onDown(); });
-  btn.addEventListener('touchend', e => { e.preventDefault(); onUp && onUp(); });
+function doJump(){
+  if (hero && hero.onGround && (state === 'playing' || state === 'catchup')) {
+    hero.vy = -CONFIG.hero.jumpVelocity;
+  }
+}
+function bindHold(btn, onDown, onUp){
+  btn.addEventListener('touchstart', (e) => { e.preventDefault(); onDown(); }, { passive: false });
+  btn.addEventListener('touchend', (e) => { e.preventDefault(); onUp && onUp(); });
+  btn.addEventListener('touchcancel', () => onUp && onUp());
   btn.addEventListener('mousedown', onDown);
   btn.addEventListener('mouseup', () => onUp && onUp());
   btn.addEventListener('mouseleave', () => onUp && onUp());
 }
-bindHold(document.getElementById('leftBtn'), () => keys.left = true, () => keys.left = false);
-bindHold(document.getElementById('rightBtn'), () => keys.right = true, () => keys.right = false);
-bindHold(document.getElementById('jumpBtn'), doJump);
+bindHold($('padLeft'), () => keys.left = true, () => keys.left = false);
+bindHold($('padRight'), () => keys.right = true, () => keys.right = false);
+bindHold($('padJump'), doJump);
 
-// ---------- Screen flow ----------
-document.getElementById('startBtn').addEventListener('click', () => {
-  document.getElementById('picker').classList.add('hidden');
-  document.getElementById('topbar').classList.remove('hidden');
-  document.getElementById('game').classList.remove('hidden');
-  document.getElementById('controls').classList.remove('hidden');
-  resetGame();
-  loop();
+/* =====================================================================
+   SCREEN FLOW
+   ===================================================================== */
+function startRun(){
+  // Snapshot the collection as it stands now, so the results screen can tell
+  // a first-ever sprite (NEW!) from a duplicate. Re-read every run, because
+  // the run before this one may have just added to it.
+  if (kid) loadCharacter(kid.id).then((c) => { preCounts = { ...(c?.counts || {}) }; }).catch(() => {});
+  $('ready').classList.add('hidden');
+  $('results').classList.add('hidden');
+  $('stage').classList.remove('hidden');
+  $('timerPill').classList.remove('is-storm');
+  resetRun();
+  state = 'countdown';
+  countdownStep = 0;
+  gt = 0; phaseUntil = 0.7; lastFrame = 0;
+  rafId = requestAnimationFrame(frame);
+}
+
+$('playBtn').addEventListener('click', (e) => {
+  celebrate(e.currentTarget);
+  startRun();
 });
+$('playAgain').addEventListener('click', () => startRun());
 
-document.getElementById('playAgain').addEventListener('click', () => {
-  document.getElementById('gameover').classList.add('hidden');
-  resetGame();
-  loop();
+// Straight to Character Home's LOCKER tab, where the run's XP, coins and
+// new sprites are all on screen together. Resolved from this file's own
+// URL so it's the same link however the game was opened.
+$('myCharacterBtn').addEventListener('click', () => {
+  window.location.href = new URL('../index.html#locker', import.meta.url).href;
 });
 </script>
 </body>

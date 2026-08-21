@@ -7,6 +7,7 @@ import { CONFIG, RARITY, luckScore, rollRarity } from './config.js';
 import { buildRound } from './content.js';
 import * as S from './state.js';
 import * as Speech from './speech.js';
+import { sfx } from '../../assets/arcade-shell.js';
 
 const $ = id => document.getElementById(id);
 
@@ -129,6 +130,7 @@ function buildChoices(R, item, options, answer, cb){
     b.onclick = () => {
       if (box.dataset.done) return;
       box.dataset.done = '1';
+      sfx.play('tap');
       [...box.children].forEach(c => {
         if (c.textContent === answer) c.classList.add('right');
         else if (c === b) c.classList.add('wrong');
@@ -233,10 +235,12 @@ function resolve(R, passed, item, score){
   if (mathy) R.mathAttempted++; else R.readAttempted++;
 
   if (passed){
+    sfx.play('pop');
     R.correct++;
     if (mathy) R.mathCorrect++; else R.readCorrect++;
     lootChest(R, item.bonus ? CONFIG.bonusRoundMultiplier : 1);
   } else {
+    sfx.play('nope');
     const label = item.kind === 'passage' ? item.question : item.prompt;
     R.missed.push(label);
     R.missedItems.push(item);
@@ -258,6 +262,7 @@ function lootChest(R, multiplier){
     const index = S.pickSpriteOfRarity(rarity);
     const sprite = S.SPRITES[index];
     R.backpack.push({ index, sprite, rarity });
+    sfx.play('coin');
     showLoot(sprite, rarity, i * 420);
   }
 }
@@ -309,8 +314,11 @@ function finish(R, afterReboot){
   const acc = accuracy(R);
   const extracted = acc >= CONFIG.extractThreshold;
 
+  // The 1e-9 nudge matters: 0.8 - 0.2 is 0.6000000000000001 in floating
+  // point, and a 3-of-5 round is EXACTLY 0.6 — without the epsilon the van
+  // refuses the one kid it exists for.
   if (!extracted && !afterReboot && R.missedItems.length &&
-      acc >= CONFIG.extractThreshold - CONFIG.rebootAllowedIfWithin){
+      acc >= CONFIG.extractThreshold - CONFIG.rebootAllowedIfWithin - 1e-9){
     return offerReboot(R);
   }
 

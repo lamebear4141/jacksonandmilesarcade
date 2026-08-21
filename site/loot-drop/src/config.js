@@ -19,6 +19,9 @@ export const CONFIG = {
   rebootQuestions: 1,        // Reboot Van: second-chance questions if you just miss (scaled with the round: was 3 of 15)
   rebootAllowedIfWithin: 0.20, // offer the van if you're within 20 points of the line
   escapeHatchMs: 12000,      // after this long waiting on the mic, offer tap mode instead
+  autoSaveReport: true,      // drop a progress file in Downloads after each round —
+                             // AJ's nightly report email reads that file. Turn off
+                             // only if the email stops depending on it.
 
   // --- Rewards ---
   // A 5-question round earns less from xpPerCorrect alone than the old 15-question

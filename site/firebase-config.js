@@ -10,7 +10,8 @@ import {
   getAuth, setPersistence, browserLocalPersistence,
   createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
   onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect,
-  getRedirectResult,
+  getRedirectResult, sendPasswordResetEmail, updatePassword,
+  reauthenticateWithCredential, EmailAuthProvider,
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import {
   getFirestore, collection, doc, addDoc, getDoc, getDocs, setDoc, updateDoc,
@@ -56,6 +57,31 @@ export function signOutParent() {
 // cb(user) fires immediately with current state, then on every change.
 export function onParentChange(cb) {
   return onAuthStateChanged(auth, cb);
+}
+
+/**
+ * "Forgot password" — emails a reset link. Resolves quietly for an
+ * unknown email too (Firebase's email-enumeration protection already
+ * behaves this way); callers should show the same "check your email"
+ * message either way so the login screen never leaks which addresses
+ * have accounts.
+ */
+export function sendPasswordReset(email) {
+  return sendPasswordResetEmail(auth, email);
+}
+
+/**
+ * Change the signed-in parent's password. Firebase requires a recent
+ * sign-in for this, so the CURRENT password is re-checked first — which
+ * also means someone picking up an already-logged-in device can't change
+ * it without knowing it.
+ */
+export async function changeParentPassword(currentPassword, newPassword) {
+  const user = auth.currentUser;
+  if (!user || !user.email) throw new Error('Not signed in');
+  const cred = EmailAuthProvider.credential(user.email, currentPassword);
+  await reauthenticateWithCredential(user, cred);
+  await updatePassword(user, newPassword);
 }
 
 // Google sign-in for the parent account. Popups are blocked by some
@@ -435,8 +461,10 @@ export async function awardRun(childId, gameId, result) {
   // game can pass whichever it already has.
   const wonCounts = {};
   (result?.sprites || []).forEach((s) => {
-    const id = typeof s === 'number' ? spriteId(s) : String(s);
-    if (spriteIndex(id) >= 0) wonCounts[id] = (wonCounts[id] || 0) + 1;
+    // Key by the id we resolved, not by whatever came in, so the counts
+    // map can only ever hold canonical s0..s59 keys.
+    const idx = spriteIndex(typeof s === 'number' ? spriteId(s) : String(s));
+    if (idx >= 0) { const id = spriteId(idx); wonCounts[id] = (wonCounts[id] || 0) + 1; }
   });
 
   const session = {
