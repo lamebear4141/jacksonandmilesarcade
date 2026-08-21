@@ -24,6 +24,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["-y", "http-server", "site", "-p", "8240", "-c-1"],
       "port": 8240
+    },
+    {
+      "name": "site-preflight",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "http-server", "site", "-p", "8250", "-c-1"],
+      "port": 8250
     }
   ]
 }

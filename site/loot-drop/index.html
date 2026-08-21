@@ -165,14 +165,48 @@
   @keyframes lootIn{ from{ transform:translateX(70px) scale(.6); opacity:0; } }
   @keyframes lootOut{ to{ transform:translateX(70px) scale(.8); opacity:0; } }
 
+  /* The quick feedback moment sits on its own white card, never as bare
+     text over the question — AJ flagged the old version overlapping the
+     content behind it. "good" = a green-tinted celebration. */
   #feedback{ position:fixed; inset:0; display:none; align-items:center; justify-content:center;
-    flex-direction:column; gap:6px; pointer-events:none; z-index:70; }
+    pointer-events:none; z-index:70; }
   #feedback.on{ display:flex; }
-  #fbIcon{ font-size:110px; animation:pop .35s cubic-bezier(.34,1.6,.64,1);
-    filter:drop-shadow(0 6px 0 rgba(30,43,99,.25)); }
-  #fbText{ font-size:28px; font-weight:800; color:var(--ac-edge);
-    text-shadow:-2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff, 2px 2px 0 #fff, 0 4px 0 rgba(30,43,99,.2); }
+  .fb-card{
+    display:flex; flex-direction:column; align-items:center; gap:2px;
+    background:var(--ac-panel); border:var(--ac-bd) solid var(--ac-edge);
+    border-radius:var(--ac-radius); padding:20px 36px;
+    box-shadow:0 var(--ac-lift) 0 var(--ac-edge), 0 18px 26px rgba(30,43,99,.30);
+    animation:pop .35s cubic-bezier(.34,1.6,.64,1);
+  }
+  #feedback.good .fb-card{ background:#F0FFF1; border-color:var(--ac-good);
+    box-shadow:0 var(--ac-lift) 0 var(--ac-good), 0 18px 26px rgba(30,43,99,.30); }
+  #fbIcon{ font-size:76px; line-height:1.1; }
+  #fbText{ font-size:27px; font-weight:800; color:var(--ac-text); }
+  #feedback.good #fbText{ color:var(--ac-good); }
   @keyframes pop{ 0%{transform:scale(.3);} 70%{transform:scale(1.15);} 100%{transform:scale(1);} }
+
+  /* The learn card — every miss becomes a mini-lesson. It's a real modal
+     the kid dismisses themselves: no timer, no rush, learning first. */
+  #learnCard{ position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+    z-index:75; background:rgba(30,43,99,.45); padding:16px; }
+  #learnCard.on{ display:flex; }
+  .learn-card{
+    background:var(--ac-panel); border:var(--ac-bd) solid var(--ac-edge);
+    border-radius:var(--ac-radius); padding:22px 20px; max-width:440px; width:100%;
+    text-align:center; box-shadow:0 var(--ac-lift) 0 var(--ac-edge), 0 18px 26px rgba(30,43,99,.30);
+    animation:pop .35s cubic-bezier(.34,1.6,.64,1);
+  }
+  .learn-title{ font-size:14px; font-weight:800; letter-spacing:2px; color:var(--ac-text-dim);
+    text-transform:uppercase; }
+  #learnPrompt{ font-size:19px; font-weight:800; color:var(--ac-text); margin:10px 0 2px; line-height:1.4; }
+  #learnAnswer{
+    font-size:30px; font-weight:800; color:var(--ac-good);
+    background:#F0FFF1; border:3px solid var(--ac-good); border-radius:14px;
+    padding:10px 16px; margin:12px auto; max-width:100%; line-height:1.3;
+  }
+  #learnTip{ font-size:14px; font-weight:700; color:var(--ac-text-dim); margin:0 0 12px; }
+  .learn-btns{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+  .learn-btns .ac-btn{ width:auto; min-width:130px; margin-top:0; }
 
   /* ---------------- reboot + result ---------------- */
   .van{ font-size:72px; filter:drop-shadow(0 8px 0 rgba(30,43,99,.2)); }
@@ -253,7 +287,7 @@
 
   @media (prefers-reduced-motion: reduce){
     .mode-card:hover{ transform:none; }
-    #fbIcon{ animation:none; }
+    .fb-card, .learn-card{ animation:none; }
     .loot-pop{ animation:none; }
   }
   @media (max-width:520px){
@@ -348,7 +382,22 @@
     </div>
 
     <div id="lootLayer"></div>
-    <div id="feedback"><div id="fbIcon">⭐</div><div id="fbText"></div></div>
+    <div id="feedback"><div class="fb-card"><div id="fbIcon">⭐</div><div id="fbText"></div></div></div>
+
+    <!-- A miss opens this instead of auto-advancing: the answer, a way to
+         hear it, and the kid moves on when THEY are ready. -->
+    <div id="learnCard">
+      <div class="learn-card">
+        <div class="learn-title" id="learnTitle">💪 Let's learn this one</div>
+        <div id="learnPrompt"></div>
+        <div id="learnAnswer"></div>
+        <p id="learnTip"></p>
+        <div class="learn-btns">
+          <button class="ac-btn ac-btn--blue" id="learnHear">🔊 Hear it</button>
+          <button class="ac-btn ac-btn--green" id="learnGo">Got it! ▶</button>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- =================== REBOOT VAN =================== -->
@@ -383,9 +432,9 @@
     <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;padding-top:6px">
       <button class="ac-btn ac-btn--green" id="resMiniBtn">🎁 Bonus game</button>
       <button class="ac-btn" id="resRetryBtn">🪂 Drop again</button>
-      <button class="ac-btn ac-btn--blue" id="resHomeBtn">🏠 My Character</button>
+      <button class="ac-btn ac-btn--blue" id="resHomeBtn">🏠 Clubhouse</button>
     </div>
-    <div class="tiny" style="text-align:center">Your XP, coins and sprites are on your Character page — same wallet as every game.</div>
+    <div class="tiny" style="text-align:center">Your XP, coins and sprites are in your Clubhouse — same wallet as every game.</div>
   </section>
 
   <!-- =================== MINIGAME =================== -->
@@ -394,7 +443,7 @@
   <!-- ================ SQUAD CODE (cousins) ================ -->
   <section id="scrCompare" class="screen scroll">
     <div class="ribbon">⚔️ Squad code</div>
-    <div class="tiny" style="text-align:center">Brothers compare on the 🏆 tab of the Character page.<br>Codes are for cousins and friends in other families!</div>
+    <div class="tiny" style="text-align:center">Brothers compare on the 🏆 tab of the Clubhouse.<br>Codes are for cousins and friends in other families!</div>
     <div class="card">
       <div class="tiny">YOUR CODE — send it to them</div>
       <div class="code-row"><input id="myCode" readonly><button class="ac-btn ac-btn--sm ac-btn--blue" id="copyCode">Copy</button></div>

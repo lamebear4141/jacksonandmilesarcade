@@ -161,7 +161,6 @@
   .recordBoard div{ display:flex; justify-content:space-between; gap:20px; font-size:15px; padding:3px 0; font-weight:800; }
   .recordBoard span:last-child{ color:var(--ac-yellow-deep); }
   .hidden{ display:none !important; }
-  a.back{ position:absolute; top:10px; left:14px; color:var(--ac-text-dim); text-decoration:none; font-size:13px; font-weight:800; z-index:20; }
   #tierNote{ color:var(--ac-text-dim); font-size:11px; margin:-4px 0 10px; }
 
   /* the biggest moments only */
@@ -176,8 +175,6 @@
 </head>
 <body>
 <div id="wrap">
-  <a class="back" href="../index.html">&larr; Arcade</a>
-
   <div id="topbar">
     <div class="cell"><span class="label">RUNS</span><span id="runsValue">0</span></div>
     <div class="cell"><span class="label">OUTS</span><span id="outsValue">⚪⚪⚪</span></div>
@@ -226,7 +223,6 @@
     <div id="awardLine" class="scoreRow" style="color:var(--ac-yellow-deep);min-height:1.2em"></div>
     <div class="recordBoard" id="endBoard"></div>
     <button class="btn" id="againBtn">PLAY AGAIN</button>
-    <a class="btn ghost" href="../index.html" style="text-decoration:none">Back to the arcade</a>
   </div>
 </div>
 

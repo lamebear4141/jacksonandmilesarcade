@@ -83,7 +83,9 @@ export async function mountBar({ back = true, title = '', mount = null } = {}) {
     const a = document.createElement('a');
     a.className = 'ac-btn--ghost';
     a.href = HUB;
-    a.textContent = '← Arcade';
+    // The hub lands on the kid's character home, which the family calls
+    // the Clubhouse — the label should match where the door actually goes.
+    a.textContent = '← Clubhouse';
     left.appendChild(a);
   }
   if (title) {
@@ -115,8 +117,10 @@ export async function mountBar({ back = true, title = '', mount = null } = {}) {
   switcher.className = 'ac-btn--ghost';
   switcher.textContent = 'Switch profile';
   // Switching always routes back through the hub's picker — never
-  // silently, and a real kid re-enters their own PIN there.
-  switcher.addEventListener('click', () => { clearCurrentKid(); window.location.href = HUB; });
+  // silently, and a real kid re-enters their own PIN there. The #pick
+  // hash tells the hub to open the who's-playing screen directly instead
+  // of parking on the front door.
+  switcher.addEventListener('click', () => { clearCurrentKid(); window.location.href = HUB + '#pick'; });
   right.appendChild(switcher);
 
   bar.append(left, right);
@@ -160,7 +164,7 @@ export async function requireKid({ mount = null, gameName = '' } = {}) {
     <h2>Who's playing?</h2>
     <p>Pick your profile first so ${gameName ? gameName + ' can' : 'we can'} save your
        XP, coins and collection to your character.</p>
-    <a class="ac-btn ac-btn--inline" href="${HUB}">Go and pick</a>`;
+    <a class="ac-btn ac-btn--inline" href="${HUB}#pick">Go and pick</a>`;
   host.appendChild(gate);
   document.body.classList.add('ac-page');
   return null;

@@ -14,7 +14,7 @@ import {
   reauthenticateWithCredential, EmailAuthProvider,
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import {
-  getFirestore, collection, doc, addDoc, getDoc, getDocs, setDoc, updateDoc,
+  getFirestore, collection, doc, addDoc, getDoc, getDocs, setDoc, updateDoc, deleteDoc,
   query, where, limit, orderBy, serverTimestamp,
   increment, arrayUnion, writeBatch, runTransaction,
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
@@ -132,6 +132,25 @@ export async function listChildren() {
   const ref = collection(db, 'families', uid, 'children');
   const snap = await getDocs(ref);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+/** Permanently remove a child profile. Firestore doesn't cascade deletes,
+    so the session history is cleared first (in pages), then the child doc
+    itself — otherwise orphaned session docs would linger unreachable.
+    Trades that referenced the child stay behind as inert status records. */
+export async function deleteChild(childId) {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('Not signed in');
+  const sessRef = collection(db, 'families', uid, 'children', childId, 'sessions');
+  for (;;) {
+    const snap = await getDocs(query(sessRef, limit(200)));
+    if (snap.empty) break;
+    const batch = writeBatch(db);
+    snap.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+    if (snap.size < 200) break;
+  }
+  await deleteDoc(doc(db, 'families', uid, 'children', childId));
 }
 
 export async function getChild(childId) {

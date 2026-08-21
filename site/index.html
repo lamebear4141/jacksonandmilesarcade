@@ -270,6 +270,7 @@
       <div class="ac-card hidden" id="addKidForm">
         <input class="ac-input" id="newKidName" placeholder="Nickname" maxlength="20">
         <input class="ac-input" id="newKidPin" placeholder="4-digit PIN" inputmode="numeric" maxlength="4">
+        <input class="ac-input" id="newKidPinConfirm" placeholder="Type the PIN again" inputmode="numeric" maxlength="4">
         <label class="ac-label" for="newKidBirthday">Birthday (used to set math difficulty)</label>
         <input class="ac-input" id="newKidBirthday" type="date">
         <label class="ac-label" for="newKidFocus">Focus area</label>
@@ -280,6 +281,12 @@
         </select>
         <button class="ac-btn" id="addKidBtn" type="button">Add kid</button>
         <p class="ac-error hidden" id="addKidError"></p>
+      </div>
+      <!-- A quiet second door: cousins and visiting friends can play without
+           touching the family profiles. Deliberately a ghost button — the
+           big choice on this screen stays "pick your profile". -->
+      <div style="text-align:center;margin-top:22px">
+        <button class="ac-btn--ghost" id="kidGateFreePlay" type="button">🎮 Free play — no profile, nothing saved</button>
       </div>
     </div>
 
@@ -309,6 +316,8 @@
   <div class="ac-modal hidden" id="editModal">
     <div class="ac-modal__card ac-modal__card--form">
       <p class="ac-modal__name" id="editKidName" style="text-align:center;"></p>
+      <label class="ac-label" for="editNickname">Nickname</label>
+      <input class="ac-input" id="editNickname" maxlength="20">
       <label class="ac-label" for="editBirthday">Birthday</label>
       <input class="ac-input" id="editBirthday" type="date">
       <label class="ac-label" for="editFocusArea">Focus area</label>
@@ -317,16 +326,31 @@
         <option value="reading">Reading</option>
         <option value="math">Math</option>
       </select>
+      <!-- Kids forget PINs — resetting one is a normal parent chore, so it
+           lives right here. Blank fields mean "keep the old PIN". -->
+      <label class="ac-label" for="editPin">New PIN (leave blank to keep the current one)</label>
+      <input class="ac-input" id="editPin" placeholder="4-digit PIN" inputmode="numeric" maxlength="4" autocomplete="off">
+      <input class="ac-input" id="editPinConfirm" placeholder="Type the new PIN again" inputmode="numeric" maxlength="4" autocomplete="off">
       <button class="ac-btn" id="editSaveBtn" type="button">Save</button>
       <button class="ac-btn--ghost" id="editCancelBtn" type="button" style="display:block;margin:12px auto 0;">Cancel</button>
       <p class="ac-error hidden" id="editError"></p>
+      <div style="text-align:center;margin-top:16px;border-top:2px solid var(--ac-line);padding-top:12px">
+        <button class="ac-btn--ghost" id="editDeleteBtn" type="button" style="color:var(--ac-bad)">🗑️ Remove this profile</button>
+        <div class="hidden" id="deleteConfirm">
+          <p class="ac-sub" id="deleteWarning" style="margin:10px 0"></p>
+          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+            <button class="ac-btn ac-btn--sm" id="deleteYesBtn" type="button" style="background:var(--ac-bad);width:auto">Yes, remove it</button>
+            <button class="ac-btn--ghost" id="deleteNoBtn" type="button">Keep it</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
 <script type="module">
 import {
   onParentChange, signUpParent, signInParent, signOutParent, signInParentWithGoogle,
-  addChild, updateChild, listChildren, getCurrentKid, setCurrentKid, clearCurrentKid,
+  addChild, updateChild, deleteChild, listChildren, getCurrentKid, setCurrentKid, clearCurrentKid,
   isGuestKid, listLocalGuests, addLocalGuest,
   getTopScores, sendPasswordReset,
 } from './firebase-config.js';
@@ -338,6 +362,16 @@ import * as shell from './assets/arcade-shell.js';
 
 const $ = (id) => document.getElementById(id);
 let childrenCache = [];
+
+// A kid mid-session must never watch the front door flash past while auth
+// resolves — hide it before first paint; onParentChange settles the real screen.
+if (getCurrentKid()) $('frontDoor').classList.add('hidden');
+
+// Games link back here with #pick when they want the who's-playing screen
+// (e.g. the top bar's "Switch profile"). Consume the hash once so a later
+// reload doesn't re-trigger it.
+let wantsPicker = location.hash === '#pick';
+if (wantsPicker) history.replaceState(null, '', location.pathname + location.search);
 
 /* ---------------------------------------------------------------- screens */
 function showScreen(name) {
@@ -385,6 +419,14 @@ let currentUser = null;
 
 onParentChange(async (user) => {
   currentUser = user;
+  // If the login card is on screen when auth resolves, the parent just
+  // finished signing in — carry them straight to the kid picker instead of
+  // dropping them back on the front door to press PLAY a second time.
+  // (The sessionStorage flag covers Google's redirect fallback, which
+  // reloads the page and so can't be caught by "is the card visible".)
+  const justSignedIn = !$('loginScreen').classList.contains('hidden')
+    || sessionStorage.getItem('arcade.justSignedIn') === '1';
+  if (user) sessionStorage.removeItem('arcade.justSignedIn');
   if (user) {
     $('parentEmail').textContent = user.email;
     $('authBar').classList.remove('hidden');
@@ -397,7 +439,8 @@ onParentChange(async (user) => {
       enterArcadeAsReal(current);
     } else {
       clearCurrentKid();
-      showScreen('frontDoor');   // PLAY goes straight to the kid gate
+      showScreen(justSignedIn || wantsPicker ? 'kidGate' : 'frontDoor');
+      wantsPicker = false;
     }
     return;
   }
@@ -408,7 +451,13 @@ onParentChange(async (user) => {
   } else {
     clearCurrentKid();
     $('guestBar').classList.add('hidden');
-    showScreen('frontDoor');     // PLAY reveals the login card
+    if (wantsPicker) {           // "Switch profile" from a game, guest side
+      wantsPicker = false;
+      renderGuestIcons();
+      showScreen('guestGate');
+    } else {
+      showScreen('frontDoor');   // PLAY reveals the login card
+    }
   }
 });
 
@@ -498,6 +547,8 @@ $('resetSend').addEventListener('click', async () => {
 $('googleBtn').addEventListener('click', async () => {
   const err = $('authError');
   err.classList.add('hidden');
+  // Survives the redirect-fallback reload so the picker still opens after.
+  sessionStorage.setItem('arcade.justSignedIn', '1');
   try {
     await signInParentWithGoogle();
   } catch (e) {
@@ -561,10 +612,17 @@ $('addKidBtn').addEventListener('click', async () => {
   err.classList.add('hidden');
   if (!name) { err.textContent = 'Give your kid a nickname.'; err.classList.remove('hidden'); return; }
   if (!/^\d{4}$/.test(pin)) { err.textContent = 'PIN needs to be exactly 4 digits.'; err.classList.remove('hidden'); return; }
+  // Typed twice on purpose — a mistyped PIN here means a locked-out kid later.
+  if (pin !== $('newKidPinConfirm').value.trim()) {
+    err.textContent = "Those PINs don't match — type the same 4 digits in both boxes.";
+    err.classList.remove('hidden');
+    return;
+  }
   try {
     await addChild(name, pin, birthday, focusArea);
     $('newKidName').value = '';
     $('newKidPin').value = '';
+    $('newKidPinConfirm').value = '';
     $('newKidBirthday').value = '';
     $('newKidFocus').value = 'both';
     $('addKidForm').classList.add('hidden');
@@ -578,9 +636,14 @@ $('addKidBtn').addEventListener('click', async () => {
 /* ---------------------------------------------------------------- edit profile (parent only) */
 function openEditModal(kid) {
   $('editKidName').textContent = `Edit ${kid.nickname}`;
+  $('editNickname').value = kid.nickname || '';
   $('editBirthday').value = kid.birthday || '';
   $('editFocusArea').value = kid.focusArea || 'both';
+  $('editPin').value = '';
+  $('editPinConfirm').value = '';
   $('editError').classList.add('hidden');
+  $('deleteConfirm').classList.add('hidden');
+  $('editDeleteBtn').classList.remove('hidden');
   $('editModal').dataset.childId = kid.id;
   $('editModal').classList.remove('hidden');
 }
@@ -589,11 +652,40 @@ $('editSaveBtn').addEventListener('click', async () => {
   const childId = $('editModal').dataset.childId;
   const err = $('editError');
   err.classList.add('hidden');
+  const nickname = $('editNickname').value.trim();
+  if (!nickname) {
+    err.textContent = 'The nickname can\'t be empty.';
+    err.classList.remove('hidden');
+    return;
+  }
+  const updates = {
+    nickname,
+    birthday: $('editBirthday').value || null,
+    focusArea: $('editFocusArea').value,
+  };
+  // Optional PIN reset — for the kid who forgot theirs. Blank means keep.
+  const pin = $('editPin').value.trim();
+  const pin2 = $('editPinConfirm').value.trim();
+  if (pin || pin2) {
+    if (!/^\d{4}$/.test(pin)) {
+      err.textContent = 'The new PIN needs to be exactly 4 digits.';
+      err.classList.remove('hidden');
+      return;
+    }
+    if (pin !== pin2) {
+      err.textContent = "Those PINs don't match — type the same 4 digits in both boxes.";
+      err.classList.remove('hidden');
+      return;
+    }
+    updates.pin = pin;
+  }
   try {
-    await updateChild(childId, {
-      birthday: $('editBirthday').value || null,
-      focusArea: $('editFocusArea').value,
-    });
+    await updateChild(childId, updates);
+    // If this kid is mid-session somewhere, keep the stored nickname in step.
+    const current = getCurrentKid();
+    if (current && current.id === childId && current.nickname !== nickname) {
+      setCurrentKid({ id: childId, nickname });
+    }
     $('editModal').classList.add('hidden');
     await refreshKidGate();
   } catch (e) {
@@ -602,8 +694,45 @@ $('editSaveBtn').addEventListener('click', async () => {
   }
 });
 
+/* Removing a profile is a two-tap decision with the consequences spelled
+   out — it permanently deletes the character and play history. */
+$('editDeleteBtn').addEventListener('click', () => {
+  const kid = childrenCache.find((c) => c.id === $('editModal').dataset.childId);
+  $('deleteWarning').textContent =
+    `This removes ${kid?.nickname || 'this profile'} for good — character, XP, coins, sprites and play history. There's no undo.`;
+  $('editDeleteBtn').classList.add('hidden');
+  $('deleteConfirm').classList.remove('hidden');
+});
+$('deleteNoBtn').addEventListener('click', () => {
+  $('deleteConfirm').classList.add('hidden');
+  $('editDeleteBtn').classList.remove('hidden');
+});
+$('deleteYesBtn').addEventListener('click', async () => {
+  const childId = $('editModal').dataset.childId;
+  const err = $('editError');
+  err.classList.add('hidden');
+  $('deleteYesBtn').disabled = true;
+  try {
+    await deleteChild(childId);
+    const current = getCurrentKid();
+    if (current && current.id === childId) clearCurrentKid();
+    $('editModal').classList.add('hidden');
+    await refreshKidGate();
+  } catch (e) {
+    err.textContent = 'Could not remove that profile — try again.';
+    err.classList.remove('hidden');
+  }
+  $('deleteYesBtn').disabled = false;
+});
+
 /* ---------------------------------------------------------------- guest mode */
 $('guestModeBtn').addEventListener('click', () => {
+  renderGuestIcons();
+  showScreen('guestGate');
+});
+// The quiet free-play door on the who's-playing screen — for cousins and
+// visiting friends, without touching the family profiles.
+$('kidGateFreePlay').addEventListener('click', () => {
   renderGuestIcons();
   showScreen('guestGate');
 });

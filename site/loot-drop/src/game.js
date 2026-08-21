@@ -164,8 +164,8 @@ export function micPressed(){
       $('micBtn').classList.remove('live'); $('micBtn').textContent = '🎤 Read it';
       if (err === 'not-allowed' || err === 'service-not-allowed'){
         R.useMic = false;
+        render(R); // clears #heard as part of its normal reset — set the message after, not before
         $('heard').textContent = 'Mic is off — switching to tap mode.';
-        render(R);
       } else {
         $('heard').textContent = "Didn't catch that — try again!";
       }
@@ -178,7 +178,7 @@ export function micPressed(){
 
       if (item.kind === 'passage'){
         if (passed){
-          flash('📖', 'Nice reading! Now the question…');
+          flash('📖', 'Nice reading! Now the question…', true);
           setTimeout(() => showPassageQuestion(R, item), 900);
         } else {
           R.tries++;
@@ -206,8 +206,8 @@ export function escapePressed(){
   R.micTrouble = true;
   Speech.stopListening();
   $('escapeBtn').style.display = 'none';
+  render(R); // clears #heard as part of its normal reset — set the message after, not before
   $('heard').textContent = 'Switched to tap mode.';
-  render(R);
 }
 
 export function hearPressed(){
@@ -217,11 +217,22 @@ export function hearPressed(){
 }
 
 /* ---------------- resolving an item ---------------- */
+function advance(R){
+  if (R.rebooting){ R.rebootDone++; if (R.rebootDone >= R.rebootQueue.length) return finishReboot(R); }
+  else R.idx++;
+  render(R);
+}
+
 function resolve(R, passed, item, score){
   // passages need BOTH: the read-aloud and the right answer
   if (item.kind === 'passage' && item._readFailed) passed = false;
 
-  if (!passed && R.tries < 1 && (item.kind === 'read-word' || item.kind === 'read-sentence')){
+  // The say-it-again retry is a MIC-path feature (score is only passed by
+  // the mic handler). In tap mode the correct choice was just highlighted,
+  // so a retry teaches nothing — worse, the locked choice buttons made it
+  // a dead end. Tap-mode misses go straight to the learn card instead.
+  if (!passed && score !== undefined && R.tries < 1 &&
+      (item.kind === 'read-word' || item.kind === 'read-sentence')){
     R.tries++;
     flash('🤔', 'So close — try again!');
     $('heard').textContent = 'Tap 🔊 to hear it, then read it again.';
@@ -238,21 +249,76 @@ function resolve(R, passed, item, score){
     sfx.play('pop');
     R.correct++;
     if (mathy) R.mathCorrect++; else R.readCorrect++;
+    celebrateCorrect();
     lootChest(R, item.bonus ? CONFIG.bonusRoundMultiplier : 1);
+    setTimeout(() => advance(R), 1400);
   } else {
     sfx.play('nope');
     const label = item.kind === 'passage' ? item.question : item.prompt;
     R.missed.push(label);
     R.missedItems.push(item);
-    Speech.speak(item.kind === 'passage' ? item.answer : (item.answer || item.prompt), 0.7);
-    flash('💪', "Let's practice this one!");
+    // No timed auto-advance on a miss: the learn card teaches the answer
+    // and the kid moves on when THEY tap "Got it!".
+    showLearnCard(R, item);
+  }
+}
+
+/* ---------------- feedback: celebrate wins, teach misses ---------------- */
+const CHEERS = [
+  ['🎉', 'You got it!'], ['⭐', 'Nailed it!'], ['🌟', "That's right!"],
+  ['🙌', 'Awesome!'], ['🏆', 'Super smart!'], ['✨', 'Boom — correct!'],
+];
+function celebrateCorrect(){
+  const [icon, text] = CHEERS[Math.floor(Math.random() * CHEERS.length)];
+  flash(icon, text, true);
+}
+
+/** Math symbols the speech engine would otherwise skip or mangle. */
+function speakable(text){
+  return String(text)
+    .replace(/−/g, ' minus ').replace(/\+/g, ' plus ')
+    .replace(/×/g, ' times ').replace(/÷/g, ' divided by ')
+    .replace(/=/g, ' equals ');
+}
+
+/* Every miss becomes a small lesson: show the right answer big and green,
+   say it out loud, and wait for the kid — no timer, no rush. */
+function showLearnCard(R, item){
+  const reading = item.kind === 'read-word' || item.kind === 'read-sentence';
+  let prompt, answer, tip, sayText;
+
+  if (reading){
+    prompt = item.kind === 'read-word' ? 'This word says…' : 'This sentence says…';
+    answer = item.prompt;
+    tip = 'Tap 🔊 to hear it, then try saying it along.';
+    sayText = item.prompt;
+  } else if (item.kind === 'passage'){
+    prompt = item.question;
+    answer = item.answer;
+    tip = 'Look back at the story — the answer is hiding in there.';
+    sayText = item.answer;
+  } else {
+    // A bare equation ("15 − 4 = ?") reads best with the answer dropped in;
+    // a word problem keeps its question on top and the answer below.
+    const isEquation = /^[\d\s+−×÷=?]+$/.test(item.prompt);
+    prompt = item.prompt;
+    answer = isEquation ? item.prompt.replace('?', item.answer) : item.answer;
+    tip = 'Say it out loud once — that makes it stick.';
+    sayText = speakable(answer);
   }
 
-  setTimeout(() => {
-    if (R.rebooting){ R.rebootDone++; if (R.rebootDone >= R.rebootQueue.length) return finishReboot(R); }
-    else R.idx++;
-    render(R);
-  }, passed ? 1250 : 1700);
+  $('learnPrompt').textContent = prompt;
+  $('learnAnswer').textContent = answer;
+  $('learnTip').textContent = tip;
+  Speech.speak(sayText, 0.72);
+  $('learnHear').onclick = () => Speech.speak(sayText, 0.7);
+  $('learnGo').onclick = () => {
+    if (!$('learnCard').classList.contains('on')) return;
+    sfx.play('tap');
+    $('learnCard').classList.remove('on');
+    advance(R);
+  };
+  $('learnCard').classList.add('on');
 }
 
 function lootChest(R, multiplier){
@@ -279,10 +345,13 @@ function showLoot(sprite, rarity, delay){
     setTimeout(() => el.remove(), 1600);
   }, delay);
 }
-function flash(icon, text){
+let flashTimer = null;
+function flash(icon, text, good){
   $('fbIcon').textContent = icon; $('fbText').textContent = text;
+  $('feedback').classList.toggle('good', !!good);
   $('feedback').classList.add('on');
-  setTimeout(() => $('feedback').classList.remove('on'), 1000);
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => $('feedback').classList.remove('on'), 1150);
 }
 
 /* ---------------- reboot van ---------------- */

@@ -23,8 +23,18 @@ let WHO = null;      // the signed-in child's id
 let KID = null;      // { id, nickname }
 let BAR = null;      // mountBar handle — refreshed after every round
 let ROUND_SNAP = null;   // character snapshot from the start of the round
+let reportDirty = false; // a round finished since the last progress-file download
 const P = () => ALL.profiles[WHO];
 const save = () => S.saveAll(ALL);
+
+/** One progress file per play session, not per round: downloads happen on
+    the way out (Clubhouse button, the top bar's links), inside the same
+    click gesture so the browser allows them even as the page navigates. */
+function flushReport(){
+  if (!reportDirty || !CONFIG.autoSaveReport) return;
+  reportDirty = false;
+  S.downloadReport(P());
+}
 
 function show(id){
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
@@ -130,9 +140,12 @@ function handleFinish(res){
   save();
   renderResult(res);
 
-  // The nightly email reads a progress file from the Downloads folder, so
-  // a finished round writes one (CONFIG.autoSaveReport turns it off).
-  if (CONFIG.autoSaveReport) S.downloadReport(P());
+  // The nightly email reads a progress file from Downloads — but writing
+  // one after EVERY round piles up "lootdrop-… (1).json" duplicates (AJ:
+  // "that should not happen"). So a finished round just marks the report
+  // dirty; the actual download fires once, on the way OUT of the game
+  // (Clubhouse button / top-bar links) with the whole session's data.
+  if (CONFIG.autoSaveReport) reportDirty = true;
 
   // Push the round's exact delta to the shared character in the
   // background — the end screen never waits on the network.
@@ -209,7 +222,7 @@ function runMinigame(){
     sfx.play('coin');
     if (BAR) BAR.refresh();
     $('miniHost').innerHTML = `<div class="mg-title">+${coins} COINS</div>
-      <div class="mg-sub">Spend them in the Shop on your Character page.</div>`;
+      <div class="mg-sub">Spend them in the Shop at your Clubhouse.</div>`;
     setTimeout(() => { renderDrop(); show('scrDrop'); }, 1500);
   });
 }
@@ -309,7 +322,14 @@ export async function boot(){
 
   $('resMiniBtn').onclick  = runMinigame;
   $('resRetryBtn').onclick = () => { renderDrop(); show('scrDrop'); };
-  $('resHomeBtn').onclick  = goHome;
+  $('resHomeBtn').onclick  = () => { flushReport(); goHome(); };
+
+  // The other ways out of the game live in the shared top bar (← Clubhouse,
+  // Switch profile). Capture-phase so the download starts inside the same
+  // user gesture, before the link's navigation unloads the page.
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.ac-bar a, .ac-bar button')) flushReport();
+  }, true);
 
   $('lnkCompare').onclick = () => { renderCompare(); show('scrCompare'); };
   document.querySelectorAll('[data-home]').forEach(b => b.onclick = () => { renderDrop(); show('scrDrop'); });
@@ -327,7 +347,7 @@ export async function boot(){
   $('copyLink').onclick = () => copy($('myLink'));
 
   $('grownup').onclick    = () => { renderParent(); show('scrParent'); };
-  $('parentSave').onclick = () => S.downloadReport(P());
+  $('parentSave').onclick = () => { reportDirty = false; S.downloadReport(P()); };
 
   if (!Speech.hasMic) $('micNote').textContent = 'Tip: open in Chrome for read-aloud mode. Tap mode works everywhere.';
 
