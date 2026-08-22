@@ -30,6 +30,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["-y", "http-server", "site", "-p", "8250", "-c-1"],
       "port": 8250
+    },
+    {
+      "name": "site-jungle",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "http-server", "site", "-p", "8260", "-c-1"],
+      "port": 8260
     }
   ]
 }

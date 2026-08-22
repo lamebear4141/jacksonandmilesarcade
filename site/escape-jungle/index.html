@@ -1,0 +1,3004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Escape from the Jungle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/arcade.css">
+<style>
+  /* Game-only styles. The shared chrome (bar, buttons, cards, badges)
+     comes from arcade.css; everything here is the trail itself. */
+  html, body { margin:0; min-height:100%; }
+  body { touch-action:manipulation; user-select:none; -webkit-user-select:none; overscroll-behavior:none; }
+
+  #wrap{ max-width:1000px; margin:0 auto; padding:0 12px 20px; }
+
+  /* ---------- start screen ---------- */
+  #start{ text-align:center; padding-top:4px; }
+  #start .ac-card{ max-width:620px; margin:0 auto; text-align:center; }
+  .ej-hero{ font-size:56px; line-height:1; margin:2px 0 6px; }
+  .ej-tagline{
+    font-size:clamp(15px,2.6vw,19px); font-weight:800; color:var(--ac-text);
+    margin:0 0 4px;
+  }
+  .ej-sparkline{
+    font-size:clamp(14px,2.4vw,17px); font-weight:800; color:var(--ac-purple-deep);
+    margin:0 0 16px;
+  }
+  .ej-rules{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(126px,1fr));
+    gap:8px; margin:0 0 18px; text-align:center;
+  }
+  .ej-rule{
+    background:var(--ac-panel-2); border:3px solid var(--ac-edge); border-radius:var(--ac-radius-sm);
+    padding:9px 6px; font-size:12px; font-weight:800; color:var(--ac-edge); line-height:1.35;
+  }
+  .ej-rule b{ display:block; font-size:22px; margin-bottom:2px; }
+
+  .ej-treks{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:8px; }
+  @media (max-width:520px){ .ej-treks{ grid-template-columns:1fr; } }
+  .ej-trek{
+    background:linear-gradient(180deg,var(--ac-blue),var(--ac-blue-deep));
+    color:#fff; font-family:inherit; font-weight:800; cursor:pointer;
+    border:var(--ac-bd) solid var(--ac-edge); border-radius:var(--ac-radius);
+    box-shadow:0 var(--ac-lift) 0 var(--ac-edge), 0 13px 14px rgba(30,43,99,0.25);
+    padding:16px 10px 14px; transition:transform 0.08s ease, box-shadow 0.08s ease;
+  }
+  .ej-trek:active{ transform:translateY(var(--ac-lift)); box-shadow:0 0 0 var(--ac-edge); }
+  .ej-trek--big{ background:linear-gradient(180deg,var(--ac-purple),var(--ac-purple-deep)); }
+  .ej-trek__name{ display:block; font-size:clamp(19px,3.4vw,24px); letter-spacing:1px; }
+  .ej-trek__sub{ display:block; font-size:12px; opacity:0.92; margin-top:4px; font-weight:700; }
+
+  .ej-bestline{ font-size:13px; font-weight:800; color:var(--ac-text-dim); margin:12px 0 0; }
+  .ej-keys{ font-size:12px; color:var(--ac-text-mute); font-weight:700; margin:8px 0 0; }
+
+  /* ---------- the stage ---------- */
+  #stage{ position:relative; margin:0 auto; width:min(1000px,97vw); }
+  #game{
+    display:block; width:100%; height:auto;
+    border:4px solid var(--ac-edge); border-radius:20px; background:#8fd8f5;
+    box-shadow:0 7px 0 var(--ac-edge), 0 14px 16px rgba(30,43,99,0.25);
+  }
+
+  /* ---------- HUD ---------- */
+  .ej-hud{
+    position:absolute; inset:10px 0 auto; display:flex; justify-content:space-between;
+    align-items:flex-start; padding:0 12px; pointer-events:none; gap:8px;
+  }
+  .ej-pill{
+    background:var(--ac-panel); border:4px solid var(--ac-edge); border-radius:999px;
+    padding:5px 13px; font-weight:800; font-size:clamp(13px,2.3vw,17px);
+    color:var(--ac-text); box-shadow:0 5px 0 var(--ac-edge); white-space:nowrap;
+  }
+  .ej-hud__left, .ej-hud__right{ display:flex; flex-direction:column; gap:6px; }
+  .ej-hud__right{ align-items:flex-end; }
+  #bananaPill{ letter-spacing:2px; }
+  #bananaPill .spent{ opacity:0.22; filter:grayscale(1); }
+  #gemPill{ background:var(--ac-tint-blue); }
+  #gemPill.pop{ animation:ej-pop 0.28s cubic-bezier(0.34,1.8,0.64,1); }
+  @keyframes ej-pop{ 50%{ transform:scale(1.28); } }
+  #shortcutPill{
+    background:var(--ac-yellow); color:var(--ac-edge); border-width:3px;
+    box-shadow:0 3px 0 var(--ac-edge); font-size:12px; padding:4px 11px;
+    animation:ej-breathe 1.1s ease-in-out infinite;
+  }
+  @keyframes ej-breathe{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.07); } }
+  #zonePill{ background:var(--ac-panel-2); font-size:12px; padding:4px 11px; border-width:3px; box-shadow:0 3px 0 var(--ac-edge); }
+
+  /* progress bar with the camp at the end */
+  .ej-progress{
+    position:absolute; left:12px; right:12px; bottom:-2px;
+    display:flex; align-items:center; gap:6px; pointer-events:none;
+  }
+  #progressWrap{
+    position:relative; flex:1; height:14px; background:rgba(255,255,255,0.75);
+    border:3px solid var(--ac-edge); border-radius:999px; overflow:hidden;
+  }
+  #progressFill{
+    height:100%; width:0%; border-radius:999px;
+    background:linear-gradient(90deg,var(--ac-good),var(--ac-yellow));
+    transition:width 0.18s linear;
+  }
+  #progressFill.jump{ transition:width 0.6s cubic-bezier(0.2,1.5,0.4,1); }
+  .ej-progress__camp{ font-size:19px; line-height:1; filter:drop-shadow(0 2px 0 rgba(30,43,99,0.35)); }
+
+  /* the banner slot: fork calls, shortcut payoffs, zone names */
+  #banner{
+    position:absolute; top:24%; left:50%; transform:translate(-50%,-50%) scale(0.5);
+    background:var(--ac-panel); color:var(--ac-edge);
+    border:4px solid var(--ac-edge); border-radius:999px; box-shadow:0 6px 0 var(--ac-edge);
+    padding:10px 24px; font-weight:800; font-size:clamp(16px,3vw,24px);
+    pointer-events:none; opacity:0; z-index:6; white-space:nowrap; text-align:center;
+    transition:opacity 0.16s ease, transform 0.16s cubic-bezier(0.34,1.8,0.64,1);
+  }
+  #banner.show{ opacity:1; transform:translate(-50%,-50%) scale(1); }
+  #banner.gold{ background:var(--ac-yellow); }
+
+  /* ---------- pause / countdown ---------- */
+  #pauseBtn{
+    position:absolute; top:10px; left:50%; transform:translateX(-50%);
+    width:44px; height:44px; border-radius:50%; font-size:19px; line-height:1;
+    background:var(--ac-panel); color:var(--ac-edge); font-family:inherit; font-weight:800;
+    border:4px solid var(--ac-edge); box-shadow:0 4px 0 var(--ac-edge); cursor:pointer; z-index:8;
+  }
+  #pauseBtn:active{ transform:translateX(-50%) translateY(4px); box-shadow:0 0 0 var(--ac-edge); }
+  #veil{
+    position:absolute; inset:0; border-radius:20px; z-index:9;
+    background:rgba(30,43,99,0.55); display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:14px; color:#fff; text-align:center;
+  }
+  #veilBig{ font-size:clamp(46px,10vw,86px); font-weight:800; line-height:1;
+            text-shadow:0 5px 0 rgba(30,43,99,0.5); }
+  #veilSub{ font-size:clamp(14px,2.6vw,18px); font-weight:800; }
+  #veil .ac-btn{ width:auto; padding:11px 26px; }
+
+  /* ---------- touch pads ---------- */
+  #pads{ display:none; }
+  #pads.on{ display:block; }
+  .ej-pad{
+    position:fixed; bottom:16px; z-index:20; width:74px; height:74px; border-radius:22px;
+    background:linear-gradient(180deg,var(--ac-blue),var(--ac-blue-deep));
+    color:#fff; font-size:29px; font-weight:900; font-family:inherit; line-height:1;
+    border:4px solid var(--ac-edge); box-shadow:0 6px 0 var(--ac-edge);
+    cursor:pointer; touch-action:none; padding:0;
+  }
+  .ej-pad:active, .ej-pad.held{ transform:translateY(6px); box-shadow:0 0 0 var(--ac-edge); }
+  #padLeft{ left:12px; }
+  #padRight{ left:94px; }
+  #padDuck{ right:12px; background:linear-gradient(180deg,var(--ac-purple),var(--ac-purple-deep)); }
+  #padJump{ right:94px; background:linear-gradient(180deg,var(--ac-red),var(--ac-red-deep)); }
+  /* Bottom-LEFT of the stage. It used to sit top-right at the same 10px/12px
+     as the HUD's right-hand column, which put it straight on top of the 💎
+     gem counter — so you could not see what you had picked up. */
+  #padsToggle{
+    position:absolute; left:12px; bottom:26px; z-index:8; font-size:11px; padding:5px 11px;
+    border-radius:999px; background:var(--ac-panel); color:var(--ac-text-dim);
+    border:3px solid var(--ac-line); font-family:inherit; font-weight:800; cursor:pointer;
+    opacity:0.85;
+  }
+  #padsToggle:hover{ opacity:1; }
+
+  /* ---------- results ---------- */
+  #results .ac-card{ max-width:600px; margin:0 auto; text-align:center; }
+  .ej-verdict{ font-size:clamp(26px,5.4vw,40px); font-weight:800; margin:2px 0 2px; line-height:1.1; }
+  .ej-verdict--out{ color:var(--ac-good); }
+  .ej-verdict--home{ color:var(--ac-purple-deep); }
+  .ej-subline{ font-size:clamp(14px,2.6vw,18px); font-weight:800; color:var(--ac-text-dim); margin:0 0 14px; }
+  .ej-stats{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:0 0 12px; }
+  .ej-stat{
+    background:var(--ac-panel-2); border:3px solid var(--ac-edge); border-radius:var(--ac-radius-sm);
+    padding:9px 4px; font-weight:800; color:var(--ac-edge);
+  }
+  .ej-stat__n{ display:block; font-size:clamp(19px,3.6vw,26px); }
+  .ej-stat__l{ display:block; font-size:11px; color:var(--ac-text-dim); margin-top:2px; }
+  #awardLine{ font-size:clamp(15px,2.8vw,19px); font-weight:800; color:var(--ac-purple-deep); margin:0 0 4px; min-height:24px; }
+  #capLine, #recordLine, #stampLine{ font-size:13px; font-weight:800; margin:0 0 8px; }
+  #recordLine{ color:var(--ac-yellow-deep); }
+  #stampLine{ color:var(--ac-purple-deep); }
+  #capLine{ color:var(--ac-text-dim); }
+  .ej-bestbar{ font-size:12px; font-weight:800; color:var(--ac-text-mute); margin:10px 0 0; }
+</style>
+</head>
+<body class="ac-page">
+
+<div id="wrap">
+
+  <!-- ============ START SCREEN ============ -->
+  <div id="start" class="hidden">
+    <div class="ac-card">
+      <div class="ej-hero">🌴</div>
+      <h2>Escape from the Jungle</h2>
+      <p class="ej-tagline">Grab the gems. Get to the beach. <b>You only keep what you carry out.</b></p>
+      <p class="ej-sparkline">Escape to earn ⚡ Sparks!</p>
+
+      <div class="ej-rules">
+        <div class="ej-rule"><b>🪵</b>JUMP the logs, snakes &amp; mud</div>
+        <div class="ej-rule"><b>🌿</b>DUCK the branches &amp; monkeys</div>
+        <div class="ej-rule"><b>🌳</b>DODGE the trees &amp; rocks</div>
+        <div class="ej-rule"><b>🍌</b>3 bananas — a monkey takes one each bump</div>
+      </div>
+
+      <div class="ej-treks">
+        <button id="trekShort" class="ej-trek" type="button">
+          <span class="ej-trek__name">SHORT TREK</span>
+          <span class="ej-trek__sub">about 45 seconds · 1 fork</span>
+        </button>
+        <button id="trekBig" class="ej-trek ej-trek--big" type="button">
+          <span class="ej-trek__name">BIG TREK</span>
+          <span class="ej-trek__sub">about 90 seconds · 3 forks · more gems</span>
+        </button>
+      </div>
+
+      <p class="ej-bestline" id="startBest">Farthest so far: —</p>
+      <p class="ej-keys" id="startKeys">Arrow keys or A/D to move · ↑ or Space to jump · ↓ to duck</p>
+    </div>
+  </div>
+
+  <!-- ============ THE TRAIL ============ -->
+  <div id="stage" class="hidden">
+    <canvas id="game" width="1000" height="580"></canvas>
+
+    <div class="ej-hud">
+      <div class="ej-hud__left">
+        <span class="ej-pill" id="bananaPill">🍌🍌🍌</span>
+        <span class="ej-pill" id="zonePill">Jungle Edge</span>
+      </div>
+      <div class="ej-hud__right">
+        <span class="ej-pill" id="gemPill">💎 0</span>
+        <span class="ej-pill hidden" id="shortcutPill">🏃 SHORTCUT!</span>
+      </div>
+    </div>
+
+    <button id="pauseBtn" type="button" aria-label="Pause">⏸</button>
+    <button id="padsToggle" type="button">Show buttons</button>
+
+    <div id="banner"></div>
+
+    <div class="ej-progress">
+      <div id="progressWrap"><div id="progressFill"></div></div>
+      <span class="ej-progress__camp">🏕️</span>
+    </div>
+
+    <div id="veil" class="hidden">
+      <div id="veilBig">3</div>
+      <div id="veilSub"></div>
+      <button id="veilBtn" class="ac-btn hidden" type="button">Keep running!</button>
+    </div>
+  </div>
+
+  <!-- on-screen controls: left hand moves, right hand jumps/ducks -->
+  <div id="pads">
+    <button class="ej-pad" id="padLeft"  type="button" aria-label="Move left">◀</button>
+    <button class="ej-pad" id="padRight" type="button" aria-label="Move right">▶</button>
+    <button class="ej-pad" id="padJump"  type="button" aria-label="Jump">⤒</button>
+    <button class="ej-pad" id="padDuck"  type="button" aria-label="Duck">⤓</button>
+  </div>
+
+  <!-- ============ RESULTS ============ -->
+  <div id="results" class="hidden">
+    <div class="ac-card">
+      <div class="ej-hero" id="resultsEmoji">🏖️</div>
+      <p class="ej-verdict" id="verdict">YOU ESCAPED!</p>
+      <p class="ej-subline" id="subline"></p>
+
+      <div class="ej-stats">
+        <div class="ej-stat"><span class="ej-stat__n" id="statGems">0</span><span class="ej-stat__l">💎 GEMS</span></div>
+        <div class="ej-stat"><span class="ej-stat__n" id="statDist">0%</span><span class="ej-stat__l">OF THE TRAIL</span></div>
+        <div class="ej-stat"><span class="ej-stat__n" id="statCuts">0</span><span class="ej-stat__l">SHORTCUTS</span></div>
+      </div>
+
+      <p id="awardLine"></p>
+      <p id="recordLine" class="hidden"></p>
+      <p id="stampLine" class="hidden"></p>
+      <p id="capLine" class="hidden"></p>
+
+      <button id="againBtn" class="ac-btn" type="button">RUN AGAIN</button>
+      <p class="ej-bestbar" id="bestBar"></p>
+    </div>
+  </div>
+
+</div>
+
+<script type="module">
+import {
+  saveChildProgress, loadChildProgress, ageFromBirthday, tierForAge, getChild,
+} from '../firebase-config.js';
+import {
+  mountBar, requireKid, finishRun, celebrateLevelUp,
+  sfx, confetti, confettiRain, deviceIsTouch, loadCharacter,
+} from '../assets/arcade-shell.js';
+import { SKINS, PETS } from '../assets/catalog.js';
+
+const GAME_ID = 'escape-jungle';
+
+/* =====================================================================
+   CONFIG — every tunable number in the game, in plain language.
+   Retune the whole feel of the trail from this block without reading
+   any of the game code below it.
+
+   TUNING TARGETS these numbers are aimed at (re-check by playing):
+     · A careful kid taking EASY TRAIL everywhere on a Short Trek should
+       escape roughly 2 runs out of 3.
+     · A Big Trek taking every SHORTCUT should be escapable but rare —
+       about 1 in 5 for a kid who is good at it.
+     · Gems: EASY-only Short Trek lands around 15-20 gems; a Big Trek
+       with every shortcut taken lands at 60+.
+   ===================================================================== */
+const CONFIG = {
+
+  /* ---- how fast you run ----
+     Speed is in "trail units" per second. One trail segment is 200 units,
+     so 6600 units/sec is about 33 segments a second. Speed ramps gently
+     from speedStart at the trailhead to speedEnd at the beach. */
+  speedStart: 5200,
+  speedEnd:   8200,
+
+  /* Age tier multiplies the whole speed range. A 5-6 year old runs at
+     0.82x, a 7-8 year old at 1.0x, a 9+ year old at 1.15x. Tier comes
+     from the child's birthday; ?tier=easy|medium|hard overrides it. */
+  tierSpeed: { easy: 0.82, medium: 1.0, hard: 1.15 },
+
+  /* ---- how long a trek is ----
+     Length is in segments. At base speed a trek averages ~33 segments a
+     second, so 2750 segments is roughly 85 seconds. */
+  treks: {
+    short: { segments: 1450, forks: 1, name: 'Short Trek' },
+    big:   { segments: 2750, forks: 3, name: 'Big Trek'   },
+  },
+
+  /* ---- bananas: the three mistakes ---- */
+  bananas: 3,               // how many bumps you can take
+  bumpInvincibleMs: 1000,   // blinking grace after a bump
+  bumpSlowMs: 1000,         // ...and this long running a little slower
+  bumpSlowFactor: 0.72,     // how much slower, while it lasts
+  mudSlowMs: 500,           // splashing a mud puddle also slows you this long
+  bananaPickupEvery: 620,   // roughly one spare banana this many segments apart
+
+  /* ---- gems ---- */
+  gemCluster: { every: 240, size: 4 },  // a line/arc of 4 gems this often.
+                                        // Tuned against the route table:
+                                        // EASY-only Short Trek carries 15-20
+                                        // gems, a Big Trek taking every
+                                        // shortcut carries 70+.
+  shortcutGemMultiplier: 3,             // shortcuts pack gems 3x as densely
+  bigGemValue: 10,                      // the one big gem near a shortcut's end
+  highGemChance: 0.34,                  // this many clusters arc up — jump to get them
+
+  /* ---- the weave (the trail winds like an old arcade road) ---- */
+  weave: {
+    scale: 3.2,     // overall curve strength; bigger = twistier trail
+    maxDrift: 0.30, // the furthest a bend may ever carry you from the centre
+                    // of the lane you are in. The two lane centres sit 1.0
+                    // apart and the widest obstacle reaches 0.40, so even at
+                    // full drift there is 1.0 - 0.30 - 0.40 = 0.30 of clear
+                    // air left: THE WEAVE ALONE CAN NEVER PUT YOU INTO
+                    // SOMETHING. Only your own lane can hit you.
+    pull: 0.16,     // how hard a bend pulls you sideways when you do nothing,
+                    // in road-widths per second per unit of curve. A held
+                    // bend is about 2.0 of curve, so a whole second of doing
+                    // nothing drifts you about 0.32 — a third of a lane, not
+                    // into a tree. The obstacles are the challenge; the weave is
+                    // only the flavour of navigating.
+  },
+
+  /* ---- how obstacles are spaced ---- */
+  minGap: 22,           // fewest segments between any two obstacles
+  minGapJumpToDuck: 30, // ...and after a JUMP obstacle before a DUCK one
+
+  /* ---- forks ---- */
+  forks: {
+    leadSegments: 60,      // the sign is visible for this long before the split
+    neutralSegments: 22,   // both branches start empty, so a late change of
+                           // mind never makes an obstacle blink into existence
+    easyLength: 320,       // segments on the EASY TRAIL branch
+    hardLength: 200,       // ...and on the SHORTCUT: well under the distance,
+                           // and faster, so a shortcut is over in roughly a
+                           // third of the time the easy trail takes. That
+                           // saving is what the risk is buying.
+    shortcutSpeed: 1.45,   // the shortcut runs this much faster
+
+    /* ---- what the fork LOOKS like ----
+       The trail has to visibly split into two paths at the sign, or the
+       choice is invisible: before this, both branches were drawn straight
+       ahead down the same centre line, so whichever way you went the road
+       looked identical and the fork read as a sign in front of nothing.
+
+       Now the path you are taking swings out to its own side (left for the
+       EASY TRAIL, right for the SHORTCUT) and settles back to centre, while
+       the path you did NOT take keeps veering away and is swallowed by the
+       jungle — drawn in its own branch's colours, so a Dark Cave mouth or a
+       vine bridge is recognisable from the sign. */
+    splitSpread: 0.62,     // how far your path swings aside, in road widths
+    splitRamp: 22,         // segments to swing out...
+    splitHold: 18,         // ...how long it stays out...
+    splitFall: 46,         // ...and how long it takes to settle back
+    ghostSegments: 74,     // how far the road-not-taken stays visible
+    ghostSpread: 2.3,      // how far it has drifted by the time it vanishes
+
+    /* WHERE SHORTCUT DIFFICULTY ACTUALLY LIVES: in the gauntlet patterns
+       down in PATTERNS.bridge / .cave / .rapids, not here. Each shortcut is
+       one long gauntlet of six or seven hazards that fills the branch by
+       itself, which is what makes taking every shortcut on a Big Trek a real
+       gamble (about a 45% escape) instead of the safest route on the map
+       (it was 85% when a shortcut carried only two obstacles). To make
+       shortcuts harder or kinder, add or remove a hazard in those patterns.
+
+       This knob only decides how tightly patterns pack when MORE than one
+       fits in a branch, so it does nothing until the gauntlets are shortened.
+       It is kept because it is the right dial the moment they are. */
+    shortcutDensity: 2.0,
+  },
+
+  /* ---- the zones, in order. share = how much of the trek is this zone ---- */
+  zones: [
+    { id:'edge',   name:'Jungle Edge',  share:0.25, speed:0.95, curve:0.55, pool:'edge'   },
+    { id:'deep',   name:'Deep Jungle',  share:0.35, speed:1.00, curve:1.00, pool:'deep'   },
+    { id:'ruins',  name:'Ancient Ruins',share:0.30, speed:1.06, curve:1.25, pool:'ruins'  },
+    { id:'beach',  name:'The Beach',    share:0.10, speed:0.92, curve:0.35, pool:'beach'  },
+  ],
+
+  /* ---- moves ---- */
+  jumpMs: 550,        // airtime
+  duckMs: 500,        // a tap ducks this long...
+  duckMaxMs: 1300,    // ...holding extends it up to here
+  laneChangeMs: 150,  // how quick the slide across is
+  inputBufferMs: 120, // a tap this much too early still counts
+
+  /* ---- what you bring home ----
+     units passed to finishRun. Escaping pays one unit per gem; NOT
+     escaping pays consolationUnits. It is deliberately 0: you have to
+     get out of the jungle to bring the treasure home. If that ever feels
+     too harsh, this single number is the whole change. */
+  consolationUnits: 0,
+
+  /* ---- ambient life ----
+     Scenery, not spectacle: a parrot every few seconds reads as a jungle,
+     a constant stream of them reads as a screensaver. Caps are how many may
+     be on screen at once; the rates are roughly how many arrive per second. */
+  ambient: {
+    parrots: 2,          fireflies: 10,        crabs: 2,
+    parrotsPerSec: 0.22, firefliesPerSec: 1.4, crabsPerSec: 0.5,
+  },
+
+  /* ---- looks ---- */
+  drawDistance: 110,   // segments drawn ahead
+  fogDensity: 4.4,     // how fast the jungle fades into the haze
+  caveFogDensity: 9.0, // ...and inside the Dark Cave, where it closes right in
+};
+
+/* Tuning overrides: ?tier=easy|medium|hard, ?trek=short|big, ?len=900 */
+const QS = new URLSearchParams(location.search);
+
+/* =====================================================================
+   PSEUDO-3D CONSTANTS
+   The trail is drawn the way an old arcade road was: flat segments,
+   projected by depth, with a horizontal offset that accumulates as you
+   look further down the trail. There is no real 3D anywhere in here.
+   ===================================================================== */
+const SEG_LEN     = 200;      // trail units per segment
+const ROAD_WIDTH  = 2000;     // half-width of the dirt path, in trail units
+const CAM_HEIGHT  = 1500;     // eye height above the path
+const PLAYER_Z    = 1900;     // how far ahead of the camera the runner is
+const FOV         = 100;
+const CAM_DEPTH   = 1 / Math.tan((FOV / 2) * Math.PI / 180);
+const CAM_FOLLOW  = 0.45;     // 0 = camera locked to the path, 1 = locked to
+                              // the runner. In between, the runner visibly
+                              // moves across the screen AND the path slides.
+/* TWO lanes across a road that runs -1..1, so each lane is a whole half of
+   the trail: one divider straight down the middle at 0, centres at ±0.5.
+   The divider pebbles are drawn on that same line, so where the runner
+   appears on screen and where the game thinks they are are the same thing.
+
+   Two lanes rather than three means every choice is a simple LEFT or RIGHT,
+   there is always exactly one way past a single obstacle, and an obstacle
+   can be drawn wide enough to properly fill the lane it blocks. */
+const LANE_X      = [-0.5, 0.5];
+const LANE_COUNT  = LANE_X.length;
+const HALF_LANE   = 0.5;
+/* A vine bridge no longer has a spare lane to fall into — the open air is
+   off the SIDES of the planks now. Wander past this either way and you are
+   off the edge. */
+const VOID_EDGE   = 0.80;
+
+/* Half-widths in road units, used BOTH for drawing and for collisions — one
+   number, so an obstacle can only ever hit you where you can see it.
+
+   Every value is below HALF_LANE (0.333). That is the whole safety rule: an
+   obstacle can never reach out of its own lane. Combined with weave.maxDrift
+   below, being anywhere in a clear lane is genuinely safe, which is what
+   "carried off without hitting anything" was really about. */
+const OBSTACLES = {
+  log:     { pass:'jump',  hw:0.40, tall:false },
+  snake:   { pass:'jump',  hw:0.30, tall:false, wiggles:true },
+  mud:     { pass:'jump',  hw:0.40, tall:false, soft:true },
+  column:  { pass:'jump',  hw:0.40, tall:false },
+  logjam:  { pass:'jump',  hw:0.40, tall:false },
+  plank:   { pass:'jump',  hw:0.40, tall:false },
+  branch:  { pass:'duck',  hw:0.40, tall:false },
+  monkey:  { pass:'duck',  hw:0.30, tall:false, swings:true },
+  bat:     { pass:'duck',  hw:0.30, tall:false, swings:true },
+  lintel:  { pass:'duck',  hw:0.40, tall:false },
+  tree:    { pass:'dodge', hw:0.38, tall:true },
+  boulder: { pass:'dodge', hw:0.38, tall:true },
+  pillar:  { pass:'dodge', hw:0.38, tall:true },
+  rock:    { pass:'dodge', hw:0.36, tall:true },
+  palm:    { pass:'dodge', hw:0.36, tall:true },
+};
+/* How far sideways a gem counts as "run through". Generous on purpose: a
+   near-miss on treasure is just annoying, unlike a near-miss on a tree. */
+const GEM_REACH = 0.42;
+/* How far a snake may wander inside its lane. Kept under HALF_LANE - hw so
+   it can never slither into the lane next door. Drawing and collision both
+   read this one number. */
+const SNAKE_WIGGLE = 0.14;
+
+/* HOW HIGH A "DUCK" OBSTACLE HANGS, in road half-widths off the trail.
+
+   This has to sit well BELOW the top of a standing runner or the whole move
+   is unreadable — which is exactly what went wrong: the bars hung at 0.30
+   while a standing runner is 0.312 tall, so they skimmed the top of his hat
+   and looked like scenery you would stroll under. At 0.19 a bar cuts clean
+   across his chest and head, so "get under that" is obvious at a glance. */
+const DUCK_BAR_HEIGHT = 0.21;
+
+/* WHICH SIDE OF THE TRAIL COUNTS AS "GOING RIGHT" AT A FORK.
+
+   The dividing line between the lanes, so being anywhere in the right-hand
+   lane picks the SHORTCUT and anywhere in the left picks the EASY TRAIL.
+   It used to compare against HALF_LANE, which on a two-lane trail is exactly
+   the right lane's own centre — so sitting dead in the right lane failed the
+   test by a hair and the shortcut could never be chosen at all. */
+const FORK_LINE = (LANE_X[LANE_COUNT - 1] + LANE_X[LANE_COUNT - 2]) / 2;
+
+/* =====================================================================
+   PATTERNS — short hand-authored stretches of trail.
+
+   A random obstacle generator feels unfair, so every obstacle on the
+   trail comes out of one of these. Each entry is:
+       len : how many segments the pattern occupies
+       obs : [segmentOffset, lane, kind]
+   Rules kept by hand AND checked by validatePatterns() at boot:
+       · never all three lanes blocked in the same row
+       · never two obstacles closer than CONFIG.minGap
+       · never a DUCK obstacle within minGapJumpToDuck of a JUMP one
+   ===================================================================== */
+const PATTERNS = {
+  /* On a TWO-lane trail every obstacle is a straight left-or-right question,
+     and a hazard laid across BOTH lanes is a pure "jump it" or "duck it" with
+     no way around — which is the cleanest thing a small player can read.
+     A dodge obstacle may never fill both lanes; validatePatterns() enforces
+     that at boot, along with the minGap spacing. */
+
+  /* ---- Jungle Edge: bright, forgiving, one thing at a time ---- */
+  edge: [
+    { len:26, obs:[[0,0,'log']] },
+    { len:26, obs:[[0,1,'log']] },
+    { len:26, obs:[[0,0,'branch']] },
+    { len:26, obs:[[0,1,'branch']] },
+    { len:26, obs:[[0,1,'tree']] },
+    { len:26, obs:[[0,0,'tree']] },
+    { len:30, obs:[[0,1,'snake']] },
+    { len:30, obs:[[0,0,'mud']] },
+    { len:34, obs:[[0,0,'log'],[0,1,'log']] },        // right across the trail: JUMP
+    { len:34, obs:[[0,0,'branch'],[0,1,'branch']] },  // right across the trail: DUCK
+    { len:52, obs:[[0,0,'log'],[26,1,'log']] },
+    { len:56, obs:[[0,1,'tree'],[30,0,'branch']] },
+    { len:56, obs:[[0,0,'tree'],[30,1,'branch']] },
+  ],
+
+  /* ---- Deep Jungle: monkeys, vines, and hazards that span the whole trail ---- */
+  deep: [
+    { len:30, obs:[[0,0,'monkey']] },
+    { len:30, obs:[[0,1,'monkey']] },
+    { len:30, obs:[[0,1,'boulder']] },
+    { len:30, obs:[[0,0,'boulder']] },
+    { len:34, obs:[[0,0,'branch'],[0,1,'branch']] },
+    { len:34, obs:[[0,0,'log'],[0,1,'log']] },
+    { len:56, obs:[[0,0,'monkey'],[30,1,'log']] },    // duck, then jump
+    { len:60, obs:[[0,1,'log'],[30,0,'branch']] },    // jump, then duck
+    { len:60, obs:[[0,0,'tree'],[30,1,'snake']] },
+    { len:64, obs:[[0,1,'snake'],[32,0,'monkey']] },
+    { len:90, obs:[[0,0,'tree'],[28,1,'mud'],[58,0,'monkey']] },
+    { len:94, obs:[[0,1,'branch'],[30,0,'log'],[62,1,'tree']] },
+  ],
+
+  /* ---- Ancient Ruins: stone. Pillars block, columns trip, lintels duck ---- */
+  ruins: [
+    { len:30, obs:[[0,0,'pillar']] },
+    { len:30, obs:[[0,1,'pillar']] },
+    { len:30, obs:[[0,1,'lintel']] },
+    { len:30, obs:[[0,0,'column']] },
+    { len:34, obs:[[0,0,'lintel'],[0,1,'lintel']] },
+    { len:34, obs:[[0,0,'column'],[0,1,'column']] },
+    { len:56, obs:[[0,0,'lintel'],[26,1,'pillar']] },
+    { len:60, obs:[[0,1,'column'],[30,0,'lintel']] },
+    { len:60, obs:[[0,0,'pillar'],[30,1,'column']] },
+    { len:64, obs:[[0,0,'snake'],[32,1,'pillar']] },
+    { len:92, obs:[[0,1,'pillar'],[30,0,'lintel'],[60,1,'column']] },
+  ],
+
+  /* ---- The Beach: easy on purpose. If you got here, you should get out ---- */
+  beach: [
+    { len:44, obs:[[0,0,'palm']] },
+    { len:44, obs:[[0,1,'palm']] },
+    { len:48, obs:[[0,1,'log']] },
+    { len:70, obs:[] },
+    { len:70, obs:[] },
+    { len:76, obs:[[0,0,'palm'],[38,1,'log']] },
+  ],
+
+  /* ---- THE SHORTCUT GAUNTLETS ----
+     A shortcut has to be genuinely worse to run than the safe trail, or the
+     whole risk/reward bet is a lie. Each one is a single sustained gauntlet
+     of six or seven hazards back to back, rather than a couple of lonely
+     ones. Spacing still obeys minGap (22) and minGapJumpToDuck (30), so it
+     is relentless but never unfair. Keep each at or under 160 segments so it
+     fits the branch with the big gem clear of the last hazard. */
+
+  /* Vine Bridge — two lanes of planks with open air off both sides. */
+  bridge: [
+    { len:156, obs:[[0,0,'plank'],[24,1,'plank'],[54,1,'branch'],[78,0,'monkey'],
+                    [102,1,'plank'],[132,0,'branch']] },
+    { len:156, obs:[[0,1,'monkey'],[24,0,'plank'],[54,1,'plank'],[84,0,'branch'],
+                    [108,1,'monkey'],[132,0,'plank']] },
+  ],
+
+  /* Dark Cave — the fog is close, so these arrive late. */
+  cave: [
+    { len:160, obs:[[0,0,'bat'],[24,1,'rock'],[48,0,'rock'],[72,1,'column'],
+                    [102,0,'bat'],[126,1,'rock'],[150,0,'rock']] },
+    { len:160, obs:[[0,1,'rock'],[24,0,'bat'],[48,1,'bat'],[72,0,'column'],
+                    [102,1,'bat'],[126,0,'rock'],[150,1,'rock']] },
+  ],
+
+  /* Rapids — you are on a log raft. Rocks, low branches, log jams. */
+  rapids: [
+    { len:160, obs:[[0,0,'rock'],[24,1,'logjam'],[54,0,'branch'],[78,1,'rock'],
+                    [102,0,'logjam'],[132,1,'branch'],[156,0,'rock']] },
+    { len:160, obs:[[0,1,'rock'],[24,0,'rock'],[48,1,'logjam'],[78,0,'branch'],
+                    [102,1,'logjam'],[132,0,'branch'],[156,1,'rock']] },
+  ],
+};
+
+/* The three shortcut flavours, rotated through a trek in this order. */
+const FLAVOURS = [
+  { id:'bridge', name:'Vine Bridge', emoji:'🌉', pool:'bridge' },
+  { id:'cave',   name:'Dark Cave',   emoji:'🕳️', pool:'cave'   },
+  { id:'rapids', name:'Rapids',      emoji:'🌊', pool:'rapids' },
+];
+
+/* ---------------------------------------------------------------------
+   Pattern safety check. Runs once at boot; shouts in the console rather
+   than silently shipping a stretch of trail a kid cannot get through.
+   --------------------------------------------------------------------- */
+function validatePatterns() {
+  const problems = [];
+  for (const [pool, list] of Object.entries(PATTERNS)) {
+    list.forEach((p, pi) => {
+      const where = pool + '#' + pi;
+      // no row with all three lanes impassable
+      const rows = {};
+      p.obs.forEach(([z, lane, kind]) => {
+        rows[z] = rows[z] || [];
+        rows[z].push({ lane, kind });
+      });
+      for (const [z, row] of Object.entries(rows)) {
+        const blocked = new Set();
+        row.forEach((o) => { if (OBSTACLES[o.kind].pass === 'dodge') blocked.add(o.lane); });
+        // a duck row and a jump row in the same place would need two moves at once
+        const passes = new Set(row.map((o) => OBSTACLES[o.kind].pass));
+        if (blocked.size >= LANE_COUNT) problems.push(`${where}: every lane blocked at ${z}`);
+        if (passes.has('jump') && passes.has('duck')) problems.push(`${where}: jump AND duck needed at ${z}`);
+      }
+      // spacing between consecutive rows
+      const zs = Object.keys(rows).map(Number).sort((a, b) => a - b);
+      for (let i = 1; i < zs.length; i++) {
+        const gap = zs[i] - zs[i - 1];
+        const prevJump = rows[zs[i - 1]].some((o) => OBSTACLES[o.kind].pass === 'jump');
+        const nextDuck = rows[zs[i]].some((o) => OBSTACLES[o.kind].pass === 'duck');
+        const need = (prevJump && nextDuck) ? CONFIG.minGapJumpToDuck : CONFIG.minGap;
+        if (gap < need) problems.push(`${where}: only ${gap} segments between rows (needs ${need})`);
+      }
+      if (zs.length && zs[zs.length - 1] > p.len) problems.push(`${where}: obstacle past the end of the pattern`);
+    });
+  }
+  if (problems.length) console.warn('[escape-jungle] pattern problems:\n' + problems.join('\n'));
+  return problems;
+}
+
+/* =====================================================================
+   BOOT — profile gate, top bar, age tier, equipped skin + pet
+   ===================================================================== */
+const $ = (id) => document.getElementById(id);
+const LOCAL_KEY = 'escapejungle.v1';
+const reducedMotion = () =>
+  window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+let kid = null;
+let tier = 'medium';
+let heroFace = '';     // the equipped skin's emoji, shown on the HUD portrait
+let petEmoji = '';     // the equipped pet trots along beside the runner
+
+/* Records. Read from localStorage first so the start screen has a number
+   immediately, then overwritten by the cloud copy when it lands. */
+let records = readLocalRecords();
+
+function readLocalRecords() {
+  try {
+    const r = JSON.parse(localStorage.getItem(LOCAL_KEY));
+    if (r && typeof r === 'object') return normaliseRecords(r);
+  } catch { /* a broken record is not worth an error */ }
+  return normaliseRecords(null);
+}
+function normaliseRecords(r) {
+  return {
+    bestDistance: Math.max(0, Number(r?.bestDistance) || 0),
+    bestGems:     Math.max(0, Number(r?.bestGems)     || 0),
+    escapes:      Math.max(0, Number(r?.escapes)      || 0),
+    runs:         Math.max(0, Number(r?.runs)         || 0),
+    bestTrek:     (r?.bestTrek === 'big' || r?.bestTrek === 'short') ? r.bestTrek : null,
+    shortcutMaster: !!r?.shortcutMaster,
+  };
+}
+function saveRecords() {
+  try { localStorage.setItem(LOCAL_KEY, JSON.stringify(records)); } catch {}
+  if (kid) saveChildProgress(kid.id, GAME_ID, { ...records }).catch(() => {});
+}
+
+kid = await requireKid({ gameName: 'Escape from the Jungle' });
+if (kid) {
+  mountBar({ title: 'Escape from the Jungle', mount: $('wrap') });
+  $('start').classList.remove('hidden');
+
+  // Age tier -> base speed. ?tier= is a tuning override, nothing more.
+  const forced = QS.get('tier');
+  if (forced && CONFIG.tierSpeed[forced]) {
+    tier = forced;
+  } else {
+    const child = await getChild(kid.id).catch(() => null);
+    tier = tierForAge(ageFromBirthday(child?.birthday));
+  }
+
+  loadChildProgress(kid.id, GAME_ID).then((p) => {
+    if (p) { records = normaliseRecords(p); }
+    paintStartScreen();
+  }).catch(() => {});
+
+  loadCharacter(kid.id).then((c) => {
+    const skin = SKINS.find((s) => s.id === c?.skin);
+    if (skin && skin.g) heroFace = skin.g;
+    const pet = PETS.find((p) => p.id === c?.pet);
+    if (pet && pet.g) petEmoji = pet.g;
+  }).catch(() => {});
+
+  paintStartScreen();
+  validatePatterns();
+}
+
+// No profile: requireKid has already replaced the page with the
+// who's-playing prompt, so there is no canvas and no game to wire up.
+// Parking on a promise that never settles stops this module cleanly,
+// instead of throwing a pile of "null is not an object" at the console.
+if (!kid) await new Promise(() => {});
+
+function paintStartScreen() {
+  $('startBest').textContent = records.runs
+    ? `Farthest so far: ${records.bestDistance}% · best haul 💎 ${records.bestGems} · escaped ${records.escapes}×`
+    : 'Your first trek! Every run moves your farthest-ever mark.';
+  $('startKeys').textContent = deviceIsTouch()
+    ? 'Swipe left/right to move · swipe up to jump · swipe down to duck — or use the big buttons'
+    : 'Arrow keys or A/D to move · ↑ or Space to jump · ↓ to duck';
+}
+
+/* =====================================================================
+   THE CANVAS
+   ===================================================================== */
+const canvas = $('game');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+const FONT = '"Baloo 2","Arial Rounded MT Bold",sans-serif';
+const NAVY = '#1E2B63';
+
+/* =====================================================================
+   BUILDING A TREK
+
+   The trail is a list of SECTIONS, not one flat array:
+       { kind:'run',  segs:[...] }
+       { kind:'fork', lead:[...], easy:{segs}, hard:{segs, flavour} }
+
+   flattenTrack() walks the sections and produces the segment array the
+   renderer actually reads. At a fork it uses whichever branch is
+   currently chosen — a *preview* while the kid is still approaching, and
+   a locked-in choice once they cross the split. Because both branches
+   start with CONFIG.forks.neutralSegments of empty trail, changing your
+   mind at the last second never pops an obstacle into existence in front
+   of you: everything that changes is still deep in the fog.
+   ===================================================================== */
+let sections = [];     // the trek, as authored
+let forks = [];        // one entry per fork: { preview, locked, flavour, ... }
+let track = [];        // the flattened segment array the renderer reads
+let totalLen = 0;      // track.length * SEG_LEN
+
+function makeSegment(zone, curve, extra) {
+  return {
+    index: 0, zone, curve,
+    p1: { world: { z: 0 }, camera: {}, screen: {} },
+    p2: { world: { z: 0 }, camera: {}, screen: {} },
+    items: [],            // obstacles, gems, bananas, the fork sign
+    shortcut: !!(extra && extra.shortcut),
+    flavour: (extra && extra.flavour) || null,
+    fog: 0,
+    ...(extra || {}),
+  };
+}
+
+/** Fill `out` with `n` segments whose curve eases in, holds, and eases
+    out — the classic way a road bends without a kink at either end. */
+function addBend(out, zone, enter, hold, leave, curve, extra) {
+  const easeIn  = (a, b, p) => a + (b - a) * Math.pow(p, 2);
+  const easeOut = (a, b, p) => a + (b - a) * (1 - Math.pow(1 - p, 2));
+  for (let i = 0; i < enter; i++) out.push(makeSegment(zone, easeIn(0, curve, i / enter), extra));
+  for (let i = 0; i < hold;  i++) out.push(makeSegment(zone, curve, extra));
+  for (let i = 0; i < leave; i++) out.push(makeSegment(zone, easeOut(curve, 0, i / leave), extra));
+}
+
+/** A stretch of trail `n` segments long, weaving according to its zone. */
+function buildStretch(n, zoneIdx, extra) {
+  const zone = CONFIG.zones[zoneIdx];
+  const out = [];
+  let dir = Math.random() < 0.5 ? 1 : -1;
+  while (out.length < n) {
+    const straight = 30 + Math.floor(Math.random() * 50);
+    for (let i = 0; i < straight && out.length < n; i++) out.push(makeSegment(zoneIdx, 0, extra));
+    if (out.length >= n) break;
+    const strength = CONFIG.weave.scale * zone.curve * (0.5 + Math.random() * 0.9) * dir;
+    const span = 40 + Math.floor(Math.random() * 60);
+    const bend = [];
+    addBend(bend, zoneIdx, Math.round(span * 0.3), Math.round(span * 0.4), Math.round(span * 0.3), strength, extra);
+    for (const s of bend) { if (out.length < n) out.push(s); }
+    dir = -dir;
+  }
+  return out.slice(0, n);
+}
+
+/* ---------------------------------------------------------------------
+   Laying obstacles and gems onto a finished stretch.
+   --------------------------------------------------------------------- */
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+
+function lastPassOf(pattern) {
+  if (!pattern.obs.length) return null;
+  const maxZ = Math.max(...pattern.obs.map((o) => o[0]));
+  return pattern.obs.filter((o) => o[0] === maxZ).map((o) => OBSTACLES[o[2]].pass);
+}
+function firstPassOf(pattern) {
+  if (!pattern.obs.length) return null;
+  const minZ = Math.min(...pattern.obs.map((o) => o[0]));
+  return pattern.obs.filter((o) => o[0] === minZ).map((o) => OBSTACLES[o[2]].pass);
+}
+
+/** Drop patterns down a stretch, keeping the required gap between the
+    last obstacle of one pattern and the first of the next. */
+function layObstacles(segs, poolName, opts) {
+  const pool = PATTERNS[poolName];
+  const startAt = (opts && opts.startAt) || 0;
+  const density = (opts && opts.density) || 1;   // >1 packs patterns closer
+  let z = startAt;
+  let prevPasses = null;
+  let guard = 0;
+  while (z < segs.length - 30 && guard++ < 400) {
+    const p = pick(pool);
+    if (z + p.len > segs.length - 10) break;
+    // spacing between the previous pattern's last row and this one's first
+    const nextPasses = firstPassOf(p);
+    let need = CONFIG.minGap;
+    if (prevPasses && nextPasses &&
+        prevPasses.includes('jump') && nextPasses.includes('duck')) need = CONFIG.minGapJumpToDuck;
+    if (prevPasses !== null) z += need;
+    if (z + p.len > segs.length - 10) break;
+
+    p.obs.forEach(([dz, lane, kind]) => {
+      const seg = segs[z + dz];
+      if (seg) seg.items.push({ type:'obstacle', kind, lane, x: LANE_X[lane], seed: Math.random() * 6.28 });
+    });
+    z += p.len;
+    prevPasses = lastPassOf(p) || prevPasses;
+    // Breathing room between patterns, tighter when the trail is denser.
+    // Two lanes means every dodge has exactly ONE way out instead of two, so
+    // the safe trail needs a little more room between hazards than it did on
+    // a three-lane road to stay a comfortable majority-escape route.
+    z += Math.round((34 + Math.random() * 54) / density);
+  }
+}
+
+/** Gem clusters: a line down a lane, or an arc that needs a jump. */
+function layGems(segs, opts) {
+  const every = Math.max(40, Math.round(CONFIG.gemCluster.every / ((opts && opts.density) || 1)));
+  const size = CONFIG.gemCluster.size;
+  let z = 40 + Math.floor(Math.random() * every);
+  while (z < segs.length - 24) {
+    const lane = Math.floor(Math.random() * ((opts && opts.lanes) || LANE_COUNT));
+    const high = Math.random() < CONFIG.highGemChance;
+    for (let i = 0; i < size; i++) {
+      const seg = segs[z + i * 5];
+      if (!seg) break;
+      // `lift` is how high off the ground the gem is drawn AND the only
+      // thing that decides whether you can reach it — one number, so a gem
+      // you can see yourself running through always collects.
+      //
+      // An arc used to be a plain sin(), which is ZERO at both ends: the
+      // first and last gem of every arc sat flat on the trail yet still
+      // demanded a jump, so you ran clean through them and they stayed put.
+      // The arc now floors at 0.30, which reads as "floating" and is still
+      // within reach at a standing run.
+      const t = size > 1 ? i / (size - 1) : 0.5;
+      seg.items.push({
+        type:'gem', lane, x: LANE_X[lane], value: 1,
+        lift: high ? 0.30 + 0.70 * Math.sin(t * Math.PI) : 0,
+      });
+    }
+    z += every + Math.floor(Math.random() * (every * 0.5));
+  }
+}
+
+/** A spare banana, now and then, rarer than gems. */
+function layBananas(segs) {
+  let z = Math.floor(CONFIG.bananaPickupEvery * (0.5 + Math.random()));
+  while (z < segs.length - 20) {
+    const lane = Math.floor(Math.random() * LANE_COUNT);
+    segs[z].items.push({ type:'banana', lane, x: LANE_X[lane] });
+    z += Math.round(CONFIG.bananaPickupEvery * (0.7 + Math.random() * 0.8));
+  }
+}
+
+/** How many gem-points a stretch of segments is carrying. Used for the
+    route table printed at boot, and nowhere in play. */
+function gemValueOf(segs) {
+  let v = 0;
+  segs.forEach((s) => s.items.forEach((it) => {
+    if (it.type === 'gem') v += it.value;
+    if (it.type === 'biggem') v += CONFIG.bigGemValue;
+  }));
+  return v;
+}
+
+/* ---------------------------------------------------------------------
+   The trek itself.
+   --------------------------------------------------------------------- */
+function zoneAt(progress) {
+  let acc = 0;
+  for (let i = 0; i < CONFIG.zones.length; i++) {
+    acc += CONFIG.zones[i].share;
+    if (progress < acc) return i;
+  }
+  return CONFIG.zones.length - 1;
+}
+
+const smoothstep = (t) => { const u = clamp01(t); return u * u * (3 - 2 * u); };
+const clamp01 = (t) => Math.max(0, Math.min(1, t));
+
+/** How far along its swerve a branch segment is: out, hold, then back to
+    centre. Peaks at 1 while the path is at its widest. */
+function forkHump(i) {
+  const F = CONFIG.forks;
+  if (i < F.splitRamp) return smoothstep(i / F.splitRamp);
+  if (i < F.splitRamp + F.splitHold) return 1;
+  const f = i - F.splitRamp - F.splitHold;
+  if (f < F.splitFall) return 1 - smoothstep(f / F.splitFall);
+  return 0;
+}
+
+/** Where the road-not-taken is: it swings the other way and keeps going,
+    fading into the trees rather than politely rejoining. */
+function ghostOffset(i) {
+  const F = CONFIG.forks;
+  const out = smoothstep(i / F.splitRamp);
+  return F.splitSpread * out + F.ghostSpread * clamp01((i - F.splitRamp) / F.ghostSegments);
+}
+
+function buildFork(id, zoneIdx, flavour) {
+  const F = CONFIG.forks;
+
+  // The lead-in: straight, empty, with the signpost near its start so it
+  // is on screen for a good few seconds before the split.
+  const lead = [];
+  for (let i = 0; i < F.leadSegments; i++) lead.push(makeSegment(zoneIdx, 0, { forkLead: id }));
+  lead[6].items.push({ type:'sign', forkId: id, flavour: flavour.id });
+
+  // EASY TRAIL — the zone's normal patterns and normal gem density.
+  const easy = buildStretch(F.easyLength, zoneIdx, { branch:'easy', forkId:id });
+  layObstacles(easy, CONFIG.zones[zoneIdx].pool, { startAt: F.neutralSegments });
+  layGems(easy, {});
+
+  // SHORTCUT — shorter, faster, denser, and worth it.
+  const hard = buildStretch(F.hardLength, zoneIdx, {
+    branch:'hard', forkId:id, shortcut:true, flavour: flavour.id,
+  });
+  layObstacles(hard, flavour.pool, { startAt: F.neutralSegments, density: F.shortcutDensity });
+  layGems(hard, { density: CONFIG.shortcutGemMultiplier });
+  // the big gem, near the end, as the payoff for having stuck it out
+  const bigAt = hard[F.hardLength - 10];
+  if (bigAt) {
+    bigAt.items = bigAt.items.filter((i) => i.type !== 'gem');
+    bigAt.items.push({ type:'biggem', lane:1, x: LANE_X[1], value: CONFIG.bigGemValue });
+  }
+
+  /* ---- make the split visible ----
+     Tag every branch segment with how far its path has swung aside, and with
+     the palette of the path NOT taken so the ghost can be drawn peeling off
+     in the right colours. EASY goes left, SHORTCUT goes right — which is the
+     same left/right the runner picks with, so the sign, the lane you are in
+     and the path you end up on all agree. */
+  const zoneStyle = ZONE_STYLE[CONFIG.zones[zoneIdx].id];
+  const flavourStyle = { ...zoneStyle, ...(FLAVOUR_STYLE[flavour.id] || {}) };
+  const tag = (segs, side, ghostStyle) => segs.forEach((sg, i) => {
+    sg.branchIndex = i;
+    sg.forkSide = side;
+    sg.forkOffset = side * F.splitSpread * forkHump(i);
+    sg.ghostStyle = ghostStyle;
+  });
+  tag(easy, -1, flavourStyle);   // on the easy trail you watch the shortcut peel away
+  tag(hard, +1, zoneStyle);      // in the shortcut you watch the safe trail peel away
+
+  return { kind:'fork', id, flavour, lead, easy:{ segs:easy }, hard:{ segs:hard } };
+}
+
+function buildTrek(trekKey) {
+  const trek = CONFIG.treks[trekKey];
+  const forced = Number(QS.get('len'));
+  const total = (Number.isFinite(forced) && forced >= 300 && forced <= 6000) ? forced : trek.segments;
+  const forkCount = trek.forks;
+
+  // Where the forks sit, as a fraction of the trek. Never in the Beach —
+  // the last stretch is a victory lap, not a decision.
+  const spots = forkCount === 1 ? [0.45]
+              : forkCount === 2 ? [0.30, 0.62]
+              : [0.22, 0.48, 0.72];
+
+  sections = [];
+  forks = [];
+  let planned = 0;       // segments laid down so far, counting EASY at forks
+  let forkI = 0;
+
+  const emitRun = (n) => {
+    if (n <= 0) return;
+    // A run section can straddle a zone boundary; split it so each piece
+    // carries the right zone.
+    let done = 0;
+    while (done < n) {
+      const zi = zoneAt((planned + done) / total);
+      // how far to the end of this zone
+      let acc = 0;
+      for (let k = 0; k <= zi; k++) acc += CONFIG.zones[k].share;
+      const zoneEndSeg = Math.round(acc * total);
+      const chunk = Math.max(20, Math.min(n - done, zoneEndSeg - (planned + done)));
+      const segs = buildStretch(chunk, zi, {});
+      layObstacles(segs, CONFIG.zones[zi].pool, { startAt: 24 });
+      layGems(segs, {});
+      layBananas(segs);
+      sections.push({ kind:'run', segs });
+      done += chunk;
+    }
+    planned += n;
+  };
+
+  while (planned < total) {
+    const nextForkAt = forkI < forkCount ? Math.round(spots[forkI] * total) : Infinity;
+    if (planned >= nextForkAt) {
+      const zi = zoneAt(planned / total);
+      const flavour = FLAVOURS[forkI % FLAVOURS.length];
+      const fork = buildFork(forkI, zi, flavour);
+      sections.push(fork);
+      forks.push({
+        id: forkI, flavour, preview: 'easy', locked: null,
+        signIndex: 0, decideIndex: 0, endIndex: 0,
+        easyLen: CONFIG.forks.easyLength, hardLen: CONFIG.forks.hardLength,
+        announced: false, rejoined: false,
+      });
+      planned += CONFIG.forks.leadSegments + CONFIG.forks.easyLength;
+      forkI++;
+      continue;
+    }
+    const run = Math.min(total - planned, (nextForkAt === Infinity ? total : nextForkAt) - planned);
+    emitRun(Math.max(20, run));
+  }
+
+  // The way out: a bamboo gate on the very last stretch.
+  const last = sections[sections.length - 1];
+  const tail = last.kind === 'run' ? last.segs : last.easy.segs;
+  const gateSeg = tail[tail.length - 12];
+  if (gateSeg) { gateSeg.items = []; gateSeg.items.push({ type:'gate' }); }
+
+  flattenTrack();
+  return { trekKey, total };
+}
+
+/** Walk the sections into the flat array the renderer reads, using each
+    fork's current branch. Re-run whenever a preview or a lock changes. */
+function flattenTrack() {
+  track = [];
+  for (const s of sections) {
+    if (s.kind === 'run') { for (const seg of s.segs) track.push(seg); continue; }
+    const f = forks[s.id];
+    f.signIndex = track.length + 6;
+    for (const seg of s.lead) track.push(seg);
+    f.decideIndex = track.length;
+    const which = f.locked || f.preview;
+    f.branch = which;
+    const branchSegs = which === 'easy' ? s.easy.segs : s.hard.segs;
+    for (const seg of branchSegs) track.push(seg);
+    f.endIndex = track.length;
+  }
+  track.forEach((s, i) => {
+    s.index = i;
+    s.p1.world.z = i * SEG_LEN;
+    s.p2.world.z = (i + 1) * SEG_LEN;
+  });
+  totalLen = track.length * SEG_LEN;
+}
+
+function segmentAt(z) {
+  const i = Math.floor(z / SEG_LEN);
+  return track[Math.max(0, Math.min(track.length - 1, i))];
+}
+
+/* =====================================================================
+   RUN STATE
+   Everything on "run time" (rt), a clock that only advances while the
+   trail is actually moving — so a hidden tab never eats a trek.
+   ===================================================================== */
+let mode = 'idle';   // idle | countdown | running | carry | finish | results
+let paused = false;
+let rt = 0;          // run time, seconds
+let lastFrame = 0;
+let rafId = null;
+
+let trekKey = 'short';
+let position = 0;      // how far down the trail, in trail units
+let laneX = 0;         // where the runner is across the path, -1..1
+let laneTarget = 1;    // the lane they are sliding towards
+let laneHome = 1;      // the lane they are actually IN — what the weave drifts around
+let seeking = false;   // true while a lane change is in progress
+let jumpY = 0, jumpV = 0, airborne = false;
+let duckUntil = -1, duckStart = -1, duckHeld = false;
+let bananas = 3, gems = 0, shortcutsTaken = 0;
+let invincibleUntil = -1, slowUntil = -1, tumbleUntil = -1;
+let phaseUntil = 0;          // how long the current carry/finish scene runs
+let bumpFlash = -1;          // when the last monkey-steals-a-banana popped
+let escaped = false, distancePct = 0;
+let ambient = [], puffs = [], floaters = [], monkeys = [];
+let scenePhase = 0;
+let bankAnim = null;
+
+const lerp = (a, b, t) => a + (b - a) * Math.max(0, Math.min(1, t));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+/* WHERE THE RUNNER ACTUALLY IS.
+
+   `position` is the CAMERA, and the runner is drawn PLAYER_Z further down
+   the trail — about nine and a half segments, a third of a second of running.
+   Everything the player can see happens at runnerZ(), so everything the game
+   decides has to happen there too.
+
+   This was the bug behind "I got carried off without hitting anything":
+   collisions were scanned at the camera, so an obstacle took a banana a third
+   of a second AFTER it had visibly swept past the runner, and a jump timed to
+   what was on screen was tested once the runner had already landed. */
+function runnerZ() { return position + PLAYER_Z; }
+function runnerIndex() { return Math.floor(runnerZ() / SEG_LEN); }
+
+function nearestLane() {
+  let best = 0, bd = 9;
+  for (let i = 0; i < LANE_COUNT; i++) { const d = Math.abs(laneX - LANE_X[i]); if (d < bd) { bd = d; best = i; } }
+  return best;
+}
+
+/** The fork the runner is inside or approaching, if any. */
+function activeFork() {
+  const i = runnerIndex();
+  for (const f of forks) {
+    if (i >= f.signIndex - 4 && i < f.endIndex) return f;
+  }
+  return null;
+}
+function insideShortcut() {
+  const f = activeFork();
+  return !!(f && f.locked === 'hard' && runnerIndex() >= f.decideIndex);
+}
+
+/** Total length the progress bar measures against. While the runner is
+    inside a shortcut it still counts the EASY length, so that when they
+    pop out the far side the bar visibly leaps forward — which is the
+    whole feeling the shortcut is selling. */
+function progressTotal() {
+  const f = activeFork();
+  if (f && f.locked === 'hard' && runnerIndex() < f.endIndex) {
+    return totalLen + (f.easyLen - f.hardLen) * SEG_LEN;
+  }
+  return totalLen;
+}
+function progressPct() { return clamp(position / progressTotal(), 0, 1); }
+
+function currentSpeed() {
+  const seg = segmentAt(runnerZ());
+  const zone = CONFIG.zones[seg.zone];
+  let s = lerp(CONFIG.speedStart, CONFIG.speedEnd, position / Math.max(1, totalLen));
+  s *= CONFIG.tierSpeed[tier] * zone.speed;
+  if (seg.shortcut) s *= CONFIG.forks.shortcutSpeed;
+  if (rt < slowUntil) s *= CONFIG.bumpSlowFactor;
+  return s;
+}
+
+/* =====================================================================
+   STARTING AND ENDING A TREK
+   ===================================================================== */
+function startTrek(key) {
+  trekKey = key;
+  buildTrek(key);
+  position = 0; laneX = 0; laneTarget = 1; laneHome = 1; seeking = false;
+  jumpY = 0; jumpV = 0; airborne = false;
+  duckUntil = -1; duckStart = -1;
+  bananas = CONFIG.bananas; gems = 0; shortcutsTaken = 0;
+  invincibleUntil = -1; slowUntil = -1; tumbleUntil = -1; bumpFlash = -1;
+  escaped = false; distancePct = 0; rt = 0; lastFrame = 0;
+  ambient = []; puffs = []; floaters = []; monkeys = [];
+  lastZoneShown = -1; bankAnim = null;
+
+  // A new trek always starts un-paused, whatever state the last one left
+  // behind. This is the belt to the brace in pause() above.
+  paused = false;
+  clearInterval(countdownTimer);
+  hideVeil();
+
+  $('start').classList.add('hidden');
+  $('results').classList.add('hidden');
+  $('stage').classList.remove('hidden');
+  $('shortcutPill').classList.add('hidden');
+  updateHud(true);
+  logRouteTable();
+
+  mode = 'countdown';
+  scenePhase = 0;
+  showVeil('3', 'Get ready to run!');
+  countdownFrom(3, () => { mode = 'running'; hideVeil(); jsfx.footstepReset(); });
+  if (!rafId) rafId = requestAnimationFrame(frame);
+}
+
+let countdownTimer = null;
+function countdownFrom(n, done) {
+  clearInterval(countdownTimer);
+  let k = n;
+  $('veilBig').textContent = String(k);
+  jsfx.tick();
+  countdownTimer = setInterval(() => {
+    k--;
+    if (k <= 0) { clearInterval(countdownTimer); done(); return; }
+    $('veilBig').textContent = String(k);
+    jsfx.tick();
+  }, 700);
+}
+
+function showVeil(big, sub, buttonLabel, onButton) {
+  $('veilBig').textContent = big;
+  $('veilSub').textContent = sub || '';
+  const btn = $('veilBtn');
+  if (buttonLabel) {
+    btn.textContent = buttonLabel;
+    btn.classList.remove('hidden');
+    btn.onclick = onButton;
+  } else { btn.classList.add('hidden'); btn.onclick = null; }
+  $('veil').classList.remove('hidden');
+}
+function hideVeil() { $('veil').classList.add('hidden'); }
+
+/* =====================================================================
+   THE FRAME LOOP
+   ===================================================================== */
+function frame(now) {
+  rafId = requestAnimationFrame(frame);
+  if (!lastFrame) lastFrame = now;
+  // Cap the step: a tab that was hidden must never teleport the runner
+  // through a wall of trees on the frame it comes back.
+  const dt = Math.min(0.05, (now - lastFrame) / 1000);
+  lastFrame = now;
+
+  if (!paused && mode !== 'idle' && mode !== 'results') {
+    rt += dt;
+    if (mode === 'running') updateRun(dt);
+    else if (mode === 'carry')  updateCarry(dt);
+    else if (mode === 'finish') updateFinish(dt);
+    updateAmbient(dt);
+  }
+  // The start and results screens cover the canvas, so there is nothing
+  // worth drawing there — and this is a game that has to hold 50fps.
+  if (mode !== 'idle' && mode !== 'results') render();
+}
+
+/* ---------------------------------------------------------------------
+   One frame of actually running.
+   --------------------------------------------------------------------- */
+function updateRun(dt) {
+  const speed = currentSpeed();
+  const before = position;
+  position += speed * dt;
+
+  // ---- sideways: a lane change, or the pull of the bend ----
+  const here = segmentAt(position + PLAYER_Z);
+  if (seeking) {
+    const target = LANE_X[laneTarget];
+    const step = (LANE_X[1] - LANE_X[0]) / (CONFIG.laneChangeMs / 1000) * dt;
+    if (Math.abs(target - laneX) <= step) { laneX = target; seeking = false; laneHome = laneTarget; }
+    else laneX += Math.sign(target - laneX) * step;
+  } else {
+    // The weave: a bend nudges you towards its outside unless you steer...
+    laneX -= here.curve * CONFIG.weave.pull * dt;
+    // ...but never further than maxDrift from the lane you are actually in.
+    // The bend is the flavour of navigating; it is never allowed to be the
+    // thing that walks you into a tree you thought you were clear of.
+    const home = LANE_X[laneHome];
+    laneX = clamp(laneX, home - CONFIG.weave.maxDrift, home + CONFIG.weave.maxDrift);
+  }
+  const edge = onBridge(here) ? VOID_EDGE + 0.10 : 0.95;
+  laneX = clamp(laneX, -edge, edge);
+
+  // ---- up and down ----
+  if (airborne) {
+    jumpV -= JUMP_G * dt;
+    jumpY += jumpV * dt;
+    if (jumpY <= 0) { jumpY = 0; jumpV = 0; airborne = false; jsfx.land(); }
+  }
+  if (duckHeld && duckUntil > rt && rt - duckStart < CONFIG.duckMaxMs / 1000) {
+    duckUntil = Math.min(duckStart + CONFIG.duckMaxMs / 1000, rt + 0.08);
+  }
+  drainInputBuffer();
+
+  // ---- forks ----
+  // This runs BEFORE the vine-bridge check on purpose. The lane you are in
+  // is what picks the branch, so it has to be read before anything else is
+  // allowed to move you: on a Vine Bridge fork the void check used to fire
+  // first, bounce you out of the shortcut lane, take a banana AND then
+  // record your choice as EASY — that shortcut could never be taken.
+  updateForks();
+
+  // ---- the vine bridge has no third lane ----
+  // Wander off either side of the planks and a hand hauls you back on.
+  if (onBridge(segmentAt(runnerZ())) && Math.abs(laneX) > VOID_EDGE && rt > invincibleUntil) {
+    const back = laneX > 0 ? 1 : 0;          // back to the nearer plank lane
+    bump('void');
+    laneX = LANE_X[back]; laneTarget = back; laneHome = back; seeking = false;
+  }
+
+  // ---- what did we just run through? ----
+  // Scanned at the RUNNER, not the camera — see runnerZ() above.
+  scanSegments(before + PLAYER_Z, runnerZ());
+
+  // ---- zone announcements ----
+  announceZone(here.zone);
+
+  // ---- footsteps on the beat ----
+  jsfx.footstep(dt, speed, airborne || ducking());
+
+  // ---- the end of the trail ----
+  if (position >= totalLen - SEG_LEN * 10) {
+    beginFinish();
+  }
+
+  updateHud(false);
+}
+
+const JUMP_G = 8 / Math.pow(CONFIG.jumpMs / 1000, 2);
+const JUMP_V0 = Math.sqrt(2 * JUMP_G);
+
+function ducking() { return rt < duckUntil; }
+function onBridge(seg) { return seg.shortcut && seg.flavour === 'bridge'; }
+
+/* ---------------------------------------------------------------------
+   Collisions and pickups: everything between where we were last frame
+   and where we are now.
+   --------------------------------------------------------------------- */
+function scanSegments(fromZ, toZ) {
+  const i0 = Math.max(0, Math.floor(fromZ / SEG_LEN));
+  const i1 = Math.min(track.length - 1, Math.floor(toZ / SEG_LEN));
+  for (let i = i0; i <= i1; i++) {
+    const seg = track[i];
+    if (!seg) continue;
+    for (const it of seg.items) {
+      if (it.gone) continue;
+      if (it.type === 'obstacle') hitTestObstacle(it);
+      else if (it.type === 'gem' || it.type === 'biggem') hitTestGem(it);
+      else if (it.type === 'banana') hitTestBanana(it);
+    }
+  }
+}
+
+function hitTestObstacle(it) {
+  const spec = OBSTACLES[it.kind];
+  // A snake wanders inside its own lane. The wiggle is capped so it can never
+  // carry the hit box out of that lane — and drawObstacle uses the identical
+  // expression, so the snake you see is the snake you hit.
+  const ix = it.x + (spec.wiggles ? Math.sin(rt * 3 + it.seed) * SNAKE_WIGGLE : 0);
+  const dx = Math.abs(laneX - ix);
+  // The reach IS the drawn half-width. Nothing invisible is added to it.
+  const reach = spec.hw;
+
+  if (dx >= reach) {
+    // a whisker away and clean — free praise for skilful play
+    if (dx < reach + 0.12) nearMiss();
+    return;
+  }
+  it.gone = true;                       // one obstacle can only get you once
+  if (rt < invincibleUntil) return;     // still blinking from the last one
+  if (spec.pass === 'jump' && jumpY > 0.35) return;
+  if (spec.pass === 'duck' && ducking()) return;
+  bump(it.kind);
+}
+
+function hitTestGem(it) {
+  const dx = Math.abs(laneX - it.x);
+  if (dx >= GEM_REACH) return;
+  // Can the runner reach it? A gem on the ground (lift 0) always collects;
+  // the top of an arc needs a real jump. The 0.40 is reach — you do not have
+  // to be exactly level with it.
+  if (jumpY < (it.lift || 0) - 0.40) return;
+  it.gone = true;
+  const worth = it.type === 'biggem' ? CONFIG.bigGemValue : it.value;
+  gems += worth;
+  if (it.type === 'biggem') { jsfx.bigGem(); floater('💎 +' + worth + '!', '#FFC93C', 1.5); }
+  else { sfx.play('coin'); gemPop(worth); }
+  const pill = $('gemPill');
+  pill.classList.remove('pop');
+  void pill.offsetWidth;
+  pill.classList.add('pop');
+}
+
+function hitTestBanana(it) {
+  if (Math.abs(laneX - it.x) >= GEM_REACH) return;
+  it.gone = true;
+  if (bananas < CONFIG.bananas) {
+    bananas++;
+    floater('🍌 Banana back!', '#FFC93C', 1.2);
+    jsfx.bigGem();
+  } else {
+    gems += 1;
+    sfx.play('coin');
+  }
+  updateHud(true);
+}
+
+function nearMiss() {
+  if (rt - (nearMiss.last || -9) < 1.1) return;
+  nearMiss.last = rt;
+  if (reducedMotion()) return;
+  floater('Close one! 😅', '#4C9BFF', 0.9);
+}
+
+/* ---------------------------------------------------------------------
+   A bump. A monkey takes a banana; nobody gets told off.
+   --------------------------------------------------------------------- */
+function bump(kind) {
+  bananas--;
+  invincibleUntil = rt + CONFIG.bumpInvincibleMs / 1000;
+  slowUntil = rt + (kind === 'mud' ? CONFIG.mudSlowMs : CONFIG.bumpSlowMs) / 1000;
+  tumbleUntil = rt + 0.55;
+  bumpFlash = rt;
+  jumpY = 0; jumpV = 0; airborne = false;
+  duckUntil = -1;
+  jsfx.bump();
+  floater('Whoa!', '#A971F5', 0.8);
+  // the thief, popping in to take his banana and scamper off
+  monkeys.push({ t: 0, life: 1.25, side: Math.random() < 0.5 ? -1 : 1, kind: 'thief' });
+  updateHud(true);
+  if (bananas <= 0) beginCarryHome();
+}
+
+/* ---------------------------------------------------------------------
+   Forks: the sign, the choice, the lock-in, the rejoin.
+   --------------------------------------------------------------------- */
+function updateForks() {
+  const i = runnerIndex();
+  for (const f of forks) {
+    if (!f.announced && i >= f.signIndex - 2) {
+      f.announced = true;
+      jsfx.drumroll();
+      banner(`${f.flavour.emoji} Which way?  ← EASY TRAIL   ·   SHORTCUT →`, 2.4, true);
+    }
+    // previewing: the road past the split shows whichever branch the
+    // runner is currently lined up for
+    if (!f.locked && i >= f.signIndex - 30 && i < f.decideIndex) {
+      const want = laneX > FORK_LINE ? 'hard' : 'easy';   // right lane = shortcut, left = easy
+      if (want !== f.preview) { f.preview = want; flattenTrack(); }
+    }
+    // crossing the split locks it in
+    if (!f.locked && i >= f.decideIndex) {
+      f.locked = laneX > FORK_LINE ? 'hard' : 'easy';
+      f.preview = f.locked;
+      flattenTrack();
+      if (f.locked === 'hard') {
+        shortcutsTaken++;
+        // You chose the shortcut from the RIGHT-hand lane — but a Vine
+        // Bridge only has two lanes, and the right one is open air. Step
+        // across onto the planks as you go in. It is a hop, not a bump:
+        // choosing the shortcut must never itself cost you a banana.
+        if (f.flavour.id === 'bridge' && Math.abs(laneX) > VOID_EDGE) {
+          const back = laneX > 0 ? 1 : 0;
+          laneX = LANE_X[back]; laneTarget = back; laneHome = back; seeking = false;
+        }
+        $('shortcutPill').classList.remove('hidden');
+        $('shortcutPill').textContent = `🏃 ${f.flavour.name.toUpperCase()}!`;
+        banner(`${f.flavour.emoji} ${f.flavour.name.toUpperCase()} — hold on!`, 1.8, true);
+        jsfx.whoosh();
+      } else {
+        banner('🟢 Easy trail — nice and steady', 1.4);
+      }
+    }
+    // popping out the far side of a shortcut
+    if (f.locked === 'hard' && !f.rejoined && i >= f.endIndex) {
+      f.rejoined = true;
+      $('shortcutPill').classList.add('hidden');
+      banner('+💎💎💎  SHORTCUT PAID OFF!', 2.0, true);
+      const fill = $('progressFill');
+      fill.classList.add('jump');
+      setTimeout(() => fill.classList.remove('jump'), 700);
+      sfx.play('win');
+      if (!reducedMotion()) confetti(window.innerWidth / 2, window.innerHeight * 0.35, 34);
+    }
+  }
+}
+
+let lastZoneShown = -1;
+function announceZone(zi) {
+  if (zi === lastZoneShown) return;
+  lastZoneShown = zi;
+  const z = CONFIG.zones[zi];
+  $('zonePill').textContent = z.name;
+  if (zi > 0) banner(z.name.toUpperCase(), 1.5);
+}
+
+/* ---------------------------------------------------------------------
+   The two endings.
+   --------------------------------------------------------------------- */
+function beginCarryHome() {
+  mode = 'carry';
+  scenePhase = 0;
+  phaseUntil = rt + 3.0;
+  distancePct = Math.round(progressPct() * 100);
+  escaped = false;
+  jsfx.carryHome();
+  monkeys.push({ t: 0, life: 3.0, side: -1, kind: 'carry' });
+  monkeys.push({ t: 0, life: 3.0, side: 1,  kind: 'carry' });
+  // the gems float away as sparkles — the jungle keeps them this time
+  for (let i = 0; i < Math.min(24, Math.max(6, gems)); i++) {
+    floaters.push({
+      text: '⚡', x: W / 2 + (Math.random() - 0.5) * 260, y: H * 0.6 + Math.random() * 60,
+      vy: -34 - Math.random() * 40, life: 1.6 + Math.random(), t: 0, color: '#FFC93C', size: 1,
+    });
+  }
+  banner('The monkeys are carrying you back to camp!', 2.8);
+}
+function updateCarry() {
+  if (rt >= phaseUntil) finishUp(false);
+}
+
+function beginFinish() {
+  mode = 'finish';
+  scenePhase = 0;
+  phaseUntil = rt + 2.6;
+  distancePct = 100;
+  escaped = true;
+  jsfx.fanfare();
+  if (!reducedMotion()) { confettiRain(150); shakeStage(); }
+  banner('🏖️ YOU ESCAPED!', 2.4, true);
+}
+function updateFinish(dt) {
+  position += currentSpeed() * dt * 0.5;
+  if (rt >= phaseUntil) finishUp(true);
+}
+
+function shakeStage() {
+  const s = $('stage');
+  s.classList.add('shake');
+  setTimeout(() => s.classList.remove('shake'), 420);
+}
+
+/* =====================================================================
+   LOOKS — one palette per zone, plus overrides for the three shortcuts.
+   ===================================================================== */
+const ZONE_STYLE = {
+  edge: {
+    skyTop:'#79D2FF', skyBot:'#D6F3FF', haze:'#CFEFD8',
+    road:['#9C7A4F','#93724A'], rumble:['#5FD963','#31A84A'],
+    grass:['#6FE07A','#5FD963'], pebble:'#E8DBBE',
+    trees:['#1E7A42','#2E9B52','#46BF6A'], mountain:'#8FB6D6', flowers:true,
+  },
+  deep: {
+    skyTop:'#3F98BE', skyBot:'#9FD9C8', haze:'#A8D6BE',
+    road:['#7A5C3C','#6E5236'], rumble:['#2E8B4A','#1F6E38'],
+    grass:['#2FA35A','#279650'], pebble:'#D8CBA8',
+    trees:['#0F4B29','#166B37','#1F8A46'], mountain:'#5E8FA6', fireflies:true,
+  },
+  ruins: {
+    skyTop:'#A9C8E8', skyBot:'#E4EEF7', haze:'#DCE3DC',
+    road:['#8A8375','#7D766A'], rumble:['#9AA089','#868C77'],
+    grass:['#6E9A64','#5E8757'], pebble:'#CFC8B6',
+    trees:['#2A6B45','#357D52','#43906080'], mountain:'#9FA8B8', stones:true,
+  },
+  beach: {
+    skyTop:'#7ED4FF', skyBot:'#FFF0C9', haze:'#FFF3D6',
+    road:['#EBD9A8','#E3CF9A'], rumble:['#F2E4BC','#E8D8AA'],
+    grass:['#F5E6BE','#EEDCAF'], pebble:'#FFF6DF',
+    trees:['#2E9B52','#3FB667','#57CC80'], mountain:'#9AD8EE', crabs:true, palms:true,
+  },
+};
+const FLAVOUR_STYLE = {
+  bridge: { road:['#A9814F','#9C7647'], rumble:['#6B4E2E','#5C4226'],
+            grass:['#2FA35A','#279650'], haze:'#BFE0F2', skyTop:'#63BFE6', skyBot:'#CFEFFF' },
+  cave:   { road:['#4A4258','#413A4D'], rumble:['#322C42','#2A2439'],
+            grass:['#241E33','#1E1A2B'], haze:'#2A2244', skyTop:'#1B1436', skyBot:'#2B2050',
+            trees:['#161028','#1E1736','#251C42'], mountain:'#241C3E', dark:true },
+  rapids: { road:['#3D8FD0','#3782C2'], rumble:['#2A6FA8','#245F92'],
+            grass:['#2E9B52','#279650'], haze:'#BFE0F2', skyTop:'#5FC0E8', skyBot:'#D2F0FF', water:true },
+};
+
+function styleFor(seg) {
+  const base = ZONE_STYLE[CONFIG.zones[seg.zone].id];
+  if (seg.shortcut && seg.flavour && FLAVOUR_STYLE[seg.flavour]) {
+    return { ...base, ...FLAVOUR_STYLE[seg.flavour] };
+  }
+  return base;
+}
+
+/* =====================================================================
+   PROJECTION — flat segments, scaled by depth. No real 3D anywhere.
+   ===================================================================== */
+function project(p, camX, camY, camZ) {
+  p.camera.x = -camX;
+  p.camera.y = -camY;
+  p.camera.z = p.world.z - camZ;
+  const s = CAM_DEPTH / Math.max(1, p.camera.z);
+  p.screen.scale = s;
+  p.screen.x = W / 2 + s * p.camera.x * W / 2;
+  p.screen.y = H / 2 - s * p.camera.y * H / 2;
+  p.screen.w = s * ROAD_WIDTH * W / 2;
+}
+
+/** How much of a segment survives the haze. 1 = right in front of you. */
+function fogAmount(depth, density) {
+  return 1 / Math.pow(Math.E, depth * depth * density);
+}
+
+/** A trapezoid across the path, between two road-space edges. */
+function quad(x1, y1, w1, x2, y2, w2, l, r, fill) {
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+  ctx.moveTo(x1 + w1 * l, y1);
+  ctx.lineTo(x1 + w1 * r, y1);
+  ctx.lineTo(x2 + w2 * r, y2);
+  ctx.lineTo(x2 + w2 * l, y2);
+  ctx.closePath();
+  ctx.fill();
+}
+
+let bgX = 0, lastRenderPos = 0;
+let anchor = { x: W / 2, y: H * 0.83, w: 420, scale: 0.0004 };
+
+/* =====================================================================
+   THE FRAME
+   ===================================================================== */
+function render() {
+  // baseSeg is the CAMERA's segment and must stay that way — it is what the
+  // whole projection is built from. The sky and fog, though, belong to the
+  // zone the RUNNER is standing in, so the palette changes when they arrive
+  // somewhere rather than a third of a second later.
+  const baseSeg = segmentAt(position);
+  const basePct = (position % SEG_LEN) / SEG_LEN;
+  const hereSeg = segmentAt(runnerZ());
+  const st = styleFor(hereSeg);
+
+  // background parallax follows the bend, so the horizon swings with you
+  bgX -= (position - lastRenderPos) * baseSeg.curve * 0.00035;
+  lastRenderPos = position;
+
+  drawSky(st);
+  drawMountains(st);
+
+  const density = (hereSeg.shortcut && hereSeg.flavour === 'cave')
+    ? CONFIG.caveFogDensity : CONFIG.fogDensity;
+
+  /* ---- the trail, far to near ---- */
+  const camX = laneX * ROAD_WIDTH * CAM_FOLLOW;
+  let x = 0, dx = -(baseSeg.curve * basePct);
+  let maxy = H;
+  const drawn = [];
+  let anchorSet = false;
+  const runnerDepth = runnerZ();
+
+  for (let n = 0; n < CONFIG.drawDistance; n++) {
+    const seg = track[baseSeg.index + n];
+    if (!seg) break;
+    // A fork branch swings out to its own side of the split. Folding that
+    // into the camera offset means the road, everything standing on it and
+    // the runner himself all veer onto the chosen path together — the lane
+    // maths never sees it, because it is all relative to the road centre.
+    const next = track[baseSeg.index + n + 1];
+    const o1 = (seg.forkOffset || 0) * ROAD_WIDTH;
+    const o2 = ((next ? next.forkOffset : seg.forkOffset) || 0) * ROAD_WIDTH;
+    project(seg.p1, camX - x - o1, CAM_HEIGHT, position);
+    project(seg.p2, camX - x - dx - o2, CAM_HEIGHT, position);
+    x += dx; dx += seg.curve;
+    seg.fog = fogAmount(n / CONFIG.drawDistance, density);
+
+    if (!anchorSet && seg.p2.world.z >= runnerDepth) {
+      const t = (runnerDepth - seg.p1.world.z) / SEG_LEN;
+      anchor = {
+        x: lerp(seg.p1.screen.x, seg.p2.screen.x, t),
+        y: lerp(seg.p1.screen.y, seg.p2.screen.y, t),
+        w: lerp(seg.p1.screen.w, seg.p2.screen.w, t),
+        scale: lerp(seg.p1.screen.scale, seg.p2.screen.scale, t),
+      };
+      anchorSet = true;
+    }
+
+    if (seg.p1.camera.z <= CAM_DEPTH || seg.p2.screen.y >= maxy) continue;
+    maxy = seg.p2.screen.y;
+    drawn.push(seg);
+  }
+
+  // draw the trail itself back-to-front so nearer segments overlap
+  for (let i = drawn.length - 1; i >= 0; i--) drawSegment(drawn[i]);
+
+  // then the jungle walls and everything standing on the trail
+  for (let i = drawn.length - 1; i >= 0; i--) drawSides(drawn[i]);
+  for (let i = drawn.length - 1; i >= 0; i--) drawItems(drawn[i]);
+
+  drawRunner(st);
+  drawAmbient(st);
+  drawFloaters();
+  if (mode === 'carry') drawCarryScene();
+}
+
+function drawSky(st) {
+  const g = ctx.createLinearGradient(0, 0, 0, H * 0.62);
+  g.addColorStop(0, st.skyTop);
+  g.addColorStop(1, st.skyBot);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  if (!st.dark) {
+    // a couple of fat cartoon clouds, drifting with the bend
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    for (let i = 0; i < 3; i++) {
+      const cx = ((bgX * 0.5 + i * 420 + 120) % (W + 400)) - 200;
+      const cy = 44 + i * 26;
+      blob(cx, cy, 48, 20);
+      blob(cx + 42, cy - 12, 36, 18);
+      blob(cx + 80, cy + 2, 40, 16);
+    }
+  }
+}
+function blob(x, y, rx, ry) {
+  ctx.beginPath();
+  ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawMountains(st) {
+  const horizon = H / 2;
+  ctx.fillStyle = st.mountain;
+  const off = (bgX * 1.2) % 520;
+  for (let k = -1; k < 4; k++) {
+    const bx = k * 520 + off;
+    ctx.beginPath();
+    ctx.moveTo(bx - 190, horizon + 2);
+    ctx.lineTo(bx, horizon - 118);
+    ctx.lineTo(bx + 190, horizon + 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(bx + 100, horizon + 2);
+    ctx.lineTo(bx + 250, horizon - 72);
+    ctx.lineTo(bx + 400, horizon + 2);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // the haze the jungle appears out of
+  const g = ctx.createLinearGradient(0, horizon - 60, 0, horizon + 46);
+  g.addColorStop(0, 'rgba(255,255,255,0)');
+  g.addColorStop(0.55, st.haze);
+  g.addColorStop(1, st.haze);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, horizon - 60, W, 108);
+}
+
+/* ---------------------------------------------------------------------
+   One segment of trail: grass, verge, dirt, lane pebbles.
+   --------------------------------------------------------------------- */
+function drawSegment(seg) {
+  const st = styleFor(seg);
+  const p1 = seg.p1.screen, p2 = seg.p2.screen;
+  if (p1.y <= p2.y) return;
+  const band = Math.floor(seg.index / 4) % 2;
+  const bridge = seg.shortcut && seg.flavour === 'bridge';
+  const right = bridge ? VOID_EDGE : 1;
+  const left = bridge ? -VOID_EDGE : -1;
+
+  // ground either side (on the vine bridge there is nothing but air)
+  if (!bridge) {
+    ctx.fillStyle = st.grass[band];
+    ctx.fillRect(0, p2.y, W, p1.y - p2.y + 1);
+  }
+
+  // The road NOT taken, veering off to the other side of the split and
+  // fading into the trees. Drawn first so the real trail sits in front of it,
+  // and in the other branch's own colours so you can see what you turned
+  // down — a cave mouth, a vine bridge, or plain safe jungle.
+  drawGhostBranch(seg, p1, p2, band);
+  // verge
+  quad(p1.x, p1.y, p1.w, p2.x, p2.y, p2.w, left - (bridge ? 0.03 : 0.16), right + (bridge ? 0.03 : 0.16), st.rumble[band]);
+  // the dirt path itself
+  quad(p1.x, p1.y, p1.w, p2.x, p2.y, p2.w, left, right, st.road[band]);
+
+  // one line of pebbles down the middle: two lanes, left or right
+  if (band === 0 && p1.w > 6) {
+    quad(p1.x, p1.y, p1.w, p2.x, p2.y, p2.w, -0.014, 0.014, st.pebble);
+  }
+  // the dashed edges that say "past here is open air" — both sides now
+  if (bridge && band === 0 && p1.w > 6) {
+    quad(p1.x, p1.y, p1.w, p2.x, p2.y, p2.w, right - 0.04, right, '#FFF1C9');
+    quad(p1.x, p1.y, p1.w, p2.x, p2.y, p2.w, left, left + 0.04, '#FFF1C9');
+  }
+  // haze over the far end of the trail
+  if (seg.fog < 1) {
+    ctx.globalAlpha = 1 - seg.fog;
+    ctx.fillStyle = st.haze;
+    ctx.fillRect(0, p2.y, W, p1.y - p2.y + 1);
+    ctx.globalAlpha = 1;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   THE ROAD NOT TAKEN.
+
+   A second trapezoid, mirrored across the split and drifting further away
+   with every segment, so the trail visibly forks in two at the sign instead
+   of carrying straight on. It is scenery only — nothing collides with it —
+   and it fades out well before it would need to go anywhere.
+   --------------------------------------------------------------------- */
+function drawGhostBranch(seg, p1, p2, band) {
+  if (seg.branchIndex == null) return;
+  const F = CONFIG.forks;
+  const i = seg.branchIndex;
+  if (i > F.ghostSegments) return;
+
+  const gs = seg.ghostStyle;
+  if (!gs) return;
+  // where the ghost sits relative to the real road, in road half-widths
+  const delta = -seg.forkSide * ghostOffset(i) - (seg.forkOffset || 0);
+  // it thins out and dims as it disappears among the trees
+  const fade = (1 - clamp01(i / F.ghostSegments)) * Math.min(1, seg.fog);
+  if (fade <= 0.02) return;
+
+  const g1x = p1.x + delta * p1.w, g2x = p2.x + delta * p2.w;
+  ctx.globalAlpha = fade;
+  quad(g1x, p1.y, p1.w, g2x, p2.y, p2.w, -1.16, 1.16, gs.rumble[band]);
+  quad(g1x, p1.y, p1.w, g2x, p2.y, p2.w, -1, 1, gs.road[band]);
+  if (band === 0 && p1.w > 6) {
+    quad(g1x, p1.y, p1.w, g2x, p2.y, p2.w, -0.014, 0.014, gs.pebble);
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* ---------------------------------------------------------------------
+   The jungle either side: layered silhouettes, ferns, vines, flowers.
+   Drawn from segment data so they slide with the bend.
+   --------------------------------------------------------------------- */
+function drawSides(seg) {
+  const st = styleFor(seg);
+  const p = seg.p1.screen;
+  if (p.w < 3 || seg.fog < 0.05) return;
+  if (seg.shortcut && seg.flavour === 'bridge') { drawBridgeSides(seg, st); return; }
+  if (seg.index % 3 !== 0) return;
+
+  ctx.globalAlpha = Math.min(1, seg.fog);
+  const h = p.w;
+  const seeded = (n) => (Math.sin(seg.index * 12.9898 + n * 78.233) * 43758.5453) % 1;
+
+  for (const side of [-1, 1]) {
+    const r1 = Math.abs(seeded(side));
+    const base = p.x + p.w * side * (1.30 + r1 * 0.55);
+    const tone = st.trees[Math.floor(Math.abs(seeded(side + 3)) * st.trees.length) % st.trees.length];
+    if (st.palms && Math.abs(seeded(side + 7)) < 0.5) { drawPalm(base, p.y, h * 0.9, tone); continue; }
+    // a fat rounded tree silhouette
+    const th = h * (0.55 + r1 * 0.55);
+    ctx.fillStyle = '#000';
+    ctx.globalAlpha = Math.min(1, seg.fog) * 0.16;
+    ctx.fillRect(base - h * 0.05, p.y - 2, h * 0.10, 4);
+    ctx.globalAlpha = Math.min(1, seg.fog);
+    ctx.fillStyle = st.dark ? tone : '#3A2A18';
+    ctx.fillRect(base - h * 0.035, p.y - th * 0.5, h * 0.07, th * 0.5);
+    ctx.fillStyle = tone;
+    blob(base, p.y - th * 0.62, h * 0.30, h * 0.24);
+    blob(base - h * 0.18, p.y - th * 0.46, h * 0.20, h * 0.16);
+    blob(base + h * 0.18, p.y - th * 0.50, h * 0.22, h * 0.17);
+    // fern at the verge
+    ctx.fillStyle = st.trees[0];
+    blob(p.x + p.w * side * 1.08, p.y - h * 0.06, h * 0.12, h * 0.07);
+    // an occasional bright flower, and a hanging vine
+    if (st.flowers && Math.abs(seeded(side + 11)) < 0.18) {
+      ctx.fillStyle = ['#FF5A5A', '#FFC93C', '#A971F5'][Math.floor(Math.abs(seeded(side + 13)) * 3) % 3];
+      blob(p.x + p.w * side * 1.12, p.y - h * 0.14, h * 0.045, h * 0.045);
+    }
+    if (!st.dark && Math.abs(seeded(side + 17)) < 0.22) {
+      ctx.strokeStyle = st.trees[0];
+      ctx.lineWidth = Math.max(1, h * 0.014);
+      ctx.beginPath();
+      ctx.moveTo(base, p.y - th * 0.78);
+      ctx.lineTo(base + h * 0.04, p.y - th * 0.34);
+      ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawBridgeSides(seg, st) {
+  const p = seg.p1.screen;
+  if (seg.index % 2 !== 0 || p.w < 4) return;
+  ctx.globalAlpha = Math.min(1, seg.fog);
+  // rope handrail on the safe side, posts every few segments
+  ctx.strokeStyle = '#7A5A34';
+  ctx.lineWidth = Math.max(1, p.w * 0.012);
+  ctx.beginPath();
+  ctx.moveTo(p.x - p.w * 1.02, p.y);
+  ctx.lineTo(p.x - p.w * 1.02, p.y - p.w * 0.30);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+function drawPalm(x, groundY, h, tone) {
+  ctx.strokeStyle = '#8A6A3E';
+  ctx.lineWidth = Math.max(1.5, h * 0.05);
+  ctx.beginPath();
+  ctx.moveTo(x, groundY);
+  ctx.quadraticCurveTo(x + h * 0.10, groundY - h * 0.5, x + h * 0.04, groundY - h * 0.92);
+  ctx.stroke();
+  ctx.fillStyle = tone;
+  for (let a = 0; a < 5; a++) {
+    const ang = -Math.PI / 2 + (a - 2) * 0.62;
+    ctx.save();
+    ctx.translate(x + h * 0.04, groundY - h * 0.92);
+    ctx.rotate(ang + Math.PI / 2);
+    blob(0, -h * 0.16, h * 0.09, h * 0.20);
+    ctx.restore();
+  }
+}
+
+/* =====================================================================
+   THINGS STANDING ON THE TRAIL
+   Everything is sized in road half-widths, so it grows correctly as it
+   comes towards you without any per-object depth maths.
+   ===================================================================== */
+function drawItems(seg) {
+  const p = seg.p1.screen;
+  if (p.w < 2 || seg.fog < 0.04) return;
+  const st = styleFor(seg);
+  ctx.globalAlpha = Math.min(1, seg.fog);
+  for (const it of seg.items) {
+    if (it.gone) continue;
+    const w = p.w;
+    const cx = p.x + (it.x || 0) * w;
+    switch (it.type) {
+      case 'obstacle': drawObstacle(it, cx, p.y, w, st, seg); break;
+      case 'gem':      drawGem(cx, p.y - (it.lift || 0) * w * 0.34, w * 0.075, st, false, it.lift > 0); break;
+      case 'biggem':   drawGem(cx, p.y - w * 0.16, w * 0.15, st, true); break;
+      case 'banana':   drawBanana(cx, p.y - w * 0.07, w * 0.09); break;
+      case 'sign':     drawForkSign(p.x, p.y, w, it); break;
+      case 'gate':     drawGate(p.x, p.y, w); break;
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function shadowUnder(cx, y, rx) {
+  ctx.fillStyle = 'rgba(30,43,99,0.22)';
+  blob(cx, y, rx, rx * 0.30);
+}
+function outline(lw) {
+  ctx.strokeStyle = NAVY;
+  ctx.lineWidth = Math.max(1, lw);
+}
+
+function drawObstacle(it, cx, y, w, st, seg) {
+  const spec = OBSTACLES[it.kind];
+  const hw = spec.hw * w;
+  const wig = spec.wiggles ? Math.sin(rt * 3 + it.seed) * SNAKE_WIGGLE * w : 0;
+  switch (it.kind) {
+
+    case 'log': case 'column': case 'logjam': {
+      shadowUnder(cx, y, hw);
+      const h = w * 0.13;
+      ctx.fillStyle = it.kind === 'column' ? '#B9B3A4' : '#7A5533';
+      roundRect(cx - hw, y - h, hw * 2, h, h * 0.45, true);
+      ctx.fillStyle = it.kind === 'column' ? '#CFC8B6' : '#9C7047';
+      roundRect(cx - hw, y - h, hw * 2, h * 0.45, h * 0.3, true);
+      // end grain, so it reads as a log and not a wall
+      ctx.fillStyle = it.kind === 'column' ? '#E3DED0' : '#C8996A';
+      blob(cx - hw + h * 0.16, y - h * 0.5, h * 0.20, h * 0.36);
+      blob(cx + hw - h * 0.16, y - h * 0.5, h * 0.20, h * 0.36);
+      break;
+    }
+
+    case 'plank': {   // a gap in the vine bridge — jump it
+      ctx.fillStyle = 'rgba(30,43,99,0.35)';
+      ctx.fillRect(cx - hw, y - w * 0.02, hw * 2, w * 0.04);
+      ctx.setLineDash([w * 0.05, w * 0.04]);
+      outline(Math.max(1.5, w * 0.014));
+      ctx.strokeStyle = '#FFF1C9';
+      ctx.beginPath();
+      ctx.moveTo(cx - hw, y);
+      ctx.lineTo(cx + hw, y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      break;
+    }
+
+    case 'mud': {
+      ctx.fillStyle = '#5E4326';
+      blob(cx, y, hw, hw * 0.26);
+      ctx.fillStyle = 'rgba(255,255,255,0.42)';
+      blob(cx - hw * 0.25, y - hw * 0.05, hw * 0.30, hw * 0.09);
+      break;
+    }
+
+    case 'snake': {
+      const x = cx + wig;
+      shadowUnder(x, y, hw * 0.8);
+      ctx.fillStyle = '#3FA34D';
+      ctx.beginPath();
+      for (let i = 0; i <= 12; i++) {
+        const t = i / 12;
+        ctx.lineTo(x - hw + hw * 2 * t, y - w * 0.03 + Math.sin(t * 6 + rt * 5) * w * 0.022);
+      }
+      outline(Math.max(2, w * 0.035));
+      ctx.strokeStyle = '#3FA34D';
+      ctx.stroke();
+      ctx.fillStyle = '#FFC93C';       // yellow eyes: the tell
+      blob(x + hw * 0.82, y - w * 0.045, w * 0.012, w * 0.012);
+      blob(x + hw * 0.94, y - w * 0.045, w * 0.012, w * 0.012);
+      break;
+    }
+
+    case 'branch': case 'lintel': {
+      const head = w * DUCK_BAR_HEIGHT;      // low enough to actually stop you
+      ctx.fillStyle = it.kind === 'lintel' ? '#A9A294' : '#2E9B52';
+      roundRect(cx - hw, y - head - w * 0.06, hw * 2, w * 0.075, w * 0.02, true);
+      if (it.kind === 'branch') {
+        ctx.fillStyle = '#1E7A42';           // leaves hanging off it
+        for (let i = -2; i <= 2; i++) blob(cx + i * hw * 0.4, y - head + w * 0.01, w * 0.045, w * 0.028);
+      } else {
+        ctx.fillStyle = '#8A8375';
+        for (const s of [-1, 1]) ctx.fillRect(cx + s * hw - w * 0.02, y - head - w * 0.06, w * 0.04, head + w * 0.06);
+      }
+      break;
+    }
+
+    case 'monkey': case 'bat': {
+      const head = w * DUCK_BAR_HEIGHT;
+      const sway = Math.sin(rt * 2.6 + it.seed) * w * 0.10;
+      // the vine appears first — the tell that a swing is coming
+      ctx.strokeStyle = it.kind === 'bat' ? '#5B4B7A' : '#1E7A42';
+      ctx.lineWidth = Math.max(1, w * 0.012);
+      ctx.beginPath();
+      ctx.moveTo(cx, y - w * 0.95);
+      ctx.lineTo(cx + sway, y - head - w * 0.02);
+      ctx.stroke();
+      ctx.font = `${Math.max(8, w * 0.20)}px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(it.kind === 'bat' ? '🦇' : '🐒', cx + sway, y - head + w * 0.03);
+      break;
+    }
+
+    case 'tree': case 'palm': {
+      shadowUnder(cx, y, hw);
+      const h = w * 0.95;
+      if (it.kind === 'palm') { drawPalm(cx, y, h, st.trees[1]); break; }
+      ctx.fillStyle = '#4A3320';
+      ctx.fillRect(cx - hw * 0.28, y - h * 0.55, hw * 0.56, h * 0.55);
+      ctx.fillStyle = st.trees[1];
+      blob(cx, y - h * 0.72, hw * 1.1, h * 0.28);
+      blob(cx - hw * 0.6, y - h * 0.55, hw * 0.7, h * 0.20);
+      blob(cx + hw * 0.6, y - h * 0.58, hw * 0.7, h * 0.21);
+      break;
+    }
+
+    case 'boulder': case 'rock': case 'pillar': {
+      shadowUnder(cx, y, hw);
+      const h = it.kind === 'pillar' ? w * 0.85 : w * 0.44;
+      ctx.fillStyle = it.kind === 'pillar' ? '#B9B3A4' : '#8E8B86';
+      if (it.kind === 'pillar') {
+        ctx.fillRect(cx - hw * 0.72, y - h, hw * 1.44, h);
+        ctx.fillStyle = '#CFC8B6';
+        ctx.fillRect(cx - hw, y - h - w * 0.05, hw * 2, w * 0.06);
+        ctx.fillRect(cx - hw, y - w * 0.05, hw * 2, w * 0.05);
+        ctx.fillStyle = '#4E9A5E';                 // moss, because ruins
+        blob(cx - hw * 0.5, y - h * 0.75, hw * 0.28, h * 0.07);
+      } else {
+        ctx.beginPath();
+        ctx.ellipse(cx, y - h * 0.42, hw, h * 0.5, 0, Math.PI, 0);
+        ctx.lineTo(cx - hw, y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.30)';
+        blob(cx - hw * 0.3, y - h * 0.62, hw * 0.32, h * 0.14);
+      }
+      break;
+    }
+  }
+}
+
+function roundRect(x, y, w, h, r, fill) {
+  ctx.beginPath();
+  const rr = Math.min(r, Math.abs(w) / 2, Math.abs(h) / 2);
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+  if (fill) ctx.fill();
+}
+
+function drawGem(cx, y, r, st, big, raised) {
+  const bob = Math.sin(rt * 4 + cx * 0.03) * r * 0.25;
+  const yy = y - r - bob;
+  // A gem that is up in the air gets a shadow on the trail beneath it, so
+  // "you have to jump for this one" is something you can see rather than
+  // something you find out by running through it.
+  if (raised) {
+    ctx.fillStyle = 'rgba(30,43,99,0.20)';
+    blob(cx, y + r * 0.6, r * 0.7, r * 0.22);
+  }
+  if (st.dark) {                       // glowing gems light the cave
+    ctx.fillStyle = 'rgba(120,220,255,0.30)';
+    blob(cx, yy, r * 2.2, r * 2.2);
+  }
+  ctx.fillStyle = big ? '#FFC93C' : '#5FE1FF';
+  ctx.beginPath();
+  ctx.moveTo(cx, yy - r);
+  ctx.lineTo(cx + r * 0.8, yy);
+  ctx.lineTo(cx, yy + r);
+  ctx.lineTo(cx - r * 0.8, yy);
+  ctx.closePath();
+  ctx.fill();
+  outline(Math.max(1, r * 0.22));
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.75)';
+  ctx.beginPath();
+  ctx.moveTo(cx, yy - r * 0.75);
+  ctx.lineTo(cx + r * 0.3, yy - r * 0.1);
+  ctx.lineTo(cx - r * 0.2, yy - r * 0.1);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawBanana(cx, y, r) {
+  ctx.font = `${Math.max(9, r * 2.4)}px ${FONT}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('🍌', cx, y - Math.sin(rt * 4) * r * 0.3);
+}
+
+/* ---- the fork signpost: a big wooden board, readable from far off ---- */
+function drawForkSign(roadX, y, w, it) {
+  if (w < 14) return;
+  const bw = w * 0.98, bh = w * 0.30;
+  const top = y - w * 0.90;
+  ctx.fillStyle = '#8A6234';
+  ctx.fillRect(roadX - w * 0.035, top + bh, w * 0.07, w * 0.90 - bh);
+  ctx.fillStyle = '#C89A5E';
+  roundRect(roadX - bw / 2, top, bw, bh, w * 0.04, true);
+  outline(Math.max(1.5, w * 0.014));
+  ctx.stroke();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `800 ${Math.max(6, w * 0.093)}px ${FONT}`;
+  ctx.fillStyle = '#1E7A42';
+  ctx.fillText('← EASY TRAIL', roadX - bw * 0.25, top + bh * 0.34);
+  ctx.fillStyle = '#2E7A42';
+  ctx.font = `800 ${Math.max(5, w * 0.070)}px ${FONT}`;
+  ctx.fillText('🟢 safe', roadX - bw * 0.25, top + bh * 0.72);
+  ctx.font = `800 ${Math.max(6, w * 0.093)}px ${FONT}`;
+  ctx.fillStyle = '#D62A2A';
+  ctx.fillText('SHORTCUT →', roadX + bw * 0.25, top + bh * 0.34);
+  ctx.font = `800 ${Math.max(5, w * 0.070)}px ${FONT}`;
+  ctx.fillStyle = '#C97A00';
+  ctx.fillText('⚠️ hard · 💎💎💎', roadX + bw * 0.25, top + bh * 0.72);
+}
+
+/* ---- the way out ---- */
+function drawGate(roadX, y, w) {
+  if (w < 10) return;
+  const h = w * 1.05;
+  ctx.fillStyle = '#C8A34F';
+  for (const s of [-1, 1]) ctx.fillRect(roadX + s * w * 0.92 - w * 0.05, y - h, w * 0.10, h);
+  ctx.fillRect(roadX - w * 0.97, y - h, w * 1.94, w * 0.16);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `800 ${Math.max(8, w * 0.13)}px ${FONT}`;
+  ctx.fillStyle = NAVY;
+  ctx.fillText('WAY OUT!', roadX, y - h + w * 0.08);
+}
+
+/* =====================================================================
+   THE EXPLORER — chunky, big-headed, thick outline, permanent grin.
+   ===================================================================== */
+function drawRunner(st) {
+  if (mode === 'carry') return;             // the carry scene draws its own
+  const w = anchor.w;
+  const s = w * 0.24;                        // the runner is this tall
+  const x = anchor.x + laneX * w;
+  const lift = jumpY * s * 1.35;
+  const y = anchor.y - lift;
+
+  // blinking while the monkeys are still nearby
+  if (rt < invincibleUntil && Math.floor(rt * 12) % 2 === 0) return;
+
+  ctx.save();
+  shadowUnder(x, anchor.y, s * 0.40 * (1 - jumpY * 0.4));
+  ctx.translate(x, y);
+  if (rt < tumbleUntil) {
+    const t = 1 - (tumbleUntil - rt) / 0.55;
+    ctx.rotate(t * Math.PI * 2);
+  } else if (seeking) {
+    ctx.rotate(Math.sign(LANE_X[laneTarget] - laneX) * 0.20);
+  }
+  const pose = mode === 'finish' ? 'cheer'
+             : rt < tumbleUntil ? 'tumble'
+             : airborne ? 'jump'
+             : ducking() ? 'duck' : 'run';
+  drawExplorerBody(0, 0, s, pose);
+  ctx.restore();
+
+  // the equipped pet trots alongside, purely for company
+  if (petEmoji) {
+    ctx.font = `${s * 0.42}px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(petEmoji, x - s * 0.85, anchor.y - Math.abs(Math.sin(rt * 9)) * s * 0.18);
+  }
+  if (rt < tumbleUntil) drawStars(x, y - s * 1.1, s);
+}
+
+function drawExplorerBody(x, y, s, pose) {
+  const cyc = rt * 13;
+  const bob = pose === 'run' ? Math.abs(Math.sin(cyc)) * s * 0.06 : 0;
+  const skin = '#F5C79A', shirt = '#E8DFC0', pack = '#8A6234';
+  ctx.lineJoin = 'round';
+  outline(Math.max(2, s * 0.055));
+  ctx.strokeStyle = NAVY;
+
+  /* ---- DUCK: a full knee-slide, drawn on its own ----
+     Sliding used to be the standing pose nudged down a bit, which topped out
+     around 0.96 of standing height — next to no difference on screen, so you
+     could not tell a duck from a jump. This is a separate, deliberately
+     flat pose: about half height, pitched forward, head down by the trail.
+     It has to LOOK like it goes under a bar, because it does. */
+  if (pose === 'duck') {
+    /* Heights matter here, so they are written down. A standing runner is
+       about 1.30 * s tall; this slide tops out at roughly 0.62 * s — under
+       half. DUCK_BAR_HEIGHT is set so a bar passes clean over this and cuts
+       straight through the standing pose, which is the whole point. */
+    ctx.fillStyle = '#5B4A2E';
+    // trailing leg stretched out behind, front knee tucked under
+    roundRect(x - s * 0.48, y - s * 0.13, s * 0.48, s * 0.13, s * 0.06, true); ctx.stroke();
+    roundRect(x - s * 0.04, y - s * 0.17, s * 0.30, s * 0.17, s * 0.07, true); ctx.stroke();
+    // backpack, flat on his back
+    ctx.fillStyle = pack;
+    roundRect(x - s * 0.32, y - s * 0.42, s * 0.22, s * 0.20, s * 0.07, true); ctx.stroke();
+    // torso, pitched right forward and low
+    ctx.fillStyle = shirt;
+    roundRect(x - s * 0.22, y - s * 0.40, s * 0.50, s * 0.28, s * 0.11, true); ctx.stroke();
+    // leading arm reaching along the ground
+    ctx.fillStyle = skin;
+    roundRect(x + s * 0.22, y - s * 0.20, s * 0.32, s * 0.12, s * 0.06, true); ctx.stroke();
+    // head, low and forward, still grinning
+    const dhy = y - s * 0.38;
+    ctx.fillStyle = skin;
+    ctx.beginPath(); ctx.arc(x + s * 0.28, dhy, s * 0.21, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = NAVY;
+    blob(x + s * 0.36, dhy - s * 0.02, s * 0.036, s * 0.044);
+    blob(x + s * 0.19, dhy - s * 0.02, s * 0.036, s * 0.044);
+    ctx.beginPath();
+    ctx.arc(x + s * 0.28, dhy + s * 0.04, s * 0.10, 0.16 * Math.PI, 0.84 * Math.PI);
+    ctx.lineWidth = Math.max(1.5, s * 0.05); ctx.stroke();
+    // hat clamped flat on his head, brim swept back by the wind
+    outline(Math.max(2, s * 0.055));
+    ctx.fillStyle = '#C8A15E';
+    roundRect(x - s * 0.02, dhy - s * 0.22, s * 0.66, s * 0.08, s * 0.04, true); ctx.stroke();
+    // dust kicked up by the slide
+    if (!reducedMotion()) {
+      ctx.fillStyle = 'rgba(200,180,140,0.55)';
+      for (let i = 0; i < 3; i++) {
+        const t = (rt * 6 + i * 0.4) % 1;
+        blob(x - s * (0.55 + t * 0.8), y - s * 0.04 - t * s * 0.12, s * 0.09 * (1 - t) + s * 0.03, s * 0.05 * (1 - t) + s * 0.02);
+      }
+    }
+    return;
+  }
+
+  // legs
+  ctx.fillStyle = '#5B4A2E';
+  const legY = y;
+  if (pose === 'jump' || pose === 'tumble') {
+    roundRect(x - s * 0.26, legY - s * 0.30, s * 0.22, s * 0.26, s * 0.08, true); ctx.stroke();
+    roundRect(x + s * 0.04, legY - s * 0.34, s * 0.22, s * 0.26, s * 0.08, true); ctx.stroke();
+  } else {
+    const sw = Math.sin(cyc) * s * 0.20;
+    roundRect(x - s * 0.20 + sw, legY - s * 0.34, s * 0.19, s * 0.36, s * 0.08, true); ctx.stroke();
+    roundRect(x + s * 0.02 - sw, legY - s * 0.34, s * 0.19, s * 0.36, s * 0.08, true); ctx.stroke();
+  }
+
+  const bodyY = y - s * 0.30 - bob;
+  // backpack, behind the body
+  ctx.fillStyle = pack;
+  roundRect(x - s * 0.36, bodyY - s * 0.34, s * 0.22, s * 0.36, s * 0.08, true); ctx.stroke();
+  // body
+  ctx.fillStyle = shirt;
+  roundRect(x - s * 0.24, bodyY - s * 0.36, s * 0.48, s * 0.40, s * 0.12, true); ctx.stroke();
+  // arms
+  ctx.fillStyle = skin;
+  if (pose === 'cheer') {
+    roundRect(x - s * 0.40, bodyY - s * 0.74, s * 0.16, s * 0.40, s * 0.07, true); ctx.stroke();
+    roundRect(x + s * 0.24, bodyY - s * 0.74, s * 0.16, s * 0.40, s * 0.07, true); ctx.stroke();
+  } else {
+    const aw = pose === 'run' ? Math.sin(cyc + Math.PI) * s * 0.16 : s * 0.10;
+    roundRect(x - s * 0.38 + aw, bodyY - s * 0.30, s * 0.16, s * 0.30, s * 0.07, true); ctx.stroke();
+    roundRect(x + s * 0.22 - aw, bodyY - s * 0.30, s * 0.16, s * 0.30, s * 0.07, true); ctx.stroke();
+  }
+
+  // head — deliberately oversized
+  const hy = bodyY - s * 0.56;
+  ctx.fillStyle = skin;
+  ctx.beginPath();
+  ctx.arc(x, hy, s * 0.30, 0, Math.PI * 2);
+  ctx.fill(); ctx.stroke();
+  // face
+  ctx.fillStyle = NAVY;
+  const eyeY = hy - s * 0.02;
+  blob(x - s * 0.11, eyeY, s * 0.045, s * 0.055);
+  blob(x + s * 0.11, eyeY, s * 0.045, s * 0.055);
+  ctx.beginPath();
+  ctx.arc(x, hy + s * 0.06, s * 0.15, 0.16 * Math.PI, 0.84 * Math.PI);
+  ctx.lineWidth = Math.max(1.5, s * 0.05);
+  ctx.stroke();
+  // safari hat — lifts off the head on a jump
+  const hatLift = pose === 'jump' ? s * 0.12 : 0;
+  ctx.fillStyle = '#C8A15E';
+  roundRect(x - s * 0.42, hy - s * 0.26 - hatLift, s * 0.84, s * 0.09, s * 0.045, true); ctx.stroke();
+  roundRect(x - s * 0.22, hy - s * 0.44 - hatLift, s * 0.44, s * 0.20, s * 0.08, true); ctx.stroke();
+}
+
+function drawStars(x, y, s) {
+  ctx.font = `${s * 0.34}px ${FONT}`;
+  ctx.textAlign = 'center';
+  for (let i = 0; i < 3; i++) {
+    const a = rt * 7 + i * 2.09;
+    ctx.fillText('⭐', x + Math.cos(a) * s * 0.5, y + Math.sin(a) * s * 0.22);
+  }
+}
+
+/* ---- the carry-home scene: two monkeys, one grinning explorer ---- */
+function drawCarryScene() {
+  const t = 1 - clamp((phaseUntil - rt) / 3.0, 0, 1);
+  const s = anchor.w * 0.26;
+  const x = W / 2 - t * W * 0.15;
+  const y = anchor.y - t * H * 0.16 - Math.sin(t * Math.PI * 5) * s * 0.18;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(Math.sin(t * Math.PI * 4) * 0.10);
+  drawExplorerBody(0, 0, s, 'cheer');
+  ctx.restore();
+  ctx.font = `${s * 0.9}px ${FONT}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('🐒', x - s * 0.95, y - s * 1.15 + Math.sin(rt * 8) * s * 0.1);
+  ctx.fillText('🐒', x + s * 0.95, y - s * 1.15 + Math.sin(rt * 8 + 1) * s * 0.1);
+}
+
+/* =====================================================================
+   AMBIENT LIFE + FLOATING TEXT
+   Ambient is the first thing to go under prefers-reduced-motion; the
+   trail itself keeps moving, because that is the game.
+   ===================================================================== */
+function updateAmbient(dt) {
+  const st = styleFor(segmentAt(runnerZ()));
+  const A = CONFIG.ambient;
+  if (!reducedMotion()) {
+    const count = (k) => ambient.reduce((n, a) => n + (a.kind === k ? 1 : 0), 0);
+    if (st.fireflies) {
+      if (count('fly') < A.fireflies && Math.random() < dt * A.firefliesPerSec)
+        ambient.push({ kind:'fly', x: Math.random() * W, y: H * 0.5 + Math.random() * H * 0.3, t: 0, life: 3 + Math.random() * 3 });
+    } else if (st.crabs) {
+      if (count('crab') < A.crabs && Math.random() < dt * A.crabsPerSec)
+        ambient.push({ kind:'crab', x: -30, y: H * 0.88 + Math.random() * 30, vx: 55 + Math.random() * 55, t: 0, life: 14 });
+    } else if (count('parrot') < A.parrots && Math.random() < dt * A.parrotsPerSec) {
+      // Parrots fly RIGHT TO LEFT. Every emoji font draws 🦜 facing left, so
+      // sending them the other way had them flying backwards across the sky.
+      ambient.push({ kind:'parrot', x: W + 40, y: 64 + Math.random() * 110,
+                     vx: -(85 + Math.random() * 60), t: 0, life: 16 });
+    }
+  }
+  ambient = ambient.filter((a) => {
+    a.t += dt; a.x += (a.vx || 0) * dt;
+    return a.t < a.life && a.x > -90 && a.x < W + 90;
+  });
+  floaters = floaters.filter((f) => { f.t += dt; f.y += (f.vy || -40) * dt; return f.t < f.life; });
+  monkeys = monkeys.filter((m) => { m.t += dt; return m.t < m.life; });
+}
+
+function drawAmbient(st) {
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const a of ambient) {
+    const fade = clamp(Math.min(a.t, a.life - a.t) * 2, 0, 1);
+    ctx.globalAlpha = fade;
+    if (a.kind === 'fly') {
+      ctx.fillStyle = '#FFE97A';
+      blob(a.x + Math.sin(a.t * 2) * 18, a.y + Math.cos(a.t * 1.6) * 12, 3, 3);
+    } else {
+      ctx.font = '22px ' + FONT;
+      // a slow, gliding bob — 6Hz looked like panic
+      ctx.fillText(a.kind === 'crab' ? '🦀' : '🦜', a.x, a.y + Math.sin(a.t * 3.2) * 7);
+    }
+  }
+  ctx.globalAlpha = 1;
+
+  // the thief monkey, mid-snatch
+  for (const m of monkeys) {
+    if (m.kind !== 'thief') continue;
+    const t = m.t / m.life;
+    const x = anchor.x + laneX * anchor.w + m.side * (60 + t * 220);
+    const y = anchor.y - anchor.w * 0.22 - Math.sin(t * Math.PI) * 40;
+    ctx.globalAlpha = 1 - t * t;
+    ctx.font = `${anchor.w * 0.14}px ${FONT}`;
+    ctx.fillText('🐒', x, y);
+    ctx.font = `${anchor.w * 0.09}px ${FONT}`;
+    ctx.fillText('🍌', x + m.side * 18, y - 14);
+    if (t < 0.4) {
+      ctx.font = `800 ${anchor.w * 0.055}px ${FONT}`;
+      ctx.fillStyle = NAVY;
+      ctx.fillText('Hey!', x, y - 34);
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawFloaters() {
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const f of floaters) {
+    ctx.globalAlpha = clamp(1 - f.t / f.life, 0, 1);
+    ctx.font = `800 ${20 * (f.size || 1)}px ${FONT}`;
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#fff';
+    ctx.strokeText(f.text, f.x, f.y);
+    ctx.fillStyle = f.color || NAVY;
+    ctx.fillText(f.text, f.x, f.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function floater(text, color, size) {
+  floaters.push({
+    text, color, size: size || 1, t: 0, life: 1.1,
+    x: anchor.x + laneX * anchor.w, y: anchor.y - anchor.w * 0.32, vy: -52,
+  });
+}
+
+/** A quick "+1" off the runner's shoulder. Small and short-lived so a line
+    of four gems reads as four little pops rather than a wall of text — the
+    point is being able to SEE that a gem counted. */
+function gemPop(n) {
+  floaters.push({
+    text: '+' + n, color: '#1F5FD6', size: 0.72, t: 0, life: 0.55,
+    x: anchor.x + laneX * anchor.w + 26 + Math.random() * 14,
+    y: anchor.y - anchor.w * 0.40, vy: -70,
+  });
+}
+
+/* =====================================================================
+   THE HUD
+   ===================================================================== */
+let lastBananas = -1, lastGems = -1;
+function updateHud(force) {
+  if (force || bananas !== lastBananas) {
+    lastBananas = bananas;
+    const pill = $('bananaPill');
+    pill.innerHTML = '';
+    if (heroFace) pill.append(document.createTextNode(heroFace + ' '));
+    for (let i = 0; i < CONFIG.bananas; i++) {
+      const s = document.createElement('span');
+      s.textContent = '🍌';
+      if (i >= bananas) s.className = 'spent';
+      pill.appendChild(s);
+    }
+  }
+  if (force || gems !== lastGems) {
+    lastGems = gems;
+    $('gemPill').textContent = '💎 ' + gems;
+  }
+  $('progressFill').style.width = (progressPct() * 100).toFixed(1) + '%';
+}
+
+let bannerTimer = null;
+function banner(text, seconds, gold) {
+  const b = $('banner');
+  b.textContent = text;
+  b.classList.toggle('gold', !!gold);
+  b.classList.add('show');
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(() => b.classList.remove('show'), (seconds || 1.6) * 1000);
+}
+
+/* =====================================================================
+   THE END OF A TREK — records, then the one call to finishRun.
+
+   THE STAKES, EXACTLY:
+     escaped      -> units = every gem in the backpack
+     did not      -> units = CONFIG.consolationUnits (0). The run is STILL
+                     reported, so the session is logged with escaped:false
+                     and the day streak still rolls: playing counted, even
+                     though the jungle won.
+   ===================================================================== */
+async function finishUp(didEscape) {
+  mode = 'results';
+  escaped = didEscape;
+  distancePct = didEscape ? 100 : Math.round(progressPct() * 100);
+  const banked = didEscape ? gems : 0;
+  const seconds = Math.round(rt);
+
+  // ---- records ----
+  const newBestDistance = distancePct > records.bestDistance;
+  const newBestGems = banked > records.bestGems;
+  const allShortcuts = trekKey === 'big' && forks.length > 0 && shortcutsTaken === forks.length;
+  const earnedStamp = didEscape && allShortcuts && !records.shortcutMaster;
+
+  records.runs += 1;
+  records.bestDistance = Math.max(records.bestDistance, distancePct);
+  if (didEscape) {
+    records.escapes += 1;
+    records.bestGems = Math.max(records.bestGems, banked);
+    if (trekKey === 'big' || !records.bestTrek) records.bestTrek = trekKey;
+    if (allShortcuts) records.shortcutMaster = true;
+  }
+  saveRecords();
+
+  // ---- the screen ----
+  $('stage').classList.add('hidden');
+  $('results').classList.remove('hidden');
+  $('resultsEmoji').textContent = didEscape ? '🏖️' : '🐒';
+  const v = $('verdict');
+  v.textContent = didEscape ? 'YOU ESCAPED!' : 'So close!';
+  v.className = 'ej-verdict ' + (didEscape ? 'ej-verdict--out' : 'ej-verdict--home');
+  $('subline').textContent = didEscape
+    ? `💎 ${banked} gems brought home from the ${CONFIG.treks[trekKey].name}`
+    : `You got ${distancePct}% of the way 🏕️ — 💎 ${gems} gems stayed in the jungle… next time!`;
+  $('statGems').textContent = didEscape ? '0' : String(gems);
+  $('statDist').textContent = distancePct + '%';
+  $('statCuts').textContent = String(shortcutsTaken);
+  $('bestBar').textContent =
+    `Your best: ${records.bestDistance}% of the trail · 💎 ${records.bestGems} brought home · escaped ${records.escapes} of ${records.runs} treks`;
+
+  const rec = $('recordLine');
+  const recBits = [];
+  if (newBestDistance) recBits.push('farthest ever');
+  if (newBestGems) recBits.push('biggest haul');
+  rec.classList.toggle('hidden', !recBits.length);
+  if (recBits.length) rec.textContent = `⭐ NEW RECORD! ${recBits.join(' · ')}`;
+
+  const stamp = $('stampLine');
+  stamp.classList.toggle('hidden', !earnedStamp);
+  if (earnedStamp) stamp.textContent = '🏆 SHORTCUT MASTER — escaped a Big Trek taking every single shortcut!';
+
+  $('capLine').classList.add('hidden');
+  $('awardLine').textContent = didEscape ? 'Banking your gems…' : '';
+
+  if (didEscape) {
+    if (!reducedMotion()) confettiRain(120);
+    bankGems(banked);
+  }
+
+  // ---- the character award ----
+  const outcome = await finishRun(GAME_ID, {
+    asked: 0, correct: 0, seconds,
+    score: banked,
+    units: didEscape ? banked : CONFIG.consolationUnits,
+    escaped: didEscape,
+    distancePct,
+    trek: trekKey,
+    shortcutsTaken,
+  });
+
+  $('awardLine').textContent = awardText(outcome, didEscape, banked);
+  const cap = $('capLine');
+  cap.classList.toggle('hidden', !outcome?.cappedByDailyFun);
+  if (outcome?.cappedByDailyFun) {
+    cap.textContent = "You've earned today's fun-game rewards! Practice games still pay full 🚀";
+  }
+  if (earnedStamp && !reducedMotion()) confetti(window.innerWidth / 2, window.innerHeight * 0.4, 70);
+  celebrateLevelUp(outcome);
+}
+
+/** The end-screen line. Sparks are only ever shown if finishRun actually
+    reports them — this game never invents a currency number of its own. */
+function awardText(outcome, didEscape, banked) {
+  if (!outcome?.saved) return 'Played as a guest — nothing saved this time.';
+  if (!didEscape) return '💎 The jungle keeps the gems this time — nothing banked. Get out to bring them home!';
+  const bits = [];
+  const sparks = Number(outcome.sparksEarned);
+  if (Number.isFinite(sparks) && sparks > 0) bits.push(`+${sparks} ⚡ Sparks`);
+  if (outcome.xp) bits.push(`+${outcome.xp} XP`);
+  if (outcome.coins) bits.push(`+${outcome.coins} 🪙`);
+  if (bits.length) return bits.join(' · ');
+  if (!banked) return 'Out of the jungle empty-handed — but you made it out!';
+  return "That's today's fun-game limit — practice games still pay full!";
+}
+
+/** Gems tick into the backpack one at a time, with a coin sound each. */
+function bankGems(n) {
+  clearInterval(bankAnim);
+  if (n <= 0) { $('statGems').textContent = '0'; return; }
+  let shown = 0;
+  const step = Math.max(1, Math.round(n / 22));
+  const delay = Math.max(40, Math.min(120, 1400 / (n / step)));
+  bankAnim = setInterval(() => {
+    shown = Math.min(n, shown + step);
+    $('statGems').textContent = String(shown);
+    jsfx.tick();
+    if (shown >= n) clearInterval(bankAnim);
+  }, delay);
+}
+
+/* =====================================================================
+   THE ROUTE TABLE
+   Prints how many gems each route is actually worth, averaged over a
+   handful of generated treks — the numbers the tuning targets are about.
+   ===================================================================== */
+function routeValues() {
+  let easyOnly = 0, allCuts = 0;
+  for (const s of sections) {
+    if (s.kind === 'run') { const v = gemValueOf(s.segs); easyOnly += v; allCuts += v; continue; }
+    easyOnly += gemValueOf(s.easy.segs);
+    allCuts  += gemValueOf(s.hard.segs);
+  }
+  return { easyOnly, allCuts };
+}
+function averageRoutes(key, n) {
+  const keep = { sections, forks, track, totalLen };
+  let e = 0, a = 0;
+  for (let i = 0; i < n; i++) { buildTrek(key); const r = routeValues(); e += r.easyOnly; a += r.allCuts; }
+  sections = keep.sections; forks = keep.forks; track = keep.track; totalLen = keep.totalLen;
+  return { easyOnly: Math.round(e / n), allCuts: Math.round(a / n) };
+}
+function logRouteTable() {
+  if (!QS.has('debug')) return;      // tuning noise, not something a kid's console needs
+  const r = routeValues();
+  console.log(`[escape-jungle] ${CONFIG.treks[trekKey].name}: EASY-only ≈ ${r.easyOnly} gems · ALL-SHORTCUTS ≈ ${r.allCuts} gems`);
+}
+window.__ejRoutes = () => ({
+  short: averageRoutes('short', 12),
+  big:   averageRoutes('big', 12),
+});
+
+/* =====================================================================
+   SOUND — synthesized, gesture-gated, honours the site mute toggle.
+   The shared palette covers tap/pop/coin/win; everything with a jungle
+   accent is built here.
+   ===================================================================== */
+const jsfx = (() => {
+  let ac = null;
+  let stepPhase = 0;
+  function ctxOf() {
+    if (sfx.isMuted()) return null;
+    try {
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      if (ac.state === 'suspended') ac.resume().catch(() => {});
+      return ac;
+    } catch { return null; }
+  }
+  function note({ freq, to, type = 'triangle', dur = 0.12, delay = 0, vol = 0.10 }) {
+    const a = ctxOf();
+    if (!a) return;
+    try {
+      const t0 = a.currentTime + delay;
+      const osc = a.createOscillator();
+      const g = a.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, t0);
+      if (to) osc.frequency.exponentialRampToValueAtTime(Math.max(20, to), t0 + dur);
+      g.gain.setValueAtTime(vol, t0);
+      g.gain.exponentialRampToValueAtTime(0.0008, t0 + dur);
+      osc.connect(g).connect(a.destination);
+      osc.start(t0); osc.stop(t0 + dur + 0.02);
+    } catch {}
+  }
+  function noise({ dur = 0.12, delay = 0, vol = 0.05 }) {
+    const a = ctxOf();
+    if (!a) return;
+    try {
+      const n = Math.floor(a.sampleRate * dur);
+      const buf = a.createBuffer(1, n, a.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+      const src = a.createBufferSource();
+      const g = a.createGain();
+      src.buffer = buf;
+      g.gain.value = vol;
+      src.connect(g).connect(a.destination);
+      src.start(a.currentTime + delay);
+    } catch {}
+  }
+  return {
+    footstepReset() { stepPhase = 0; },
+    footstep(dt, speed, off) {
+      if (off) return;
+      stepPhase += dt * (speed / 900);
+      if (stepPhase >= 1) { stepPhase -= 1; noise({ dur: 0.05, vol: 0.022 }); }
+    },
+    land() { noise({ dur: 0.05, vol: 0.028 }); },
+    tick() { note({ freq: 720, type: 'square', dur: 0.05, vol: 0.07 }); },
+    whoosh() { note({ freq: 480, to: 170, type: 'sawtooth', dur: 0.20, vol: 0.045 }); },
+    bigGem() { note({ freq: 784, dur: 0.12, vol: 0.12 }); note({ freq: 1175, dur: 0.20, delay: 0.11, vol: 0.12 }); },
+    // a goofy slide whistle plus a monkey "oo-oo" — never harsh, never a buzzer
+    bump() {
+      note({ freq: 900, to: 320, type: 'sine', dur: 0.30, vol: 0.075 });
+      note({ freq: 420, to: 520, type: 'sine', dur: 0.12, delay: 0.26, vol: 0.07 });
+      note({ freq: 480, to: 590, type: 'sine', dur: 0.12, delay: 0.40, vol: 0.07 });
+    },
+    drumroll() {
+      for (let i = 0; i < 14; i++) noise({ dur: 0.03, delay: i * 0.045, vol: 0.030 });
+      note({ freq: 300, to: 460, type: 'triangle', dur: 0.18, delay: 0.64, vol: 0.09 });
+    },
+    fanfare() {
+      sfx.play('win');
+      [523, 659, 784, 1047, 1319].forEach((f, i) =>
+        note({ freq: f, type: 'square', dur: 0.16, delay: 0.30 + i * 0.10, vol: 0.09 }));
+    },
+    // bouncy, not sad — nobody gets a sad trombone in this house
+    carryHome() {
+      [784, 698, 622, 523].forEach((f, i) =>
+        note({ freq: f, type: 'triangle', dur: 0.20, delay: i * 0.16, vol: 0.10 }));
+      note({ freq: 420, to: 520, type: 'sine', dur: 0.14, delay: 0.72, vol: 0.08 });
+      note({ freq: 480, to: 600, type: 'sine', dur: 0.14, delay: 0.88, vol: 0.08 });
+    },
+  };
+})();
+
+/* =====================================================================
+   CONTROLS — keyboard, swipe, and the big on-screen buttons.
+   ===================================================================== */
+let bufJump = -1, bufDuck = -1;
+
+function move(dir) {
+  if (mode !== 'running' || paused) return;
+  // While a slide is already under way the next press counts from where that
+  // slide is HEADING, so two quick taps really do cross two lanes. Once the
+  // runner has settled — or has drifted sideways with the bend — it counts
+  // from where they actually are, which is what "go left" then means.
+  const from = seeking ? laneTarget : nearestLane();
+  const t = clamp(from + dir, 0, LANE_COUNT - 1);
+  laneTarget = t;
+  seeking = true;
+}
+function doJump() {
+  jumpV = JUMP_V0; jumpY = 0.001; airborne = true;
+  duckUntil = -1;
+  sfx.play('pop');
+}
+function requestJump() {
+  if (mode !== 'running' || paused) return;
+  if (airborne) { bufJump = rt; return; }
+  doJump();
+}
+function requestDuck(held) {
+  if (mode !== 'running' || paused) return;
+  duckHeld = !!held;
+  if (airborne) { bufDuck = rt; return; }
+  duckStart = rt;
+  duckUntil = rt + CONFIG.duckMs / 1000;
+  jsfx.whoosh();
+}
+function drainInputBuffer() {
+  const win = CONFIG.inputBufferMs / 1000;
+  if (bufJump >= 0) {
+    if (!airborne && rt - bufJump <= win) { doJump(); bufJump = -1; }
+    else if (rt - bufJump > win) bufJump = -1;
+  }
+  if (bufDuck >= 0) {
+    if (!airborne && rt - bufDuck <= win) {
+      duckStart = rt; duckUntil = rt + CONFIG.duckMs / 1000; jsfx.whoosh(); bufDuck = -1;
+    } else if (rt - bufDuck > win) bufDuck = -1;
+  }
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.repeat) return;
+  const k = e.key.toLowerCase();
+  if (k === 'arrowleft'  || k === 'a') { e.preventDefault(); move(-1); }
+  if (k === 'arrowright' || k === 'd') { e.preventDefault(); move(1); }
+  if (k === 'arrowup'    || k === 'w' || k === ' ') { e.preventDefault(); requestJump(); }
+  if (k === 'arrowdown'  || k === 's') { e.preventDefault(); requestDuck(true); }
+  if (k === 'escape' || k === 'p') togglePause();
+});
+document.addEventListener('keyup', (e) => {
+  const k = e.key.toLowerCase();
+  if (k === 'arrowdown' || k === 's') duckHeld = false;
+});
+
+/* ---- swipes ---- */
+let touchStart = null;
+const stageEl = $('stage');
+stageEl.addEventListener('touchstart', (e) => {
+  const t = e.changedTouches[0];
+  touchStart = { x: t.clientX, y: t.clientY, at: Date.now() };
+}, { passive: true });
+stageEl.addEventListener('touchend', (e) => {
+  if (!touchStart) return;
+  const t = e.changedTouches[0];
+  const dx = t.clientX - touchStart.x, dy = t.clientY - touchStart.y;
+  touchStart = null;
+  if (Math.abs(dx) < 26 && Math.abs(dy) < 26) return;
+  if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 1 : -1);
+  else if (dy < 0) requestJump();
+  else { requestDuck(false); }
+}, { passive: true });
+
+/* ---- the big buttons ---- */
+function wirePad(id, down, up) {
+  const el = $(id);
+  el.addEventListener('pointerdown', (e) => { e.preventDefault(); el.classList.add('held'); down(); });
+  const release = () => { el.classList.remove('held'); if (up) up(); };
+  el.addEventListener('pointerup', release);
+  el.addEventListener('pointercancel', release);
+  el.addEventListener('pointerleave', release);
+  el.addEventListener('contextmenu', (e) => e.preventDefault());
+}
+wirePad('padLeft',  () => move(-1));
+wirePad('padRight', () => move(1));
+wirePad('padJump',  () => requestJump());
+wirePad('padDuck',  () => requestDuck(true), () => { duckHeld = false; });
+
+// Always on for a fingertip; a laptop gets a toggle for testing.
+if (deviceIsTouch()) $('pads').classList.add('on');
+$('padsToggle').textContent = deviceIsTouch() ? 'Hide buttons' : 'Show buttons';
+$('padsToggle').addEventListener('click', () => {
+  const on = $('pads').classList.toggle('on');
+  $('padsToggle').textContent = on ? 'Hide buttons' : 'Show buttons';
+});
+
+/* ---- pause ---- */
+function togglePause() {
+  if (mode !== 'running' && mode !== 'carry' && mode !== 'finish') return;
+  if (paused) resume(); else pause();
+}
+function pause() {
+  // Only a trek in progress can be paused. Without this guard, tabbing away
+  // while the RESULTS screen was up left paused=true behind a veil nobody
+  // could see (the stage is hidden there) — and the next trek then counted
+  // 3-2-1 down onto a trail that never moved. Only a refresh cleared it.
+  if (paused || (mode !== 'running' && mode !== 'carry' && mode !== 'finish')) return;
+  paused = true;
+  clearInterval(countdownTimer);
+  showVeil('⏸', 'Paused — the jungle will wait.', 'Keep running!', resume);
+}
+function resume() {
+  if (!paused) return;
+  showVeil('3', 'Here we go!');
+  countdownFrom(3, () => { paused = false; hideVeil(); lastFrame = 0; });
+}
+$('pauseBtn').addEventListener('click', togglePause);
+document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+
+/* ---- the two treks, and running it all again ---- */
+$('trekShort').addEventListener('click', () => startTrek('short'));
+$('trekBig').addEventListener('click', () => startTrek('big'));
+$('againBtn').addEventListener('click', () => {
+  clearInterval(bankAnim);
+  $('results').classList.add('hidden');
+  $('start').classList.remove('hidden');
+  paintStartScreen();
+  mode = 'idle';
+});
+
+/* A ?trek= override drops straight into a trek, for tuning. */
+{
+  const t = QS.get('trek');
+  if (kid && (t === 'short' || t === 'big')) startTrek(t);
+}
+
+/* =====================================================================
+   ?debug=1 — the tuning handle.
+
+   Opens up the trail to the console so the numbers in CONFIG can be
+   checked without playing a hundred treks by hand: step the run forward
+   by a fixed slice of time, read the state out, and drive the controls.
+   Off unless the query parameter is there, so a kid never meets it.
+   ===================================================================== */
+if (QS.has('debug')) {
+  window.__ejDebug = {
+    CONFIG, OBSTACLES, LANE_X, SEG_LEN,
+    start: startTrek,
+    move, jump: requestJump, duck: requestDuck,
+    /** Skip the 3-2-1, which runs on real clock time. */
+    skipCountdown() {
+      clearInterval(countdownTimer);
+      if (mode === 'countdown') { mode = 'running'; hideVeil(); jsfx.footstepReset(); }
+    },
+    /** Advance the trail by dt seconds, exactly as a frame would.
+        Pass draw:false to run the simulation without drawing, which is
+        the only way to measure a few hundred treks in a sitting. */
+    step(dt, draw) {
+      if (paused || mode === 'idle' || mode === 'results') return;
+      rt += dt;
+      if (mode === 'running') updateRun(dt);
+      else if (mode === 'carry') updateCarry(dt);
+      else if (mode === 'finish') updateFinish(dt);
+      updateAmbient(dt);
+      if (draw !== false) render();
+    },
+    snap() {
+      const seg = segmentAt(runnerZ());
+      return {
+        mode, rt, position, totalLen, pct: progressPct(),
+        laneX, laneTarget, seeking, jumpY, ducking: ducking(),
+        bananas, gems, shortcutsTaken, escaped, distancePct, trekKey,
+        zone: CONFIG.zones[seg.zone].id, shortcut: seg.shortcut, flavour: seg.flavour,
+        forks: forks.map((f) => ({
+          locked: f.locked, preview: f.preview, rejoined: f.rejoined,
+          signIndex: f.signIndex, decideIndex: f.decideIndex, endIndex: f.endIndex,
+        })),
+      };
+    },
+    /** Every live thing on the next `segs` segments of trail. */
+    itemsAhead(segs, types) {
+      const want = types || ['obstacle', 'gem', 'biggem', 'banana'];
+      const from = runnerIndex();
+      const out = [];
+      for (let i = from; i < Math.min(track.length, from + (segs || 120)); i++) {
+        for (const it of track[i].items) {
+          if (it.gone || !want.includes(it.type)) continue;
+          out.push({
+            type: it.type, kind: it.kind || null, lane: it.lane, x: it.x,
+            lift: it.lift || 0, index: i, dz: (i - from),
+            pass: it.kind ? OBSTACLES[it.kind].pass : null,
+            hw: it.kind ? OBSTACLES[it.kind].hw : 0.24,
+          });
+        }
+      }
+      return out;
+    },
+    /** How fast the trail is moving right now, in segments per second. */
+    segsPerSecond() { return currentSpeed() / SEG_LEN; },
+    runnerIdx() { return runnerIndex(); },
+    /** How far a segment's path has swung aside at the fork, and where the
+        road-not-taken sits — for checking the split actually looks like one. */
+    branchInfoAt(index) {
+      const sg = track[index];
+      if (!sg || sg.branchIndex == null) return null;
+      return {
+        branchIndex: sg.branchIndex,
+        side: sg.forkSide,
+        yourPathOffset: +(sg.forkOffset || 0).toFixed(3),
+        ghostOffset: +(-sg.forkSide * ghostOffset(sg.branchIndex)).toFixed(3),
+        gapBetweenPaths: +Math.abs((-sg.forkSide * ghostOffset(sg.branchIndex)) - (sg.forkOffset || 0)).toFixed(3),
+      };
+    },
+    /** What scenery is alive right now — for tuning how busy the jungle is. */
+    ambientNow() {
+      const byKind = {};
+      for (const a of ambient) byKind[a.kind] = (byKind[a.kind] || 0) + 1;
+      return { total: ambient.length, byKind,
+               directions: [...new Set(ambient.filter(a => a.vx).map(a => a.vx < 0 ? 'leftward' : 'rightward'))] };
+    },
+    onBridgeNow() { return onBridge(segmentAt(position + PLAYER_Z)); },
+    /** Jump the runner straight to a segment index — test scaffolding only. */
+    seekTo(index) { position = index * SEG_LEN; },
+    setLane(l) { laneX = LANE_X[l]; laneTarget = l; laneHome = l; seeking = false; },
+    /** Commit a fork without running to it, so the shortcut branches can
+        be inspected and tested from the console. */
+    forceFork(i, which) {
+      const f = forks[i];
+      if (!f) return false;
+      f.preview = which; f.locked = which;
+      flattenTrack();
+      return { decideIndex: f.decideIndex, endIndex: f.endIndex, flavour: f.flavour.id };
+    },
+    forkCount() { return forks.length; },
+    routes: (key, n) => averageRoutes(key, n || 12),
+  };
+}
+
+</script>
+</body>
+</html>
