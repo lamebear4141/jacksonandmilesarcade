@@ -15,7 +15,7 @@
        that delta through awardRun() — one write, increments only.
 
      · Loot-Drop-SPECIFIC history stays Loot Drop's: the daily records
-       (`days`, which power loot luck and the grown-up view) and the
+       (`days`, which feed the grown-up view) and the
        reading/math lifetime split live in localStorage under
        lootdrop.v2.{childId}, per child.
 
@@ -23,7 +23,12 @@
    those are game mechanics, not progression.
    ===================================================================== */
 import { CONFIG, SPRITES, RARITY, RARITY_ORDER, SKINS, PETS, levelFromXp, GRADES, spriteId } from './config.js';
-import { spriteIndex } from '../../assets/catalog.js';
+import { spriteIndex, inCollection, displayRarity, LIVE_SPRITE_IDS, practicePowerNow } from '../../assets/catalog.js';
+import { encodeSquad, decodeSquad } from '../../assets/squad-code.js';
+
+/** Does index i belong to a collection? Parked sprites never count,
+    never roll, and never show — here or anywhere else. */
+const live = (i) => inCollection(spriteId(i));
 import { loadCharacter, awardRun, grantCoins, equipItem, getChild, ageFromBirthday, isGuestKid } from '../../firebase-config.js';
 
 const MEM = {};
@@ -100,6 +105,9 @@ export async function initFor(kid){
     ownedPets: [...(character.ownedPets || ['none'])],
     counts,
     dayStreak: character.dayStreak || 0,
+    // Read through the helper, so a profile opened after a few days away
+    // shows the decayed value rather than the stored one.
+    practicePower: practicePowerNow(character),
     lastPlayed: character.lastPlayed || null,
     claimedStreakGifts: [...(character.claimedStreakGifts || [])],
     days: local.days,
@@ -158,10 +166,22 @@ export async function syncRoundToCharacter(kid, p, snap, meta){
   return outcome;
 }
 
-/** The bonus mini-game pays a few coins outside a run. */
+/** Loot Drop's bespoke bonus round. Floored at the same value as the
+    shared Vault so a kid is never worse off for playing the game that
+    earned its own bonus round, and clamped by the same daily coin cap
+    as every other coin in the arcade (grantCoins owns that rule).
+    Returns what was actually granted so the UI can say it honestly. */
 export async function minigameCoins(kid, p, coins){
-  p.coins += coins;
-  try { await grantCoins(kid.id, coins); } catch(e){ /* keep playing */ }
+  const want = Math.max(CONFIG.minigameFloorCoins, Math.round(coins) || 0);
+  try {
+    const r = await grantCoins(kid.id, want);
+    const granted = r?.ok ? r.granted : want;
+    p.coins += granted;
+    return { granted, capped: !!r?.capped };
+  } catch(e){
+    p.coins += want;                    // keep playing; the cloud catches up
+    return { granted: want, capped: false };
+  }
 }
 
 /* ---------------- derived (same shapes as always) ---------------- */
@@ -181,18 +201,19 @@ export function minutesToday(p){
   return d ? Math.round(d.seconds / 60) : 0;
 }
 export function levelInfo(p){ return levelFromXp(p.xp); }
-export function totalSprites(p){ return p.counts.reduce((a,b)=>a+b,0); }
-export function uniqueSprites(p){ return p.counts.filter(c=>c>0).length; }
+export function totalSprites(p){ return p.counts.reduce((a,b,i)=>a+(live(i)?b:0),0); }
+export function uniqueSprites(p){ return p.counts.filter((c,i)=>c>0&&live(i)).length; }
+/** Four tiers: mythic folds into legendary everywhere a kid looks. */
 export function rarityTally(p){
-  const t = { common:0, rare:0, epic:0, legendary:0, mythic:0 };
-  p.counts.forEach((c,i)=>{ if (c>0) t[SPRITES[i].r] += c; });
+  const t = { common:0, rare:0, epic:0, legendary:0 };
+  p.counts.forEach((c,i)=>{ if (c>0 && live(i)) t[displayRarity(SPRITES[i].r)] += c; });
   return t;
 }
 /** A single "how good is this collection" number, so the boys can settle it. */
 export function collectionScore(p){
   const pts = { common:1, rare:3, epic:8, legendary:20, mythic:60 };
   let s = 0;
-  p.counts.forEach((c,i)=>{ s += c * pts[SPRITES[i].r]; });
+  p.counts.forEach((c,i)=>{ if (live(i)) s += c * pts[SPRITES[i].r]; });
   return s;
 }
 
@@ -211,10 +232,9 @@ export function addXp(p, amount){
   p.xp += amount;
   const after = levelFromXp(p.xp).level;
   let gained = [];
-  for (let l = before + 1; l <= after; l++){
-    p.coins += CONFIG.coinsPerLevel;
-    gained.push(l);
-  }
+  // Levelling up no longer pays coins (E4) — the reward for a level is
+  // what it UNLOCKS: shop items, and a new band of critters in the wild.
+  for (let l = before + 1; l <= after; l++) gained.push(l);
   return gained;   // list of newly reached levels
 }
 
@@ -223,8 +243,12 @@ export function grantSprite(p, index){
   return { sprite: SPRITES[index], index, isNew: p.counts[index] === 1 };
 }
 
+/** A random LIVE sprite of this rarity. Mythic folds into legendary on
+    both sides of the match, so a 'mythic' roll draws from the eight
+    legendary crowns (one of which is stored as mythic). */
 export function pickSpriteOfRarity(rarity){
-  const idxs = SPRITES.map((s,i)=>[s,i]).filter(([s])=>s.r===rarity).map(([,i])=>i);
+  const want = displayRarity(rarity);
+  const idxs = SPRITES.map((s,i)=>[s,i]).filter(([s,i])=>live(i) && displayRarity(s.r)===want).map(([,i])=>i);
   return idxs[Math.floor(Math.random()*idxs.length)];
 }
 
@@ -336,59 +360,31 @@ export function declineMigration(kid){
 }
 
 /* =====================================================================
-   SQUAD CODE — compact, shareable, no backend. Unchanged wire format,
-   still the only way to compare with a cousin in a different family.
-   Layout: [ver][who][level][streak][rounds hi][rounds lo][counts 4bits each]
+   SQUAD CODE — compact, shareable, no backend; still the only way to
+   compare with a cousin in a different family. The codec itself lives
+   in assets/squad-code.js (pure, so it is unit-tested): codes are now
+   written as scheme v2 — one OWNED bit per sprite, which is all the
+   compare screen ever showed — and old v1 links still decode.
    ===================================================================== */
-const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-function bytesToCode(bytes){
-  let out = '', bits = 0, val = 0;
-  for (const b of bytes){ val = (val << 8) | b; bits += 8;
-    while (bits >= 6){ out += B64[(val >> (bits - 6)) & 63]; bits -= 6; } }
-  if (bits) out += B64[(val << (6 - bits)) & 63];
-  return out;
-}
-function codeToBytes(code){
-  const out = []; let bits = 0, val = 0;
-  for (const ch of code){
-    const i = B64.indexOf(ch); if (i < 0) continue;
-    val = (val << 6) | i; bits += 6;
-    if (bits >= 8){ out.push((val >> (bits - 8)) & 255); bits -= 8; }
-  }
-  return out;
-}
-
 export function makeSquadCode(p){
-  const lvl = Math.min(255, levelInfo(p).level);
-  const rounds = Math.min(65535, p.lifetime.rounds);
   // the who-byte kept meaning "miles or jackson" in old codes; a migrated
   // child keeps their old identity bit so existing shared codes line up
   const whoBit = CURRENT?.local.migrated === 'jackson' ? 1 : 0;
-  const bytes = [1, whoBit, lvl, Math.min(255, dayStreak(p)),
-                 (rounds >> 8) & 255, rounds & 255];
-  for (let i = 0; i < SPRITES.length; i += 2){
-    const a = Math.min(15, p.counts[i] || 0);
-    const b = Math.min(15, p.counts[i+1] || 0);
-    bytes.push((a << 4) | b);
-  }
-  return bytesToCode(bytes);
+  return encodeSquad({
+    whoBit, level: levelInfo(p).level, streak: dayStreak(p),
+    rounds: p.lifetime.rounds, counts: p.counts,
+  });
 }
 
 export function readSquadCode(code){
-  const b = codeToBytes((code || '').trim());
-  if (b.length < 6 || b[0] !== 1) return null;
-  const counts = new Array(SPRITES.length).fill(0);
-  for (let i = 0; i < SPRITES.length; i += 2){
-    const byte = b[6 + i/2]; if (byte == null) break;
-    counts[i] = byte >> 4;
-    if (i+1 < SPRITES.length) counts[i+1] = byte & 15;
-  }
-  const who = b[1] === 1 ? 'jackson' : 'miles';
-  const fake = { counts };
-  return { who, name: GRADES[who]?.name || 'Rival', level:b[2], streak:b[3],
-           rounds:(b[4]<<8)|b[5], counts,
-           total: counts.reduce((x,y)=>x+y,0),
-           unique: counts.filter(c=>c>0).length,
+  const d = decodeSquad(code);
+  if (!d) return null;
+  const who = d.whoBit === 1 ? 'jackson' : 'miles';
+  const fake = { counts: d.counts };
+  return { who, name: GRADES[who]?.name || 'Rival', level: d.level, streak: d.streak,
+           rounds: d.rounds, counts: d.counts,
+           total: totalSprites(fake),
+           unique: uniqueSprites(fake),
            score: collectionScore(fake) };
 }
 
@@ -413,7 +409,7 @@ export function buildReport(p){
       level: levelInfo(p).level,
       dayStreak: dayStreak(p),
       coins: p.coins,
-      collection: { unique: uniqueSprites(p), total: totalSprites(p), outOf: SPRITES.length,
+      collection: { unique: uniqueSprites(p), total: totalSprites(p), outOf: LIVE_SPRITE_IDS.length,
                     score: collectionScore(p), byRarity: rarityTally(p) },
       lifetime: { ...lt, accuracyPct: lt.attempted ? Math.round(lt.correct/lt.attempted*100) : 0,
                   readingAccuracyPct: lt.readAttempted ? Math.round(lt.readCorrect/lt.readAttempted*100) : null,

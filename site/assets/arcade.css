@@ -564,3 +564,285 @@ button.ac-sprite:active{ transform:translateY(2px); }
   .ac-tile{ transition:none; }
   .ac-tile:hover{ transform:none; }
 }
+
+/* =====================================================================
+   COLLECTIONS (R2B · E1) — the three sprite states, the badge banner,
+   the set cards, and the completion card.
+   ===================================================================== */
+
+/* ---- the three states (see catalog.js spriteState) ---- */
+/* silhouette: the emoji blacked out on a light tile, name ???, ring kept
+   (the rarity class still sets border-color). Contrast: the black shape
+   at .55 on cream reads as a dark grey cut-out, never as a broken glyph. */
+.ac-sprite--silhouette{ background:var(--ac-panel-2); }
+.ac-sprite--silhouette .ac-sprite__glyph{ filter:brightness(0); opacity:0.55; }
+.ac-sprite--silhouette .ac-sprite__name{ color:var(--ac-text-mute); letter-spacing:1px; }
+.ac-sprite--silhouette.ac-sprite--legendary::before{ opacity:0.55; }
+/* hidden: an empty slot. No shape, no name, no ring — just a cell. */
+.ac-sprite--hidden{
+  border:3px dashed var(--ac-line); background:transparent; box-shadow:none;
+  min-height:74px; opacity:0.55;
+}
+/* the "JAX HAS ONE" chip on a silhouette a sibling can trade */
+.ac-sprite__hint{
+  position:absolute; bottom:-9px; left:50%; transform:translateX(-50%);
+  font-size:8px; font-weight:800; letter-spacing:0.4px; padding:1px 6px;
+  background:var(--ac-blue); color:#FFFFFF; border:2px solid var(--ac-edge);
+  border-radius:99px; white-space:nowrap;
+}
+.ac-sprites--set{ row-gap:16px; }
+
+/* ---- badge banner: bunting with pennants ---- */
+.ac-banner{ padding:6px 0 0; }
+.ac-bunting{
+  display:flex; gap:10px; flex-wrap:wrap; justify-content:center; padding:10px 8px 6px;
+  border-top:4px solid var(--ac-edge); border-radius:2px;
+}
+.ac-pennant{
+  width:86px; padding:10px 6px 16px; text-align:center;
+  background:linear-gradient(180deg,#FFF8E4,#FFE9B8); color:#7A4E00;
+  clip-path:polygon(0 0,100% 0,100% 74%,50% 100%,0 74%);
+  transform-origin:top center; animation:ac-sway 2.6s ease-in-out infinite;
+}
+.ac-pennant__e{ display:block; font-size:30px; line-height:1.1; }
+.ac-pennant__n{ display:block; font-size:10.5px; font-weight:800; line-height:1.15; margin-top:2px; }
+.ac-pennant--empty{
+  background:repeating-linear-gradient(45deg,var(--ac-panel-2) 0 6px,#F1E4C4 6px 12px);
+  color:var(--ac-text-mute); opacity:0.7; animation:none;
+}
+.ac-pennant--empty .ac-pennant__e{ filter:grayscale(1); opacity:0.6; }
+@keyframes ac-sway{ 0%,100%{ transform:rotate(-2.5deg); } 50%{ transform:rotate(2.5deg); } }
+.ac-banner__caption{ margin:8px 0 0; text-align:center; font-size:12px; font-weight:800; color:var(--ac-text-dim); letter-spacing:0.5px; }
+@media (prefers-reduced-motion: reduce){ .ac-pennant{ animation:none; } }
+
+/* ---- Collections header card ---- */
+.ac-col-head{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+.ac-col-head__emoji{ font-size:44px; }
+.ac-col-head__text{ flex:1; min-width:200px; }
+.ac-col-head__text h2{ margin:0; font-size:26px; }
+.ac-col-head__text p{ margin:2px 0 0; font-size:14px; color:var(--ac-text-dim); }
+.ac-col-head__count{ text-align:center; }
+.ac-col-head__n{ font-size:31px; line-height:1; }
+.ac-col-head__of{ font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--ac-text-mute); }
+
+/* ---- set cards ---- */
+.ac-sets{ display:grid; grid-template-columns:repeat(auto-fill,minmax(290px,1fr)); gap:16px; }
+.ac-set{
+  background:var(--ac-panel); border:var(--ac-bd) solid var(--ac-edge); border-radius:var(--ac-radius);
+  box-shadow:0 var(--ac-lift) 0 var(--ac-edge); overflow:hidden; text-align:left;
+}
+.ac-set.is-done{ border-color:var(--ac-yellow-deep); box-shadow:0 var(--ac-lift) 0 var(--ac-yellow-deep),0 0 34px rgba(255,201,60,.5); }
+.ac-set__top{
+  width:100%; display:flex; align-items:center; gap:13px; padding:15px 16px 12px;
+  background:none; border:0; color:var(--ac-text); font-family:inherit; font-weight:800; cursor:pointer; text-align:left;
+}
+.ac-set__icon{ width:56px; height:56px; flex:none; display:grid; place-items:center; font-size:30px; border-radius:14px; border:3px solid var(--ac-edge); background:var(--ac-panel-2); }
+.ac-set__title{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+.ac-set__name{ font-size:19px; line-height:1.1; }
+.ac-set__sub{ font-size:12.5px; color:var(--ac-text-dim); }
+.ac-set__chev{ margin-left:auto; font-size:15px; color:var(--ac-text-mute); transition:transform .2s; }
+.ac-set.is-open .ac-set__chev{ transform:rotate(90deg); }
+.ac-bar{ height:16px; margin:0 16px; background:var(--ac-panel-2); border:3px solid var(--ac-edge); border-radius:999px; overflow:hidden; }
+.ac-bar__fill{ height:100%; background:linear-gradient(90deg,#63E08A,#23A354); border-radius:999px; box-shadow:inset 0 -5px 0 rgba(0,0,0,.13); transition:width .7s cubic-bezier(.34,1.3,.64,1); }
+.ac-bar__fill.is-full{ background:linear-gradient(90deg,var(--ac-yellow),var(--ac-yellow-deep)); }
+.ac-set__reward{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:11px 16px 14px; font-size:12.5px; color:var(--ac-text-dim); }
+.ac-set__reward b{ color:var(--ac-text); }
+.ac-badge--hot{ background:var(--ac-yellow); animation:ac-breathe 1.8s ease-in-out infinite; }
+@keyframes ac-breathe{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.05); } }
+.ac-set__body{ display:none; padding:4px 16px 18px; }
+.ac-set.is-open .ac-set__body{ display:block; }
+.ac-set__locked{ margin:14px 0 0; font-size:12.5px; font-weight:800; color:var(--ac-purple-deep); text-align:center; }
+.ac-col-hint{
+  display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-top:16px; padding:10px 13px;
+  font-size:13px; background:var(--ac-tint-blue); border:3px dashed var(--ac-blue); border-radius:12px; color:var(--ac-text);
+}
+.ac-col-hint__e{ font-size:19px; }
+.ac-col-hint__btn{ margin-left:auto; font-size:13px; padding:8px 16px; }
+.ac-btn--purple{ background:linear-gradient(180deg,var(--ac-purple),var(--ac-purple-deep)); }
+
+/* ---- the completion card ---- */
+.ac-complete__card{ width:min(470px, 92vw); max-height:88vh; overflow:auto; }
+.ac-complete__kicker{ margin:0; font-size:13px; letter-spacing:2px; color:var(--ac-text-mute); font-weight:800; }
+.ac-complete__icon{ font-size:60px; line-height:1.1; }
+.ac-rewards{ display:grid; grid-template-columns:repeat(3,1fr); gap:11px; margin:16px 0; }
+.ac-reward{ padding:13px 7px; background:var(--ac-panel-2); border:3px solid var(--ac-edge); border-radius:14px; }
+.ac-reward__e{ font-size:32px; line-height:1.2; }
+.ac-reward__k{ font-size:9.5px; letter-spacing:0.9px; text-transform:uppercase; color:var(--ac-text-mute); margin-top:3px; font-weight:800; }
+.ac-reward__n{ font-size:12.5px; line-height:1.2; font-weight:800; }
+.ac-complete__card--grand{ background:linear-gradient(180deg,#FFFFFF,#FFF4D2); }
+
+/* =====================================================================
+   FINDING CRITTERS (R2B · E2) — the drop reveal and the level-up beat.
+   ===================================================================== */
+.ac-reveal__card{ width:min(440px, 92vw); }
+.ac-reveal__kicker{ margin:0; font-size:13px; letter-spacing:2px; color:var(--ac-text-mute); font-weight:800; }
+.ac-reveal__stage{ min-height:132px; display:grid; place-items:center; margin:6px 0 2px; }
+.ac-reveal__chest{ font-size:84px; line-height:1.1; }
+.ac-reveal__chest--pop{ animation:ac-chest 0.7s ease-in-out; }
+@keyframes ac-chest{
+  0%{ transform:scale(0.6) rotate(-8deg); } 40%{ transform:scale(1.15) rotate(6deg); }
+  70%{ transform:scale(0.95) rotate(-4deg); } 100%{ transform:scale(1.3) rotate(0); opacity:0.2; }
+}
+.ac-reveal__ring{
+  width:120px; height:120px; border-radius:50%; display:grid; place-items:center;
+  background:var(--ac-panel); border:6px solid var(--rar-common);
+  animation:ac-scalein 0.45s cubic-bezier(.34,1.6,.64,1);
+}
+.ac-reveal__ring--rare{ border-color:var(--rar-rare); }
+.ac-reveal__ring--epic{ border-color:var(--rar-epic); box-shadow:0 0 0 6px rgba(169,113,245,.25); }
+.ac-reveal__ring--legendary{ border-color:var(--rar-legend); box-shadow:0 0 28px rgba(255,201,60,.75); }
+.ac-reveal__critter{ font-size:64px; line-height:1; }
+@keyframes ac-scalein{ from{ transform:scale(0); } to{ transform:scale(1); } }
+.ac-reveal__label{ margin:6px 0 0 !important; }
+.ac-reveal__name{ margin:2px 0 6px; font-size:18px; font-weight:800; }
+.ac-reveal__rarity{ display:inline-block; margin-bottom:8px; }
+.ac-reveal__rarity--rare{ background:var(--ac-tint-blue); }
+.ac-reveal__rarity--epic{ background:var(--ac-tint-purple); }
+.ac-reveal__rarity--legendary{ background:var(--ac-yellow); }
+.ac-reveal__note{ margin:6px 0 0; font-size:13px; font-weight:800; color:var(--ac-purple-deep); }
+.ac-reveal__btns{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:6px; }
+.ac-reveal .ac-btn--inline + .ac-btn--inline{ margin-left:8px; }
+
+/* the level-up beat: silhouettes of what just became findable */
+.ac-levelup__beat{ margin:10px 0 6px; font-size:16px; font-weight:800; color:var(--ac-purple-deep); letter-spacing:0.5px; }
+.ac-levelup__silhouettes{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; align-items:center; margin-bottom:10px; }
+.ac-silhouette{
+  width:46px; height:46px; border-radius:12px; display:grid; place-items:center; font-size:26px;
+  background:var(--ac-panel-2); border:3px solid var(--rar-common);
+}
+.ac-silhouette{ color:transparent; text-shadow:0 0 0 rgba(30,43,99,.75); }   /* the shape, not the colours */
+.ac-silhouette--rare{ border-color:var(--rar-rare); }
+.ac-silhouette--epic{ border-color:var(--rar-epic); }
+.ac-silhouette--legendary{ border-color:var(--rar-legend); }
+.ac-levelup__more{ font-size:12px; font-weight:800; color:var(--ac-text-dim); }
+
+/* =====================================================================
+   THE BONUS VAULT (R2B · E4) — three doors, a timing bar, and a payout
+   that never goes below the floor.
+   ===================================================================== */
+.ac-vault__card{ width:min(420px, 92vw); }
+.ac-vault__emoji{ font-size:64px; line-height:1.2; }
+.ac-vault__doors{ display:flex; gap:14px; justify-content:center; margin:14px 0 18px; }
+.ac-vault__door{
+  width:74px; height:74px; display:grid; place-items:center; font-size:40px;
+  background:linear-gradient(180deg,#FFF4DA,#F0DFB4);
+  border:4px solid var(--ac-edge); border-radius:16px;
+  box-shadow:0 5px 0 var(--ac-edge);
+  animation:ac-vault-shimmer 1.6s ease-in-out infinite;
+}
+@keyframes ac-vault-shimmer{
+  0%,100%{ filter:brightness(1); transform:translateY(0); }
+  50%{ filter:brightness(1.18); transform:translateY(-3px); }
+}
+.ac-vault__door.is-shut{ animation:none; opacity:0.35; filter:grayscale(0.7); transform:scale(0.9); }
+.ac-vault__door.is-open{
+  animation:none; transform:scale(1.22); background:linear-gradient(180deg,#FFE9A8,var(--ac-yellow));
+  box-shadow:0 5px 0 var(--ac-yellow-deep), 0 0 34px rgba(255,201,60,.75);
+}
+/* the timing bar */
+.ac-vault__track{
+  position:relative; height:26px; margin:0 4px 12px; overflow:hidden;
+  background:var(--ac-panel-2); border:4px solid var(--ac-edge); border-radius:999px;
+}
+/* left/width are set from the run's accuracy in arcade-shell.js */
+.ac-vault__zone{
+  position:absolute; left:38%; width:24%; top:0; bottom:0;
+  background:linear-gradient(180deg,#63E08A,#23A354); opacity:0.85;
+  transition:left 0.3s ease, width 0.3s ease;
+}
+.ac-vault__marker{
+  position:absolute; top:-3px; bottom:-3px; left:50%; width:10px; margin-left:-5px;
+  background:var(--ac-red); border:3px solid var(--ac-edge); border-radius:99px;
+}
+.ac-vault__tap{ font-size:18px; padding:14px 26px; }
+.ac-vault__skip{ display:block; margin:10px auto 0; font-size:13px; }
+.ac-vault__prize{
+  margin:6px 0 2px; font-size:34px; font-weight:800; color:var(--ac-yellow-deep);
+  animation:ac-scalein 0.4s cubic-bezier(.34,1.6,.64,1);
+}
+@media (prefers-reduced-motion: reduce){
+  .ac-vault__door{ animation:none; }
+}
+
+/* =====================================================================
+   OPEN TRADES (R2B · E5) — two trays, two shelves, and the dot.
+   ===================================================================== */
+.ac-trays{ display:flex; align-items:stretch; gap:10px; margin:6px 0 4px; }
+.ac-trays__swap{ align-self:center; font-size:24px; flex:none; }
+.ac-tray{
+  flex:1; min-width:0; padding:10px 10px 12px; border-radius:16px;
+  background:var(--ac-panel-2); border:3px dashed var(--ac-line);
+}
+.ac-tray__label{
+  display:block; font-size:10px; font-weight:800; letter-spacing:1.2px;
+  text-transform:uppercase; color:var(--ac-text-mute); text-align:center; margin-bottom:6px;
+}
+.ac-tray__row{ display:flex; flex-wrap:wrap; gap:6px; justify-content:center; min-height:64px; align-items:center; }
+.ac-tray__empty{ font-size:26px; opacity:0.35; }
+.ac-sprite--tray{ min-width:58px; }
+.ac-sprite--tray .ac-sprite__glyph{ font-size:22px; }
+/* a spare that's all used up, or a tray that's full */
+.ac-sprite.is-spent{ opacity:0.4; filter:grayscale(0.75); cursor:default; }
+
+.ac-offer__shape{
+  margin:8px 0 2px; text-align:center; font-size:13.5px; font-weight:800;
+  color:var(--ac-purple-deep); background:var(--ac-tint-purple);
+  border-radius:12px; padding:8px 12px;
+}
+.ac-offer__row{ display:flex; gap:6px; flex-wrap:wrap; justify-content:center; }
+/* Rarity pips: a wordless second read on the shape of a deal. Scoped
+   under .ac-offer__dots so they outrank the notification .ac-dot below,
+   whose red background would otherwise win on source order. */
+.ac-offer__dots{ display:flex; gap:3px; justify-content:center; margin-top:5px; }
+.ac-offer__dots .ac-dot{
+  position:static; width:8px; height:8px; min-width:0; padding:0; font-size:0;
+  border:1px solid var(--ac-edge); border-radius:99px; box-shadow:none; animation:none;
+}
+.ac-offer__dots .ac-dot--common{ background:var(--rar-common); }
+.ac-offer__dots .ac-dot--rare{ background:var(--rar-rare); }
+.ac-offer__dots .ac-dot--epic{ background:var(--rar-epic); }
+.ac-offer__dots .ac-dot--legendary{ background:var(--rar-legend); }
+.ac-trade-send{ text-align:center; margin-top:18px; }
+
+/* the notification dot — on the TRADE tab and on the avatar */
+.ac-hometab{ position:relative; }
+.ac-dot{
+  position:absolute; top:-9px; right:-6px; min-width:24px; height:24px; padding:0 6px;
+  display:grid; place-items:center; font-size:12px; font-weight:800; color:#FFFFFF;
+  background:var(--ac-red); border:3px solid var(--ac-edge); border-radius:999px;
+  box-shadow:0 3px 0 var(--ac-edge); z-index:3;
+}
+.ac-dot--avatar{ top:-4px; right:-4px; }
+@keyframes ac-dot-pulse{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.18); } }
+.ac-dot--pulse{ animation:ac-dot-pulse 1.1s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce){ .ac-dot--pulse{ animation:none; } }
+/* how many of this critter are still free to offer (counts down live) */
+.ac-sprite__spare{
+  position:absolute; top:-8px; right:-8px; min-width:20px; height:20px; padding:0 5px;
+  display:grid; place-items:center; font-size:10px; font-weight:800;
+  color:var(--ac-edge); background:var(--ac-yellow);
+  border:2px solid var(--ac-edge); border-radius:999px;
+}
+.ac-sprite.is-spent .ac-sprite__spare{ background:var(--ac-line); color:var(--ac-text-mute); }
+
+
+/* =====================================================================
+   PRACTICE POWER (E7) — the Clubhouse meter. Green while it is being
+   built, gold at full, and never red: falling behind is not an error
+   state, it is just a smaller number.
+   ===================================================================== */
+.ac-power{ margin-top:14px; }
+.ac-power__top{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px; }
+.ac-power__name{ font-size:11px; font-weight:800; letter-spacing:1.2px; color:var(--ac-text-dim); }
+.ac-power__num{ font-size:17px; font-weight:800; color:var(--ac-text); }
+.ac-power__bar{
+  height:16px; background:var(--ac-panel-2); border:3px solid var(--ac-edge);
+  border-radius:999px; overflow:hidden;
+}
+.ac-power__fill{
+  height:100%; border-radius:999px; background:linear-gradient(90deg,#63E08A,#23A354);
+  box-shadow:inset 0 -5px 0 rgba(0,0,0,.13);
+  transition:width 0.7s cubic-bezier(.34,1.3,.64,1);
+}
+.ac-power__fill.is-full{ background:linear-gradient(90deg,var(--ac-yellow),var(--ac-yellow-deep)); }
+.ac-power__hint{ margin:6px 0 0; font-size:12px; font-weight:800; color:var(--ac-text-dim); }

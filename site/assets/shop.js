@@ -5,7 +5,7 @@
    showing the goal is the motivation. Nothing here ever scolds: a kid
    who can't afford something sees how many coins away they are.
    ===================================================================== */
-import { SKINS, PETS, levelFromXp } from './catalog.js';
+import { SKINS, PETS, levelFromXp, shopListing } from './catalog.js';
 import { buyItem } from '../firebase-config.js';
 import { el, fmt, sectionTitle, toast } from './widgets.js';
 import { celebrate, sfx } from './arcade-shell.js';
@@ -14,7 +14,7 @@ export async function renderShop(panel, ctx) {
   const c = ctx.character;
   const level = levelFromXp(c.xp || 0).level;
 
-  panel.append(el('p', { class: 'ac-sub ac-shop-purse', text: `You have \u{1FA99} ${fmt(c.coins)} — practice games earn coins 4× faster!` }));
+  panel.append(el('p', { class: 'ac-sub ac-shop-purse', text: `You have \u{1FA99} ${fmt(c.coins)} — play any game well and the bonus round pays coins!` }));
 
   panel.append(sectionTitle('SKINS'));
   panel.append(itemGrid(ctx, 'skin', SKINS, c.ownedSkins, level, c.coins));
@@ -23,9 +23,13 @@ export async function renderShop(panel, ctx) {
   panel.append(itemGrid(ctx, 'pet', PETS.filter((p) => p.id !== 'none'), c.ownedPets, level, c.coins));
 }
 
+/* Every list passes through shopListing(): anything buyable:false —
+   statues, the Grand Prize — is excluded structurally, not by being
+   left off a list. That is the rule "nothing with no price is ever for
+   sale", enforced here and again inside buyItem's transaction. */
 function itemGrid(ctx, kind, items, ownedList, level, coins) {
   const grid = el('div', { class: 'ac-items' });
-  const sorted = [...items].sort((a, b) => a.level - b.level || a.cost - b.cost);
+  const sorted = shopListing(items).sort((a, b) => a.level - b.level || a.cost - b.cost);
   for (const item of sorted) grid.append(itemCard(ctx, kind, item, ownedList, level, coins));
   return grid;
 }
@@ -61,7 +65,7 @@ function itemCard(ctx, kind, item, ownedList, level, coins) {
     // The goal, not a wall: say exactly what to reach.
     card.append(el('span', { class: 'ac-item__lock', text: `Reach Level ${item.level}` }));
   } else if (short > 0) {
-    card.append(el('span', { class: 'ac-item__lock', text: `${fmt(short)} more coins` }));
+    card.append(el('span', { class: 'ac-item__lock', text: `${fmt(short)} more coins — keep saving!` }));
   } else {
     card.append(el('button', {
       // yellow, not red — red is reserved for THE action on a screen

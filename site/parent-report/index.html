@@ -100,6 +100,7 @@
     </div>
 
     <div id="kids"></div>
+    <div id="trades"></div>
 
     <!-- Account settings live here on purpose: this page is already the
          parents-only area, behind the login and away from the kids' UI. -->
@@ -126,9 +127,9 @@
 
 <script type="module">
 import { onParentChange, listChildren, listFamilyCharacters, listSessions,
-         changeParentPassword, db, auth }
+         listTradeLog, changeParentPassword, db, auth }
   from '../firebase-config.js';
-import { GAMES } from '../assets/catalog.js';
+import { GAMES, spriteById, LIVE_SPRITE_IDS } from '../assets/catalog.js';
 import { collection, doc, writeBatch, Timestamp }
   from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
@@ -200,7 +201,7 @@ async function renderKid(kid, character){
       <span class="kid-meta">Level ${character?.level || 1}
         · ${fmt(character?.xp)} XP · ${fmt(character?.coins)} coins
         · ${character?.dayStreak ? character.dayStreak + '-day streak' : 'no streak yet'}
-        · ${character?.uniqueSprites || 0}/60 sprites</span>
+        · ${character?.uniqueSprites || 0}/${LIVE_SPRITE_IDS.length} critters</span>
     </div>
     <div class="split">
       <div class="box"><b>${weekMin} min</b><span>played in the last 7 days</span></div>
@@ -234,7 +235,50 @@ async function renderFamily(){
   const blocks = await Promise.all(children.map((kid) =>
     renderKid(kid, characters.find((c) => c.childId === kid.id))));
   kidsEl.innerHTML = blocks.join('');
+  renderTrades();
   renderLegacyOffer(children);
+}
+
+/* ---------------- the trade log ----------------
+   Open trading deliberately does NOT stop a big brother talking a little
+   brother into five-for-one — the boys are meant to negotiate, and being
+   generous to your brother should not be something an app polices.
+   THIS is the safety valve instead: every offer, who made it, what moved,
+   and whether it was accepted, so a lopsided habit is something a parent
+   can notice and have a conversation about. */
+function critterList(ids){
+  const tally = {};
+  (ids || []).forEach((id) => { tally[id] = (tally[id] || 0) + 1; });
+  return Object.entries(tally).map(([id, n]) => {
+    const sp = spriteById(id);
+    return esc((sp ? sp.g + ' ' + sp.n : id) + (n > 1 ? ' \u00d7' + n : ''));
+  }).join(', ') || '\u2014';
+}
+
+async function renderTrades(){
+  const host = $('trades');
+  const log = await listTradeLog(100).catch(() => []);
+  if (!log.length){ host.innerHTML = ''; return; }
+  const shape = (t) => {
+    const g = (t.offer || []).length, w = (t.want || []).length;
+    return g === w ? (g + ' for ' + w) : ('<b>' + g + ' for ' + w + '</b>');
+  };
+  const rows = log.map((t) => (
+    '<tr>' +
+      '<td>' + dateOf(t.createdAt) + '</td>' +
+      '<td>' + esc(t.from) + '</td>' +
+      '<td>' + esc(t.to) + '</td>' +
+      '<td>' + critterList(t.offer) + '</td>' +
+      '<td>' + critterList(t.want) + '</td>' +
+      '<td class="num">' + shape(t) + '</td>' +
+      '<td><span class="tag ' + (t.status === 'accepted' ? 'learn' : 'fun') + '">' + esc(t.status) + '</span></td>' +
+    '</tr>'
+  )).join('');
+  host.innerHTML =
+    '<div class="card"><h2>Trades</h2>' +
+    '<p class="muted">Every offer between the kids. Trading is deliberately open — any number of critters on either side — so this log is here to make a lopsided habit visible. Nobody can ever trade away their last copy of anything.</p>' +
+    '<table><tr><th>Date</th><th>From</th><th>To</th><th>Gave</th><th>Got</th><th class="num">Shape</th><th></th></tr>' +
+    rows + '</table></div>';
 }
 
 /* ---------------- the one-time legacy import ----------------

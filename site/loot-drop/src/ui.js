@@ -6,10 +6,11 @@
    The lobby, collection, item shop and brother-compare that used to
    live in here are the site's job — one character, one locker, one
    wallet, shared by every game. Loot Drop keeps only what's Loot Drop's:
-   the rounds, the reboot van, loot luck, the cousin squad codes, and
+   the rounds, the reboot van, practice power, the cousin squad codes, and
    the grown-up view.
    ===================================================================== */
-import { CONFIG, RARITY, RARITY_ORDER, SPRITES, SKINS, PETS } from './config.js';
+import { CONFIG, RARITY, SPRITES, SKINS, PETS } from './config.js';
+import { LIVE_SPRITE_IDS, DISPLAY_RARITY_ORDER, inCollection, displayRarity, spriteId } from '../../assets/catalog.js';
 import * as S from './state.js';
 import * as G from './game.js';
 import * as Speech from './speech.js';
@@ -93,30 +94,21 @@ function renderDrop(){
   $('dropStreak').textContent = `🔥 ${st} day${st === 1 ? '' : 's'}`;
   const mins = S.minutesToday(p);
   $('dropToday').textContent = mins ? `⏱ ${mins} min today` : '⏱ First drop today';
-  $('dropDex').textContent = `🗂️ ${S.uniqueSprites(p)}/${SPRITES.length}`;
+  $('dropDex').textContent = `🗂️ ${S.uniqueSprites(p)}/${LIVE_SPRITE_IDS.length}`;
 
-  const luckNow = Math.round(currentLuck(p));
-  $('luckFill').style.width = luckNow + '%';
-  $('luckText').textContent = luckNow + '% loot luck right now';
-  $('luckWhy').textContent = luckHint(p);
+  const power = p.practicePower || 0;
+  $('luckFill').style.width = power + '%';
+  $('luckText').textContent = power + ' practice power';
+  $('luckWhy').textContent = powerHint(p);
 }
 
-function currentLuck(p){
-  const lt = p.lifetime;
-  const acc = Math.max(0, ((lt.attempted ? lt.correct/lt.attempted : 0.8) - 0.5) / 0.5) * CONFIG.accuracyBonusLuck;
-  const st = Math.min(S.dayStreak(p) * CONFIG.streakBonusLuck, CONFIG.streakBonusMaxLuck);
-  let t = 0;
-  const capped = Math.min(S.minutesToday(p), CONFIG.timeBonusCapMinutes);
-  CONFIG.minutesForTimeBonus.forEach((m, i) => { if (capped >= m) t = CONFIG.timeBonusLuck[i]; });
-  return Math.max(0, Math.min(100, acc + st + t));
-}
-function luckHint(p){
-  const mins = S.minutesToday(p), st = S.dayStreak(p);
-  const next = CONFIG.minutesForTimeBonus.find(m => mins < m);
-  const bits = [];
-  if (next) bits.push(`${next - mins} more min today = better loot`);
-  if (st < 7) bits.push(`day ${st + 1} streak = more luck`);
-  return bits.join(' · ') || 'Max daily bonus reached — nice.';
+/* No minutes, no countdown, no "play a bit longer". The only thing this
+   line can ever suggest is practising — which is the whole point. */
+function powerHint(p){
+  const power = p.practicePower || 0;
+  if (power >= 100) return 'FULL POWER — the rarest sprites are looking for you!';
+  if (power === 0)  return 'Finish a practice round to start building it up.';
+  return 'Practise again tomorrow to build it up — stronger power, rarer sprites.';
 }
 
 /* ============================== PLAY ============================= */
@@ -174,7 +166,8 @@ function renderResult(res){
     : `You needed ${Math.round(CONFIG.extractThreshold*100)}% to get home — the loot stays in the storm. Try again 🙂`;
   $('resAcc').textContent = Math.round(res.accuracy * 100) + '%';
   $('resXp').textContent = '+' + res.xp;
-  $('resCoins').textContent = '+' + res.coins;
+  // the result screen's third stat is the haul now, not a coin wage
+  $('resCoins').textContent = res.won.length ? '+' + res.won.length : '0';
   $('resSaved').textContent = '';
 
   const lootBox = $('resLoot');
@@ -199,7 +192,7 @@ function renderResult(res){
   }
 
   const extra = [];
-  res.levelsGained.forEach(l => extra.push(`⬆️ Reached level ${l}! +${CONFIG.coinsPerLevel} coins`));
+  res.levelsGained.forEach(l => extra.push(`⬆️ Reached level ${l}! New things in the shop 🛒`));
   (res.gifts||[]).forEach(g => {
     if (g.awarded) extra.push(`🎁 ${g.day}-day streak: unlocked ${g.awarded.n}!`);
     else extra.push(`🎁 ${g.day}-day streak reward!`);
@@ -217,12 +210,15 @@ function renderResult(res){
 /* =========================== MINI-GAME =========================== */
 function runMinigame(){
   show('scrMini');
-  playMinigame(randomMinigame(), $('miniHost'), coins => {
-    S.minigameCoins(KID, P(), coins); save();
+  playMinigame(randomMinigame(), $('miniHost'), async coins => {
+    const { granted, capped } = await S.minigameCoins(KID, P(), coins);
+    save();
     sfx.play('coin');
     if (BAR) BAR.refresh();
-    $('miniHost').innerHTML = `<div class="mg-title">+${coins} COINS</div>
-      <div class="mg-sub">Spend them in the Shop at your Clubhouse.</div>`;
+    $('miniHost').innerHTML = `<div class="mg-title">+${granted} COINS</div>
+      <div class="mg-sub">${capped
+        ? 'That fills up today — tomorrow’s coins are already on their way! 🌙'
+        : 'Spend them in the Shop at your Clubhouse.'}</div>`;
     setTimeout(() => { renderDrop(); show('scrDrop'); }, 1500);
   });
 }
@@ -242,16 +238,17 @@ function summaryOf(p){
 function showCompare(a, b){
   const rows = [
     ['Collection score', a.score, b.score],
-    ['Unique sprites', `${a.unique}/${SPRITES.length}`, `${b.unique}/${SPRITES.length}`],
+    ['Unique sprites', `${a.unique}/${LIVE_SPRITE_IDS.length}`, `${b.unique}/${LIVE_SPRITE_IDS.length}`],
     ['Total sprites', a.total, b.total],
     ['Level', a.level, b.level],
     ['Day streak', a.streak, b.streak],
     ['Rounds played', a.rounds, b.rounds],
   ];
-  const tallyOf = c => { const t={}; RARITY_ORDER.forEach(r=>t[r]=0);
-    c.forEach((n,i)=>{ if(n>0) t[SPRITES[i].r]+=n; }); return t; };
+  // live sprites only, four tiers (mythic folds into legendary)
+  const tallyOf = c => { const t={}; DISPLAY_RARITY_ORDER.forEach(r=>t[r]=0);
+    c.forEach((n,i)=>{ if(n>0 && inCollection(spriteId(i))) t[displayRarity(SPRITES[i].r)]+=n; }); return t; };
   const ta = tallyOf(a.counts), tb = tallyOf(b.counts);
-  RARITY_ORDER.slice().reverse().forEach(r => rows.push([RARITY[r].name, ta[r], tb[r]]));
+  DISPLAY_RARITY_ORDER.slice().reverse().forEach(r => rows.push([RARITY[r].name, ta[r], tb[r]]));
 
   const winner = a.score === b.score ? null : (a.score > b.score ? a : b);
   $('cmpResult').style.display = '';
@@ -272,7 +269,7 @@ function showCompare(a, b){
     </div>`;
 }
 function exclusive(mine, theirs){
-  return SPRITES.map((s,i)=> (mine[i]>0 && !theirs[i]) ? s.g : null).filter(Boolean).join(' ');
+  return SPRITES.map((s,i)=> (mine[i]>0 && !theirs[i] && inCollection(spriteId(i))) ? s.g : null).filter(Boolean).join(' ');
 }
 
 /* ============================ GROWN-UPS ============================ */

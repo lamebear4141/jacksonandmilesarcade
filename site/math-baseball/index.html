@@ -310,7 +310,13 @@ const CONFIG = {
     startWindowMs:  140, minWindowMs:   55, windowDecay: 0.97,
     mulligans: 1,       // the first non-homer is forgiven, once
     maxHomers: 100,     // a provable ceiling; reaching it is a PERFECT DERBY
-    sparksPerHomer: 1,  // ⚡ paid per homer, on top of the run's normal award
+    /* The derby is Math Baseball's bespoke bonus round, standing in for
+       the shared Bonus Vault — so it pays on the same scale (E4, AJ's
+       "equal" call): the floor lands even on a homerless derby, and a
+       good one beats a good Vault tap. Was 2/homer + a per-run coin
+       wage; the wage is gone, so this carries it all now. */
+    coinsFloor:     40,   // 🪙 just for earning the derby — it never pays nothing
+    coinsPerHomer:   8,   // 🪙 per homer on top
   },
 
   // ---- adaptive practice (the ADAPT engine below reads these) ----
@@ -1004,7 +1010,8 @@ function recordOut(how){
 
    Nothing in here touches asked / correctCount / accuracy. Swinging a
    bat is not doing maths, so it can never earn the learning currency;
-   the derby pays ⚡ sparks and nothing else.
+   the derby pays 🪙 coins and nothing else. Coins are the reward for
+   bonus play you earned — this round is the model for that.
    ===================================================================== */
 let derbyDone = null;    // { homers, longestFt, perfect } — survives into endInning
 
@@ -1670,9 +1677,9 @@ function endInning(){
   awardEl.textContent = 'Saving…';
   // Derby homers are deliberately absent from asked / correct / units:
   // they are not maths, so they can never move accuracy, the ≥80% clear
-  // bonus, or 🧱 bricks. They pay ⚡ sparks through bonusSparks, which
-  // the shared economy clamps against the same daily spark budget as
-  // every fun game.
+  // bonus, or 🧱 bricks. They pay 🪙 coins through bonusCoins, which
+  // the shared economy adds straight onto the run's coin award — coins
+  // come from bonus play, never from answering questions.
   const derbyHomers = derbyDone?.homers || 0;
   finishRun('math-baseball', {
     asked,
@@ -1681,7 +1688,7 @@ function endInning(){
     score: runs,
     units: correctCount + CONFIG.unitsPerRun * runs,
     derbyHomers,
-    bonusSparks: CONFIG.derby.sparksPerHomer * derbyHomers,
+    bonusCoins: derbyDone ? CONFIG.derby.coinsFloor + CONFIG.derby.coinsPerHomer * derbyHomers : 0,
   }).then((outcome) => {
     awardEl.textContent = describeAward(outcome);
     celebrateLevelUp(outcome);

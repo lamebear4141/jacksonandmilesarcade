@@ -1,9 +1,14 @@
 # Claude Code prompt — R2A: run caps, the Home Run Derby, and no more tier labels
 
-Small, independent of the economy work in `r2b-collection-economy-prompt.md`.
-Safe to run before or after it. Paste everything below the line into Claude
-Code in the `jacksonandmilesarcade` repo. Phased — stop after each phase and
-report how to test.
+**v2 — Aug 22, 2026: the Derby now pays 🪙 coins** (it's the first bespoke
+"bonus mini-game" of the economy in `claude/economy-r2-spec.md`). If you
+already ran v1 of this prompt and the derby pays ⚡ sparks, the only change is
+in Phase 1's payout: swap it per the Scoring section below.
+
+Small and independent of `r2b-collection-economy-prompt.md`; safe to run
+before or after it. Paste everything below the line into Claude Code in the
+`jacksonandmilesarcade` repo. Phased — stop after each phase and report how to
+test.
 
 ---
 
@@ -51,7 +56,7 @@ derby: {
   startWindowMs:  140, minWindowMs:   55, windowDecay: 0.97,
   mulligans: 1,
   maxHomers: 100,
-  sparksPerHomer: 1,
+  coinsPerHomer: 2,
 }
 ```
 
@@ -74,24 +79,25 @@ curve before a kid does.
 ### Scoring and records
 
 - Derby homers **do not count as correct answers** and must not change `asked`,
-  `correct`, or `accuracy`. Bricks stay welded to math; swinging a bat can
-  never earn the learning currency.
-- Derby homers pay **⚡ sparks** — `sparksPerHomer × homers`, added to the run's
-  spark payout and clamped by the existing daily spark cap. If
-  `wallet-foundation-w0-prompt.md` hasn't been run yet and `PILLAR_ECONOMY`
-  doesn't exist in `catalog.js`, **skip the spark payout entirely** (leave a
-  clearly-marked TODO comment) rather than inventing a currency — everything
-  else in this phase still works.
+  `correct`, or `accuracy` — resources stay welded to math, and no amount of
+  swinging can earn the learning currency.
+- **Derby homers pay 🪙 coins**: `coinsPerHomer × homers`, added through the
+  existing coin award path (coins still work exactly as they do today — the
+  wider coin-faucet change happens later, in R2B, and this derby is already
+  the model for it: coins come from bonus play, not from answering questions).
 - New record `bestDerby` in `progress['math-baseball'].records`, guest fallback
   `mathbaseball.v1.records.bestDerby`. Show it beside best runs.
 - The `finishRun` payload gains `derbyHomers` and keeps `score: runs` as-is.
+- **If v1 of this prompt already ran:** replace `sparksPerHomer` with
+  `coinsPerHomer: 2`, remove the derby's spark payout entirely, and route the
+  payout through the coin path as above. Nothing else changes.
 
 *Stop and report. Test: set `CONFIG.runCap` to 2 via the console, score two
 runs, confirm the inning ends immediately and the derby card appears; swing
 through a derby and confirm the mulligan fires exactly once; confirm a derby
-never changes the accuracy shown on the end screen. The thing that should fail
-if this is broken: setting `maxHomers: 3` should end the derby at 3 with the
-PERFECT DERBY celebration.*
+never changes the accuracy shown on the end screen and that coins tick up by
+2 per homer. The thing that should fail if this is broken: setting
+`maxHomers: 3` should end the derby at 3 with the PERFECT DERBY celebration.*
 
 ---
 
@@ -115,7 +121,7 @@ Then add one backstop regardless of what the audit finds:
   "What a session! Time for a break — your stuff is saved. 🎉". Never a
   freeze, never a lost run, no scolding about screen time.
 
-*Stop and report with the table. Test: set `maxRunMinutes: 0.2`, start any
+*Stop and report with the table. Test: set `maxRunMinutes` to 0.2, start any
 game, wait, confirm it ends and the earned XP still lands on Character Home.*
 
 ---

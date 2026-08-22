@@ -224,9 +224,9 @@ import {
 } from '../firebase-config.js';
 import {
   mountBar, requireKid, finishRun, celebrateLevelUp, describeAward,
-  sfx, confetti, confettiRain, celebrate, isGuestKid, loadCharacter,
+  sfx, confetti, confettiRain, celebrate, isGuestKid, loadCharacter, showScamperCard,
 } from '../assets/arcade-shell.js';
-import { SPRITES, RARITY, spriteId, SKINS, PETS } from '../assets/catalog.js';
+import { SPRITES, RARITY, spriteId, SKINS, PETS, displayRarity, encounterSpawn, dropsLeftToday } from '../assets/catalog.js';
 
 const GAME_ID = 'multiverse-collector';
 
@@ -285,7 +285,11 @@ const CONFIG = {
            doubleCoinSeconds: 8 },   // bigBag = 🛝 Big Trampoline
 
   // Sprite rarity odds for this game (fun game = common-heavy; mythic never drops here)
-  spriteOdds: { common: 0.80, rare: 0.15, epic: 0.045, legendary: 0.005 },
+  /* Which critter falls, and how rare, is no longer decided here: it
+     comes from the shared, level-gated roll in catalog.js
+     (encounterSpawn), so this game can never be a better farm than any
+     other. A caught critter is a PENDING capture until the timer runs
+     out — see captureCondition in the catalog. */
   maxSpritesPerRun: 3,             // cap so this can't out-farm the practice games
 
   // Rewards → finishRun units: 1 unit per coin bag, 2 per sprite, 1 per 150 score
@@ -331,6 +335,7 @@ let cheerPet = '';         // equipped pet cheers from the grass (cosmetic only)
 let best = 0;         // best score
 let bestPets = 0;     // best "pets safe" — the stat the results screen leads on
 let preCounts = {};   // the collection as it stood before this run, for NEW! / ×N
+let character = null; // the shared character — level, daily drops, focus — for encounter spawns
 
 kid = await requireKid({ gameName: 'Raining Cats and Dogs' });
 if (kid) {
@@ -341,11 +346,31 @@ if (kid) {
     bestPets = p?.bestPets || 0;
   }).catch(() => {});
   loadCharacter(kid.id).then((c) => {
+    character = c;
     const skin = SKINS.find((s) => s.id === c?.skin);
     if (skin && skin.g) kidFace = skin.g;
     const pet = PETS.find((p) => p.id === c?.pet);
     if (pet && pet.g) cheerPet = pet.g;
   }).catch(() => {});
+
+  // Leaving mid-run with a critter still in the bubble: it scampers off
+  // (nothing is granted until the timer runs out). Warm, never a
+  // penalty — and never a silent loss either.
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('.ac-bar a, .ac-bar button');
+    if (!link) return;
+    const live = state === 'playing' || state === 'countdown' || state === 'catchup';
+    if (!live || !spritesWon.length) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    const href = link.getAttribute('href');
+    showScamperCard({
+      onLeave: () => {
+        if (href) { window.location.href = href; return; }
+        sessionStorage.removeItem('arcade.currentKid');
+        window.location.href = new URL('../index.html#pick', import.meta.url).href;
+      },
+    });
+  }, true);
 }
 
 /* =====================================================================
@@ -442,14 +467,13 @@ function whoosh(){
 /* =====================================================================
    SPAWNING — what comes down out of the rain
    ===================================================================== */
-function rollSpriteRarity(){
-  const odds = CONFIG.spriteOdds;
-  let x = Math.random();
-  for (const r of ['legendary', 'epic', 'rare']) {
-    if (x < odds[r]) return r;
-    x -= odds[r];
-  }
-  return 'common';
+/** Critters still to be had today, minus the ones already pending or
+    falling in this run. Once it reaches zero, no critter spawns — never
+    spawn something that can't be kept. */
+function critterRoom(){
+  if (!character) return 0;
+  const falling = items.filter((it) => it.type === 'sprite').length;
+  return dropsLeftToday(character.drops) - spritesWon.length - falling;
 }
 
 function rollType(){
@@ -458,6 +482,7 @@ function rollType(){
   if (inStorm()) w.coinBag *= 3;
   const fallingSprites = items.filter((it) => it.type === 'sprite').length;
   if (spritesWon.length + fallingSprites >= CONFIG.maxSpritesPerRun) w.sprite = 0;
+  if (critterRoom() <= 0) w.sprite = 0;
   const total = Object.values(w).reduce((s, v) => s + v, 0);
   let x = Math.random() * total;
   for (const [type, weight] of Object.entries(w)) { x -= weight; if (x <= 0) return type; }
@@ -574,10 +599,13 @@ function makeGood(type){
   } else if (type === 'power') {
     it.power = pick(['magnet', 'bigBag', 'doubleCoin']);
   } else if (type === 'sprite') {
-    const rarity = rollSpriteRarity();
-    const pool = SPRITES.map((s, i) => ({ s, i })).filter((e) => e.s.r === rarity);
-    const chosen = pick(pool);
-    it.spriteIdx = chosen.i; it.rarity = rarity; it.emoji = chosen.s.g;
+    // The shared level-gated roll: only collection critters, only the
+    // kid's unlocked bands, Collection Focus and pity included, and
+    // null once today's cap is spent.
+    const pending = spritesWon.length + items.filter((x) => x.type === 'sprite').length;
+    const d = encounterSpawn(character, { pending });
+    if (!d) return makeGood('pet');
+    it.spriteIdx = d.index; it.rarity = d.rarity; it.emoji = d.sprite.g;
     it.chute = 'rainbow';
   }
   return it;
@@ -1428,7 +1456,9 @@ function updateHud(force){
   setText('scorePill', '⭐ ' + score.toLocaleString());
   setText('timerPill', String(Math.ceil(remaining())));
   setText('bagPill', '💰 ' + bagsCaught);
-  setText('spritePill', '✨ ' + spritesWon.length);
+  // The bubble: every pending capture rides on the HUD until the timer
+  // runs out and awardRun confirms it.
+  setText('spritePill', '🫧 ' + (spritesWon.length ? spritesWon.map((i) => SPRITES[i].g).join('') : '—'));
 
   const mult = comboMult();
   const comboPill = $('comboPill');
@@ -1504,8 +1534,8 @@ async function showResults(){
   const chips = $('resultsSprites');
   chips.innerHTML = '';
   $('resultsSpritesLabel').textContent = spritesWon.length
-    ? '✨ Special visitors:'
-    : '✨ No special visitors this time — the clouds are shy!';
+    ? '🫧 Caught and kept:'
+    : '✨ No critters this time — the clouds are shy!';
   const seenThisRun = {};
   spritesWon.forEach((i) => {
     const sp = SPRITES[i];
@@ -1514,7 +1544,7 @@ async function showResults(){
     const total = (preCounts[id] || 0) + seenThisRun[id];
     const chip = document.createElement('span');
     chip.className = 'mc-chip';
-    chip.style.borderColor = RARITY[sp.r].color;
+    chip.style.borderColor = RARITY[displayRarity(sp.r)].color;
     const face = document.createElement('span');
     face.textContent = `${sp.g} ${sp.n}`;
     const tag = document.createElement('span');
@@ -1542,9 +1572,13 @@ async function showResults(){
               + Math.floor(score / CONFIG.unitsPer.scorePer);
   const seconds = Math.round(CONFIG.runSeconds);
   $('awardLine').textContent = 'Saving…';
+  // Pending captures confirm HERE and only here: the run reached the
+  // timer (captureCondition), so awardRun grants them against today's
+  // cap and hands back `drops` for the shared reveal.
   const outcome = await finishRun(GAME_ID, {
     asked: 0, correct: 0, seconds, score, units,
-    sprites: spritesWon.map((i) => spriteId(i)),
+    captures: spritesWon.map((i) => spriteId(i)),
+    completed: true,
   });
   $('awardLine').textContent = describeAward(outcome);
   // Hitting the daily fun budget is good news about how much they've played,
@@ -1552,7 +1586,7 @@ async function showResults(){
   const cap = $('capLine');
   cap.classList.toggle('hidden', !outcome?.cappedByDailyFun);
   if (outcome?.cappedByDailyFun) {
-    cap.textContent = "You've earned today's fun-game coins! Practice games still pay 4× 🚀";
+    cap.textContent = "That's today's fun-game XP! Practice games still pay 4× 🚀";
   }
   celebrateLevelUp(outcome);
 }
@@ -1593,7 +1627,7 @@ function startRun(){
   // Snapshot the collection as it stands now, so the results screen can tell
   // a first-ever sprite (NEW!) from a duplicate. Re-read every run, because
   // the run before this one may have just added to it.
-  if (kid) loadCharacter(kid.id).then((c) => { preCounts = { ...(c?.counts || {}) }; }).catch(() => {});
+  if (kid) loadCharacter(kid.id).then((c) => { character = c; preCounts = { ...(c?.counts || {}) }; }).catch(() => {});
   $('ready').classList.add('hidden');
   $('results').classList.add('hidden');
   $('stage').classList.remove('hidden');

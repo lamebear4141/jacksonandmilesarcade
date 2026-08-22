@@ -4,6 +4,7 @@
    Loot is only yours if you finish at or above the extraction line.
    ===================================================================== */
 import { CONFIG, RARITY, luckScore, rollRarity } from './config.js';
+import { displayRarity, clampRarity } from '../../assets/catalog.js';
 import { buildRound } from './content.js';
 import * as S from './state.js';
 import * as Speech from './speech.js';
@@ -44,8 +45,7 @@ function currentItem(R){
 function luckFor(R){
   return luckScore({
     accuracy: accuracy(R),
-    dayStreak: S.dayStreak(R.profile),
-    minutesToday: S.minutesToday(R.profile) + (Date.now() - R.startedAt) / 60000,
+    practicePower: R.profile.practicePower || 0,
   });
 }
 
@@ -324,7 +324,11 @@ function showLearnCard(R, item){
 function lootChest(R, multiplier){
   const luck = luckFor(R);
   for (let i = 0; i < multiplier; i++){
-    const rarity = rollRarity(luck);
+    // mythic folds into legendary at the roll boundary, and the roll
+    // clamps down to the kid's unlocked band (RARITY_UNLOCK) — luck is
+    // never wasted, and "not high enough" is never said. In-round
+    // chests are exempt from the daily drop cap on purpose.
+    const rarity = clampRarity(displayRarity(rollRarity(luck)), S.levelInfo(R.profile).level).rarity;
     const index = S.pickSpriteOfRarity(rarity);
     const sprite = S.SPRITES[index];
     R.backpack.push({ index, sprite, rarity });
@@ -396,16 +400,18 @@ function finish(R, afterReboot){
   const day = S.ensureDay(p);
 
   let xp = R.correct * CONFIG.xpPerCorrect + Math.round(seconds / 60 * CONFIG.xpPerMinutePlayed);
-  let coins = 0;
+  // A round pays no coins at all now (E4) — extracting, sprite rarity and
+  // levelling all pay XP, and the coins come from the mini-game that a
+  // successful extract unlocks. Kept as a variable so the result screen
+  // and the character sync keep the same shape.
+  const coins = 0;
   let won = [];
 
   if (extracted){
     xp += CONFIG.xpExtractBonus;
-    coins += CONFIG.coinsPerExtract;
     R.backpack.forEach(b => {
       const res = S.grantSprite(p, b.index);
       xp += RARITY[b.rarity].xp;
-      coins += RARITY[b.rarity].coins;
       won.push({ ...b, isNew: res.isNew });
     });
   } else {
@@ -413,7 +419,6 @@ function finish(R, afterReboot){
   }
 
   const levelsGained = S.addXp(p, xp);
-  p.coins += coins;
 
   // daily + lifetime bookkeeping
   day.seconds += seconds; day.rounds++; day.attempted += R.attempted; day.correct += R.correct;

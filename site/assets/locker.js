@@ -1,8 +1,15 @@
 /* =====================================================================
    LOCKER — equip what you own, browse what you've collected.
    Buying happens in the SHOP tab; this tab never moves coins.
+
+   The collection grid is the flat view of every LIVE sprite (the 80 that
+   belong to a collection) in its three-state form — hidden, silhouette,
+   owned — from the same spriteState() every other screen uses. The
+   Collections tab is the curated view of the same counts.
    ===================================================================== */
-import { SKINS, PETS, SPRITE_IDS, RARITY, RARITY_ORDER } from './catalog.js';
+import {
+  SKINS, PETS, LIVE_SPRITE_IDS, RARITY, DISPLAY_RARITY_ORDER, spriteState, uniqueLiveCount,
+} from './catalog.js';
 import { equipItem } from '../firebase-config.js';
 import { el, sectionTitle, spriteChip, toast } from './widgets.js';
 
@@ -15,14 +22,14 @@ export async function renderLocker(panel, ctx) {
   panel.append(sectionTitle('MY PETS'));
   panel.append(ownedGrid(ctx, 'pet', PETS.filter((p) => c.ownedPets.includes(p.id)), c.pet));
 
-  const unique = SPRITE_IDS.filter((id) => (c.counts[id] || 0) > 0).length;
-  panel.append(sectionTitle(`COLLECTION · ${unique}/${SPRITE_IDS.length}`));
+  const unique = uniqueLiveCount(c.counts);
+  panel.append(sectionTitle(`COLLECTION · ${unique}/${LIVE_SPRITE_IDS.length}`));
 
   // Legend colours come from the --rar-* skin tokens, not catalog hexes.
-  const RAR_TOKEN = { common: '--rar-common', rare: '--rar-rare', epic: '--rar-epic',
-                      legendary: '--rar-legend', mythic: '--rar-mythic' };
+  // Four tiers: mythic folds into legendary everywhere a kid looks.
+  const RAR_TOKEN = { common: '--rar-common', rare: '--rar-rare', epic: '--rar-epic', legendary: '--rar-legend' };
   panel.append(el('div', { class: 'ac-rarity-legend' },
-    ...RARITY_ORDER.map((r) => {
+    ...DISPLAY_RARITY_ORDER.map((r) => {
       const chip = el('span', { class: 'ac-rarity-key', text: RARITY[r].name });
       chip.style.color = `var(${RAR_TOKEN[r]})`;
       return chip;
@@ -30,11 +37,13 @@ export async function renderLocker(panel, ctx) {
   ));
 
   const grid = el('div', { class: 'ac-sprites' });
-  for (const id of SPRITE_IDS) grid.append(spriteChip(id, { count: c.counts[id] || 0 }));
+  for (const id of LIVE_SPRITE_IDS) {
+    grid.append(spriteChip(id, { count: c.counts[id] || 0, state: spriteState(id, c) }));
+  }
   panel.append(grid);
 
   if (unique === 0) {
-    panel.append(el('p', { class: 'ac-sub', text: 'Win sprites by playing Loot Drop — every drop is a chance at a rare one!' }));
+    panel.append(el('p', { class: 'ac-sub', text: 'Play well and critters find you — every great run is a chance at a rare one!' }));
   }
 }
 

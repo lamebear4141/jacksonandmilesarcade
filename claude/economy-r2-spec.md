@@ -1,16 +1,17 @@
 # Release 2 — The Game Economy (spec + bug log)
 
-**v2, Aug 21, 2026** — rewritten after AJ's economy proposal. Replaces the
-three-pillar/coins model. Supersedes the coin decisions in `decisions-log.md`
-§"Design — the three-pillar economy" and `claude/my-world-spec.md` §1.
+**v3, Aug 22, 2026** — the settled model, after AJ's three-currency proposal
+and two decisions: the Box renders as an **isometric diorama first** (walking
+later), and the 12 named bedtime critters **fold into the main collections**.
+Supersedes v1/v2 of this file and the coin decisions in `decisions-log.md`.
 
-Related: `claude/my-world-spec.md` (the spend surface),
-`claude/collections-spec.md` (sets, badges, trades),
-`claude/wallet-foundation-w0-prompt.md` (earning — run first),
-`claude/critter-catchers-v2-prompt.md`, `claude/math-baseball-prompt.md`.
+Prompts: `claude/r2a-bugfix-prompt.md` (bugs + Home Run Derby),
+`claude/r2b-collection-economy-prompt.md` (collections, drops, coins faucet,
+trades), `claude/r2c-live-counter-prompt.md` (live counter). The Box gets its
+own prompt (W1) after R2B lands.
 
-Prompts: `claude/r2a-bugfix-prompt.md`, `claude/r2b-collection-economy-prompt.md`,
-`claude/r2c-live-counter-prompt.md`.
+Status: **W0 (wallet foundation) has been run** — resources and energy are
+accruing. W0 never touched coins, so it stands as-is under this model.
 
 ---
 
@@ -18,234 +19,253 @@ Prompts: `claude/r2a-bugfix-prompt.md`, `claude/r2b-collection-economy-prompt.md
 
 ```
 🧠 LEARN games ──► XP + 🧱 RESOURCES ─┐
-                                      ├──► spend BOTH ──► skins · pets · My World
+                                       ├──► spend BOTH ──► 📦 THE BOX
 🎮 PLAY  games ──► XP + ⚡ ENERGY     ─┘
 
-either type, played well ──► 🎲 CRITTER ──► LOCKER ──► trade with family
-                                               └──► complete a SET ──► 🏆 STATUE
+great run ──► 🎰 BONUS MINI-GAME ──► 🪙 COINS ──► avatar skins · pets
+box visits ──► 👍 COMPLIMENTS ──────► 🪙 COINS ─┘
 
-XP ──► LEVEL ──► unlocks more to buy AND more critters to find
+any game, played well ──► 🐾 CRITTER ──► LOCKER ──► trade with family
+                                            └──► complete a COLLECTION
+                                                    └──► badge + statue (no price)
+
+XP ──► LEVEL ──► unlocks shop items + new critters into the wild
 ```
 
-**Two currencies, one ladder, and luck.** That's the whole system.
+| Currency | Earned by | Spent on | Character |
+|---|---|---|---|
+| 🧱 Resources | Learning games — "your job" | The Box (always with ⚡) | The steady wage |
+| ⚡ Energy | Fun games — recharging | The Box (always with 🧱) | Daily-capped balance |
+| 🪙 Coins | Bonus mini-games after a great run; compliments on your Box | Avatar skins, appearance, pets | The bonus check |
+| ⭐ XP | Any game, any time | Nothing — it's the level ladder | Time in the system |
+| 🐾 Critters | Encounters, rewards, reading, trades | Never bought, never spent | Luck + persistence |
+| 🏆 Badges & statues | Completing a collection | — | Cannot be bought at any price |
 
-- **🧱 Resources** come only from learning games. **⚡ Energy** comes only from
-  fun games. **Every purchase costs both** — skins, pets, and everything in My
-  World. Grind only math and you run out of energy to build with; play only fun
-  games and you run out of materials. Nobody has to enforce "do both."
-- **Critters cannot be purchased at any price, in any currency, ever.** They're
-  found by playing either kind of game and succeeding. This is the one thing
-  money can't touch, which is what makes trading matter.
-- **XP is the single ladder.** Both game types pay it. Leveling up unlocks more
-  items in the shop *and* more critters into the wild.
+**Every sink has exactly one lane.** Work builds your home. Play keeps you
+balanced. Excellence funds your self-expression. Generosity gets rewarded.
+Achievement gets a trophy that money can't touch.
 
-### 1.1 Coins are retired
+### 1.1 Nothing crosses over
 
-**Decision (AJ, Aug 21): coins are removed entirely.** Every price becomes
-resources + energy. Existing balances convert once, at a rate set after Claude
-Code reports what the boys actually hold.
+Resources and energy buy Box items only, always in combination. Coins buy
+avatar items only. No currency converts to any other. Nothing buys a critter.
+Nothing buys a badge or statue. Enforce in code, not by remembering: there must
+be no function that turns one of these into another.
 
-This also **deletes the sequencing constraint** that was blocking work: the old
-model needed coins to move from games to the social loop, which couldn't happen
-until My World's friend-visiting existed, or the Shop would be stranded with no
-way to earn. With one earn path feeding every sink, that ordering problem is
-gone. High-fives and world visits will pay XP (and later, small resource/energy
-bonuses) rather than a third currency.
+### 1.2 The coin faucet
 
-### 1.2 Nothing crosses over
+Coins stop being a per-run payout and become a **bonus**:
 
-Resources can't buy energy. Energy can't buy resources. Neither buys a critter.
-Nothing buys a statue. The moment any of these becomes purchasable with
-another, the balance mechanic dies and it all collapses into one currency with
-several names. Enforce this in code, not by remembering.
+- **The Bonus Vault** — a shared ~10-second mini-game that appears after any
+  qualifying run in any game (same thresholds as critter drops, §3.3). Three
+  vaults shimmer; a timing tap cracks one open for 5–15🪙 by accuracy. It
+  always pays at least the floor — there is no losing the bonus round.
+- **Bespoke bonus rounds** replace the Vault in games that earn one over time
+  and pay more. The **Home Run Derby is the first** (2🪙 per homer).
+- **Compliments** on your Box (§5.2), capped and bonus-sized.
+- Daily coin cap, same reset pattern as energy.
 
----
-
-## 2. Prices, and the thing that changed
-
-The Shop and My World now draw from the **same pot**, where the old price tiers
-assumed the world was the only sink. Left alone, a "dream" item goes from ~2
-weeks to 3–4, which is past what a 1st grader will hold in his head. **Fix it by
-lowering prices, not raising earn rates** — inflating income makes resources
-stop feeling scarce, which is the whole motivation.
-
-| Tier | Example | Cost |
-|---|---|---|
-| Small | bush, fence, path tile | 15🧱 + 8⚡ |
-| Medium | tent, dog house, small pond, a **pet** | 60🧱 + 30⚡ |
-| Large | house, treehouse, barn, a **skin** | 200🧱 + 100⚡ |
-| Dream | roller coaster, castle | 500🧱 + 250⚡ |
-
-Reference earn rate: a good learn run (20 correct) ≈ 40🧱; daily energy cap is
-60⚡. So medium ≈ a day, large ≈ 4 days, dream ≈ 2 weeks of balanced play.
-
-Skins and pets slot into the same ladder as world items deliberately — a kid
-choosing between a new pet and a treehouse is a real decision, and real
-decisions are the point.
+Shop prices for skins and pets are **unchanged** — the existing coin prices and
+level gates stand. Calibration rule for the transition: Vault payouts are tuned
+so a typical day's coin income lands within ~±30% of what the boys earn today,
+measured before changing anything (R2B / E4 reports it first).
 
 ---
 
-## 3. Critters
+## 2. Critters: 80, in 8 collections
 
-### 3.1 Found, never bought
+### 2.1 The collections
 
-One shared drop roll in the award path, firing for **every** game:
+Eight collections of exactly 10, each with the rarity shape
+**5 common / 3 rare / 1 epic / 1 legendary** — so there are eight legendaries
+in the world, each the named crown of its collection.
 
-- **Qualifying run:** learn games ≥ 80% accuracy (the existing clear-bonus
-  line); fun games at a per-game milestone (`GAMES[id].dropUnits`).
-- 1 roll per qualifying run, +1 at 100% accuracy or 2× the milestone.
-- **Daily cap 4** per kid, so a rainy Saturday can't devalue the collection.
-  Loot Drop's chests are unchanged and don't consume the cap — it's the daily
-  habit game and stays the biggest source by design.
-- Hitting the cap is never a wall: "Tomorrow's critters are already waking up
-  🌙" — never "limit reached", never a lock icon.
+| Collection | Icon | Badge (the brag) | Statue for the Box |
+|---|---|---|---|
+| Dinosaurs | 🦖 | Dino Ranger | Fossil Skeleton |
+| Farm Animals | 🚜 | Ranch Boss | Big Red Barn |
+| Bugs | 🐞 | Master Bug Catcher | Giant Ladybug |
+| Sea Creatures | 🌊 | Marine Biologist | Whale Fountain |
+| Fantasy | 🦄 | Legend Keeper | Crystal Castle |
+| Space Invasion | 🛸 | Galaxy Defender | Crashed UFO |
+| Jungle | 🌴 | Jungle Explorer | Ancient Temple |
+| Safari | 🦁 | Safari Guide | Watering Hole |
 
-**Both game types drop at the same rate.** The learn/play balance rests entirely
-on resources vs energy. If reading and math should feel luckier, the lever is
-`dropUnits` and per-game roll counts — not exclusivity.
+Future seasonal collections (Halloween, Christmas) append later — the
+architecture already supports a `season` field.
 
-### 3.2 Level gates the wild
+**Rarities collapse from five to four.** Mythic folds into legendary — a
+display-and-roll change; stored rarity values on existing sprites are not
+edited.
 
-**Rarity is unlocked by level**, not just rolled:
+### 2.2 The migration rule
 
-| Rarity | Available from |
+`SPRITES` is index-locked and the boys already own critters, so the
+restructure works by **membership, not by rewriting the array**: collections
+are lists of sprite ids. Existing sprites map into the new collections by theme
+(🦖🦕 → Dinosaurs, 🐬🦈🐙 → Sea Creatures, 👽🤖🧑‍🚀 → Space Invasion…); new
+sprites are appended only to fill each collection to 10. Nobody loses anything
+caught, and a kid who already owns the shark gets Sea Creatures credit on day
+one. Existing oddball sprites that fit no theme stay unaffiliated flavor —
+still catchable, still tradeable, just not in a collection.
+
+**The 12 named bedtime critters fold in** (decision, Aug 22): Pip, Mo, Wren,
+Sprout, Luna, Bram, Puddle, Ziggy, Nova, Willow, Sir Biscuit, and Twinkle are
+appended as ordinary sprites, keep their names, and are assigned to whichever
+collection fits (Ziggy the Dragon and Nova the Unicorn → Fantasy, Sir Biscuit →
+Farm Animals, …). No exclusivity — same pool as everything else.
+
+### 2.3 Level gates the wild
+
+| Rarity | Findable from |
 |---|---|
 | common | Level 1 |
-| rare | Level 4 |
-| epic | Level 8 |
-| legendary | Level 12 |
-| mythic | Level 16 |
+| rare | Level 3 |
+| epic | Level 7 |
+| legendary | Level 11 |
 
-A roll above your unlocked band **clamps down** to the highest band you have —
-you never "waste" luck, you just can't exceed your level yet. Per-sprite
-`unlockLevel` overrides the band default when a specific critter should arrive
-earlier or later.
+A roll above the kid's unlocked band **clamps down** to the highest band they
+have — luck is never wasted, and "you weren't high enough" is never shown.
+Crossing a threshold makes level-up the biggest moment in the game:
+**"🎉 NEW CRITTERS ARE OUT THERE!"** with silhouettes of what's now findable.
 
-This fixes a real problem in the old design: a Level 2 kid rolling a mythic made
-the whole ladder meaningless, and the pity timer was a bandage over it. Now
-**every level-up is a reward moment** — "🎉 3 NEW CRITTERS ARE OUT THERE!" with
-their silhouettes — which beats any number going up.
+Tuning target (verified in the balance pass): rare within the first week, epic
+within a month, legendary a real but *visible* horizon — if legendary means
+"next school year" for a 1st grader, the curve is wrong, not the kid.
 
-Pity timer still applies *within* the unlocked bands: 8 qualifying runs with no
-epic-or-better (once epic is unlocked) guarantees rare+ on the next roll.
+### 2.4 The three states
 
-### 3.3 The three states
-
-Every critter in the Locker and the Collections tab renders in exactly one of
-three states. This is the whole progression, visible at a glance:
+Everywhere critters render — Locker, Collections, trade builder, reveals:
 
 | State | When | Renders as |
 |---|---|---|
-| **Hidden** | your level hasn't unlocked its rarity | an empty slot — no shape, no name, no rarity |
-| **Silhouette** | unlocked and findable, not yet caught | the shape in solid dark on a lighter tile, name `???`, rarity ring visible |
-| **Full colour** | caught | the critter, its name, rarity ring, duplicate count |
+| **Hidden** | level hasn't unlocked its rarity | empty slot — no shape, no name |
+| **Silhouette** | findable, not yet caught | dark shape on a light tile, name `???`, rarity ring shown |
+| **Full colour** | caught | critter, name, rarity ring, duplicate count |
 
-Hidden slots still **count toward the totals** — a set card reads "3 / 7" and
-the four unknown slots sit there as plain tiles. The kid knows how many are
-left, not what they are. Sprites are emoji, so the silhouette is
-`filter: brightness(0)` at ~0.55 opacity on a light tile; check contrast in both
-themes, and never let a silhouette read as a rendering bug.
+Hidden slots still count toward totals ("3 / 10") so the kid knows how many
+remain, not what they are.
 
-### 3.4 Critter Catchers joins the main collection
+### 2.5 Four ways to get a critter
 
-Its twelve named critters (Pip, Luna, Ziggy, Twinkle…) are **appended to
-`SPRITES` as ordinary critters** — same pool, same rarities, same level gates,
-findable in any game like everything else. No exclusivity flag.
+1. **Encounters** (spatial games — Multiverse Collector, Harvest Night, future
+   runners): the critter appears *in* the gameplay. Touching it puts it in a
+   bubble on the HUD — a **pending capture** that confirms only when the run
+   ends successfully through the normal award path. Quitting mid-run releases
+   it: "It scampered off — it's still out there! 🌿" Never punishing, and it
+   kills farming the first ten seconds of a course.
+2. **Reward rolls** (question games — Loot Drop, Math Defender, Math Baseball,
+   Coin Climb): a qualifying run (§3.3 thresholds) rolls a random critter at
+   the end.
+3. **Reading** (Critter Reader): pick any *unlocked* critter and read it
+   bedtime stories — common 1 night, rare 3, epic 6, legendary 10, one star
+   per calendar day. The slow, guaranteed road next to play's fast, random
+   road. The only place in the arcade where you choose your critter.
+4. **Trading** (siblings now, approved friends later): structured, tap-only,
+   never your last copy. Trading legitimately bypasses level gates — a
+   received legendary renders in full colour at any level. That's the reward
+   for having a generous brother.
 
-The bedtime star quest survives with a **new and better job**: it's the one
-place in the arcade where you can **aim at a specific critter.** Everywhere else
-is luck; here you pick Twinkle and read to her over fifteen nights. That's a
-genuinely distinct role, it keeps the game's characters meaningful, and it gives
-a kid stuck one critter short of a set something to actually *do* about it.
+Each game declares exactly one acquisition mode in the catalog. Encounters and
+reward rolls share the same daily cap (4/kid) and the same level-gated pool, so
+neither is a strictly better farm.
 
-- Star progress moves to the character doc so it survives switching iPads.
-- Completing a quest grants the sprite through the normal award path.
-- A star for an already-owned critter grants **+1 spare** — trade goods.
+### 2.6 Completion — the things with no price
 
-### 3.5 Sets, and the thing with no price
-
-Per `collections-spec.md`: every completed set grants a badge, an avatar unlock,
-and a **statue** — 2×2, animated, `buyable: false`, never listed in any shop at
-any price. Completing **all** sets grants the Grand Prize: 🎢 Sky Coaster
-Island, 3×3, the only one of its kind.
+Completing a collection grants the **badge** (displayed on the profile and
+visible to visitors — the brag), an avatar accessory, and the **statue**: 2×2,
+animated, `buyable:false`, never listed in any shop. Completing **all eight**
+grants the Grand Prize: 🎢 Sky Coaster Island, 3×3, the only one in existence.
 
 ---
 
-## 4. Bug / polish log
+## 3. Drops machinery (shared by modes 1 and 2)
+
+- **Qualifying:** learn games ≥ 80% accuracy; fun games at a per-game
+  milestone (`GAMES[id].dropUnits`). +1 bonus roll at 100% or 2× milestone.
+- **Daily cap 4** per kid. Loot Drop's in-round chests are unchanged and
+  exempt — it stays the daily habit game — but its pool respects level gates.
+- **Pity:** 8 qualifying runs without epic+ (once epic is unlocked) guarantees
+  rare+ next roll.
+- **Collection Focus:** the kid's chosen collection pulls a share of rolls
+  toward its missing, unlocked members — after the rarity roll, never
+  inflating it.
+- Cap language is always tomorrow-flavored: "Tomorrow's critters are already
+  waking up 🌙" — never "limit reached."
+
+---
+
+## 4. Bug / polish log (unchanged from v2 except derby payout)
 
 | # | Game | Issue | Fix | Where |
 |---|---|---|---|---|
-| 1 | Math Baseball | No upper bound on a great inning | Cap at 10 runs → **Home Run Derby** | R2A |
-| 2 | Math Defender | Unverified that a perfect run terminates | Audit all games + global safety cap | R2A |
+| 1 | Math Baseball | No upper bound on a great inning | 10-run cap → **Home Run Derby**, paying 🪙 **coins** (2/homer) — the first bespoke bonus mini-game | R2A |
+| 2 | All games | Unverified that perfect runs terminate | Audit + `SAFETY.maxRunMinutes: 45` backstop | R2A |
 | 3 | Math Baseball | Shows EASY/MEDIUM/HARD though difficulty comes from the profile | Remove all tier language from kid-facing UI | R2A |
-| 4 | Critter Catchers | Private dex, disconnected from the Locker | Merge into the main collection | R2B / E3 |
-| 5 | All games | Doing well pays nothing collectible | Universal critter drop | R2B / E2 |
-
-### 4.1 Home Run Derby
-
-Three outs still ends a normal game. Reaching `runCap` (10) ends the inning
-early and opens the Derby, framed as the crowd demanding it.
-
-- No questions — the only input is the swing.
-- **A home run continues. Anything else ends it.** Faster every homer, both the
-  flight time and the contact window shrinking to a floor, so it provably ends.
-- **One mulligan** — the first non-homer is forgiven once. Ending a 10-run
-  masterpiece on a single bad swing is exactly the feeling this project avoids.
-- Cap at 100 homers → "PERFECT DERBY 💯".
-- **Derby homers pay ⚡ energy, not 🧱 resources**, and never touch `correct` or
-  `accuracy`. Resources stay welded to right answers so no amount of swinging
-  can farm the learning currency.
-
-### 4.2 Terminating-condition audit
-
-Every game must end for a kid who never misses. Expected: Math Defender (20
-questions / 60s), Coin Climb (15 correct / 60s), Loot Drop (5 questions),
-Critter Catchers (pages), Math Baseball (3 outs, now + run cap) all bounded;
-Multiverse Collector and Block Stacker endless by design and needing a graceful
-cap. Ship a `SAFETY.maxRunMinutes: 45` backstop regardless — full credit, warm
-message, never a freeze.
+| 4 | Critter Catchers | Private dex, disconnected from the Locker | Becomes **Critter Reader**, feeding the main collection | R2B |
+| 5 | All games | Doing well pays nothing collectible | Encounters + reward rolls | R2B |
 
 ---
 
-## 5. The live counter
+## 5. The Box
 
-Public aggregate count of who's playing now. Prompt:
-`claude/r2c-live-counter-prompt.md`.
+Each kid starts with an empty **isometric diorama** — a 3D-looking room/yard
+with a fixed camera and a placement grid (decision, Aug 22: diorama first,
+walkable avatar later, free camera maybe never). The economy is identical
+regardless of renderer, so the renderer never blocks the economy.
 
-- **"3 KIDS IN THE ARCADE"** plus a detail line from what they're doing
-  ("1 catching critters · 1 out in the corn").
-- **Never renders a zero** — at zero it shows all-time totals instead.
-- Aggregate only: no uid, childId, nickname, or location on a public surface.
-- Guests need `signInAnonymously` to pass the presence write rules, or it
-  silently undercounts every cousin.
-- Structurally decoration: every failure mode degrades and never blocks a game.
+### 5.1 Building
+
+Everything costs 🧱 + ⚡ in combination. Tiers: small 15🧱+8⚡ · medium
+60🧱+30⚡ · large 200🧱+100⚡ · dream 500🧱+250⚡ (houses, furniture, cars,
+sports gear, pools, rides). Placement, moving, and re-arranging are always
+free — buying is the spend, creativity is not. Statues and the Grand Prize
+place like any item but can never be bought.
+
+### 5.2 Visiting and compliments
+
+Siblings (later: parent-approved friends) can visit each other's Boxes and
+compliment them — **structured reaction buttons only** ("🔥 SO COOL!",
+"🏗️ GREAT BUILD!", "😂 THAT'S FUNNY!"), never free text, per the standing
+privacy rules.
+
+The anti-money-printer bounds, all of them load-bearing:
+
+- Only the **first compliment per visitor per day** pays the owner (10🪙,
+  minted by the system — the visitor spends nothing).
+- The **visitor** earns a small capped "good friend" XP bonus, so visiting is
+  rewarded without complimenting becoming a job.
+- Repeat compliments on an **unchanged** Box pay nothing new — "Come back when
+  they've built something new!" — which quietly rewards kids for iterating.
+- Compliment income counts against the daily coin cap. Coins from play are the
+  wage; compliments are the tip jar. With two kids, one brother's income can
+  never depend on the other's mood.
 
 ---
 
 ## 6. Sequencing
 
-1. **W0 — wallet foundation.** Resources and energy start accruing.
-   (Its note about coins moving to the Create pillar is superseded by §1.1 —
-   the code it asks for is still exactly right.)
-2. **R2A — bug fixes.** Independent; any time.
-3. **R2C — live counter.** Independent; any time.
-4. **R2B — the collection economy**, E1–E6, including retiring coins.
-5. **My World W1 — Build Mode.** The spend surface. Its own prompt, bigger than
-   everything above combined.
+1. ~~W0 — wallet foundation~~ **done.**
+2. **R2A** — bugs + Derby (paying coins). Independent; next.
+3. **R2C** — live counter. Independent; any time.
+4. **R2B** — collections restructure, drops + encounters, Critter Reader, the
+   coin faucet, trades. Phase E1 stops for AJ's approval of the full
+   80-critter roster before anything is written.
+5. **W1 — the Box** (isometric diorama, build/buy/place, visiting +
+   compliments). Own prompt after R2B lands.
 
 ---
 
 ## 7. Open questions
 
-1. **Coin conversion rate** — set it after Claude Code reports the boys' actual
-   balances. A generous rate makes them instantly rich and skips the first week
-   of the new economy.
-2. **Level gates vs. sets.** With rarity gated by level, low-level kids can't
-   complete sets containing legendaries. Intended — but watch whether Miles
-   reads it as unfair rather than as a goal.
-3. **Do learn and fun games really drop at the same rate**, or should reading
-   and math be luckier? (Lever: `dropUnits` and rolls per run.)
-4. **What the social loop pays** once My World lands — XP only, or small
-   resource/energy bonuses? No third currency either way.
-5. **Squad code width.** At 93 sprites the 4-bit code hits ~74 chars; R2B takes
-   the 1-bit fix with a version prefix.
+1. Rename "Critter Catchers" → "Critter Reader" in kid-facing copy? (Folder
+   and game id stay regardless.)
+2. Exact XP curve to Level 11 at the boys' real play rates — R2B's balance
+   phase reports it; adjust `RARITY_UNLOCK` rather than XP rates if legendary
+   is too far.
+3. Vault payout calibration — set after E4 reports current real coin
+   income/day.
+4. Which existing unaffiliated sprites join collections vs stay flavor — AJ
+   approves the roster table in E1 before it's written.
+5. Seasonal collections (Halloween first?) — architecture ready, content
+   later.

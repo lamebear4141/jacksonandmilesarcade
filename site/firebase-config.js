@@ -21,6 +21,12 @@ import {
 import {
   ECONOMY, GAMES, SKINS, PETS, levelFromXp, spriteId, spriteIndex,
   computeAward, clampFunAward, computePillarAward, collectionScoreFromCounts, todayKey,
+  COLLECTIONS, GRAND_PRIZE, newlyCompletedCollections, uniqueLiveCount, isBuyable,
+  dropRolls, rollDrops, confirmCaptures, freshDrops, luckScore,
+  starsNeededFor, BEDTIME_SPRITE_IDS, inCollection,
+  clampDailyCoins, vaultOpens, VAULT, vaultZone,
+  tradeSideProblem, tradeTally,
+  PRACTICE_POWER, practicePowerNow, practicePowerAfterRun, runQualifies,
 } from './assets/catalog.js';
 
 const firebaseConfig = {
@@ -357,11 +363,36 @@ export function blankCharacter() {
     counts: {},                       // sprite id -> how many, e.g. { s12: 3 }
     dayStreak: 0, lastPlayed: null,
     dailyFun: { date: todayKey(), xp: 0, coins: 0 },
+    // Every coin from every source counts against one cap (E4): the
+    // Bonus Vault, a bespoke bonus round, and later Box compliments.
+    dailyCoins: { date: todayKey(), total: 0 },
     // The pillar wallet: 🧱 from Learn games, ⚡ from Play games. Kept
     // beside xp/coins rather than replacing them — see PILLAR_ECONOMY.
     wallet: { bricks: 0, sparks: 0, dailySparks: { date: todayKey(), total: 0 } },
     lifetime: { runs: 0, correct: 0, attempted: 0, seconds: 0, byGame: {} },
     claimedStreakGifts: [],
+    // Collections (R2B · E1). Completion itself is never stored — it is
+    // derived from counts — only what completing GRANTED is:
+    badges: [],          // completed collection ids, e.g. ['dinosaurs']
+    worldItems: {},      // statues queued for the Box: { 'fossil-skeleton': 1 }
+    avatarUnlocks: [],   // studio accessories granted by badges
+    // Finding critters (E2): today's drop count against DROPS.dailyCap,
+    // the pity counter, and the collection the kid is aiming luck at.
+    drops: { date: todayKey(), count: 0, sinceEpic: 0 },
+    focusCollection: null,
+    // Critter Reader (E3): bedtime stars per sprite and the day the last
+    // one was earned. On the character, not in localStorage, so a
+    // ten-night quest survives switching iPads.
+    critterStars: {},      // { s77: 2 }
+    starDay: null,         // 'YYYY-MM-DD' — one star per calendar day
+    ccMigrated: false,     // the old local dex has been folded in, once
+    // Practice Power (E7): the one number here that can go DOWN. Rises
+    // on a day the child practises, decays gently when they stop. Never
+    // touches xp, level, counts, badges or coins — progress ratchets,
+    // form decays. Read it through practicePowerNow(), which applies the
+    // decay since powerDay rather than trusting the stored value.
+    practicePower: 0,
+    powerDay: null,
   };
 }
 
@@ -377,10 +408,183 @@ function healCharacter(c) {
   out.lifetime   = { ...blank.lifetime, ...(c?.lifetime || {}) };
   out.lifetime.byGame = { ...(c?.lifetime?.byGame || {}) };
   out.dailyFun   = { ...blank.dailyFun, ...(c?.dailyFun || {}) };
+  out.dailyCoins = { ...blank.dailyCoins, ...(c?.dailyCoins || {}) };
   out.wallet     = { ...blank.wallet, ...(c?.wallet || {}) };
   out.wallet.dailySparks = { ...blank.wallet.dailySparks, ...(c?.wallet?.dailySparks || {}) };
+  out.badges        = Array.isArray(c?.badges) ? c.badges.slice() : [];
+  out.worldItems    = { ...(c?.worldItems || {}) };
+  out.avatarUnlocks = Array.isArray(c?.avatarUnlocks) ? c.avatarUnlocks.slice() : [];
+  out.drops         = { ...blank.drops, ...(c?.drops || {}) };
+  out.focusCollection = COLLECTIONS.some((x) => x.id === c?.focusCollection) ? c.focusCollection : null;
+  out.practicePower = Math.max(0, Math.min(PRACTICE_POWER.max, Number(c?.practicePower) || 0));
+  out.powerDay      = c?.powerDay || null;
+  out.critterStars  = { ...(c?.critterStars || {}) };
+  out.starDay       = c?.starDay || null;
+  out.ccMigrated    = !!c?.ccMigrated;
   out.level      = levelFromXp(out.xp || 0).level;
   return out;
+}
+
+/* =======================================================================
+   CRITTER READER — one bedtime star a day.
+
+   Computed against the character as it really is at write time, then
+   folded into awardRun's single write. Completing a quest grants the
+   sprite down the same path Loot Drop's loot takes (counts increment),
+   which is what makes it land in the Locker with the full reveal and
+   fire the collection-completion check.
+
+   On completion the star count RESETS to zero: the quest can be run
+   again for a spare, which is the whole "read it again for a trade
+   good" idea. A quest on a critter the kid already owns is therefore
+   just another lap — it grants a duplicate, never nothing.
+   ======================================================================= */
+function critterStarGrant(character, spriteId, day) {
+  const none = { earned: false, spriteId: null, stars: 0, needed: 0, complete: false, granted: false, isNew: false, alreadyToday: false };
+  if (!spriteId || !inCollection(spriteId)) return { ...none, update: {} };
+  if (character.starDay === day) {
+    // Already tucked one in today. The story still counts (XP is paid by
+    // the normal award); the star simply waits for tomorrow.
+    return { ...none, spriteId, stars: character.critterStars?.[spriteId] || 0,
+             needed: starsNeededFor(spriteId), alreadyToday: true, update: {} };
+  }
+  const needed = starsNeededFor(spriteId);
+  const stars = (character.critterStars?.[spriteId] || 0) + 1;
+  const complete = stars >= needed;
+  const isNew = !((character.counts?.[spriteId] || 0) > 0);
+  const update = {
+    'character.starDay': day,
+    [`character.critterStars.${spriteId}`]: complete ? 0 : stars,
+  };
+  if (complete) update[`character.counts.${spriteId}`] = increment(1);
+  return { earned: true, spriteId, stars, needed, complete, granted: complete, isNew, alreadyToday: false, update };
+}
+
+/**
+ * Fold the old local Critter Catchers dex into the character, once.
+ *
+ * `dex` is { pip:{n:3}, luna:{...} } and `stars` is { pip:2 } straight
+ * out of the game's localStorage save. Collected critters are granted as
+ * counts[spriteId] = max(existing, 1) — never a second copy for someone
+ * who already has one — and star progress copies across, clamped to the
+ * new (cheaper) rarity ladder. Guarded by character.ccMigrated, so
+ * running it twice changes nothing at all.
+ */
+export async function migrateCritterDex(childId, { dex = {}, stars = {} } = {}) {
+  assertActiveChild(childId);
+  const day = todayKey();
+
+  const plan = (character) => {
+    if (character.ccMigrated) return { ok: true, already: true, granted: [], starsCopied: [] };
+    const granted = [], starsCopied = [];
+    const update = { 'character.ccMigrated': true, 'character.updatedAt': serverTimestamp() };
+    for (const [legacyId, spriteId] of Object.entries(BEDTIME_SPRITE_IDS)) {
+      const needed = starsNeededFor(spriteId);
+      const had = Number(stars[legacyId]) || 0;
+      const wasCollected = !!dex[legacyId] || had >= needed;
+      if (wasCollected) {
+        // max(existing, 1): never double-grant, never remove.
+        if ((character.counts?.[spriteId] || 0) < 1) {
+          update[`character.counts.${spriteId}`] = increment(1);
+          granted.push({ legacyId, spriteId, tuckIns: dex[legacyId]?.n || 0 });
+        }
+      } else if (had > 0) {
+        const keep = Math.min(had, needed - 1);
+        if (keep > 0) {
+          update[`character.critterStars.${spriteId}`] = keep;
+          starsCopied.push({ legacyId, spriteId, stars: keep, needed });
+        }
+      }
+    }
+    return { ok: true, already: false, granted, starsCopied, update };
+  };
+
+  if (isGuestKid(childId)) {
+    const character = healCharacter(readLocal(charKey(childId), null));
+    const p = plan(character);
+    if (p.already) return p;
+    p.granted.forEach(({ spriteId }) => { character.counts[spriteId] = Math.max(character.counts[spriteId] || 0, 1); });
+    p.starsCopied.forEach(({ spriteId, stars: n }) => { character.critterStars[spriteId] = n; });
+    character.ccMigrated = true;
+    character.updatedAt = Date.now();
+    localStorage.setItem(charKey(childId), JSON.stringify(character));
+    return { ok: true, already: false, granted: p.granted, starsCopied: p.starsCopied };
+  }
+
+  const ref = childRef(childId);
+  try {
+    return await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      const character = healCharacter(snap.exists() ? snap.data()?.character : null);
+      const p = plan(character);
+      if (p.already) return p;
+      tx.update(ref, p.update);
+      return { ok: true, already: false, granted: p.granted, starsCopied: p.starsCopied };
+    });
+  } catch (e) {
+    return { ok: false, why: 'failed' };
+  }
+}
+
+/** Collection Focus — the one collection a share of the kid's rolls is
+    aimed at. `collectionId` null clears it. Never moves anything else. */
+export async function setFocusCollection(childId, collectionId) {
+  assertActiveChild(childId);
+  const id = COLLECTIONS.some((c) => c.id === collectionId) ? collectionId : null;
+  if (isGuestKid(childId)) {
+    const character = healCharacter(readLocal(charKey(childId), null));
+    character.focusCollection = id;
+    character.updatedAt = Date.now();
+    localStorage.setItem(charKey(childId), JSON.stringify(character));
+    return { ok: true, focusCollection: id };
+  }
+  await updateDoc(childRef(childId), {
+    'character.focusCollection': id,
+    'character.updatedAt': serverTimestamp(),
+  });
+  return { ok: true, focusCollection: id };
+}
+
+/* =======================================================================
+   COLLECTION COMPLETION — derived, never stored as a flag.
+
+   A collection is complete iff every member's count is > 0. The only
+   thing written is the GRANT: the badge (arrayUnion, so a double-fire
+   can't double-grant), the statue queued in worldItems for the Box, the
+   avatar unlock — and, once all eight badges are in, the Grand Prize.
+
+   Called INSIDE the same transaction that writes the sprites, with the
+   counts as they will be after that write. Returns the dotted-path
+   update to merge into that write plus what to celebrate.
+   ======================================================================= */
+function completionGrants(nextCounts, character) {
+  const badgesBefore = character?.badges || [];
+  const newly = newlyCompletedCollections(nextCounts, badgesBefore);
+  const update = {};
+  const cols = newly.map((id) => COLLECTIONS.find((c) => c.id === id)).filter(Boolean);
+  if (cols.length) {
+    update['character.badges']        = arrayUnion(...cols.map((c) => c.id));
+    update['character.avatarUnlocks'] = arrayUnion(...cols.map((c) => c.avatar.id));
+    cols.forEach((c) => { update[`character.worldItems.${c.statue.id}`] = 1; });
+  }
+  const all = new Set([...badgesBefore, ...newly]);
+  const grandPrize = cols.length > 0
+    && COLLECTIONS.every((c) => all.has(c.id))
+    && !(character?.worldItems || {})[GRAND_PRIZE.id];
+  if (grandPrize) update[`character.worldItems.${GRAND_PRIZE.id}`] = 1;
+  return { newlyCompleted: newly, grandPrize, update };
+}
+
+/** The guest (localStorage) twin of the dotted update above. */
+function applyGrantsLocal(next, grants) {
+  for (const id of grants.newlyCompleted) {
+    const c = COLLECTIONS.find((x) => x.id === id);
+    if (!c) continue;
+    if (!next.badges.includes(c.id)) next.badges.push(c.id);
+    if (!next.avatarUnlocks.includes(c.avatar.id)) next.avatarUnlocks.push(c.avatar.id);
+    next.worldItems[c.statue.id] = 1;
+  }
+  if (grants.grandPrize) next.worldItems[GRAND_PRIZE.id] = 1;
 }
 
 const charKey    = (childId) => 'arcade.character.' + childId;
@@ -464,17 +668,22 @@ export async function awardRun(childId, gameId, result) {
   // Work out the reward, then clamp it if this is a fun game and today's
   // fun budget is already spent.
   const raw = computeAward(gameId, result);
-  // Loot Drop computes its own richer totals (sprite rarity bonuses,
-  // level-up coins, streak gifts) with numbers that mirror the shared
-  // economy. `override` lets it pass those exact totals through while the
-  // session doc still records the real asked/correct/accuracy.
+  // Loot Drop computes its own richer XP total (sprite rarity bonuses,
+  // streak gifts) with numbers that mirror the shared economy.
+  // `override` lets it pass that exact total through while the session
+  // doc still records the real asked/correct/accuracy. Since E4 it may
+  // no longer override COINS: coins come from bonus rounds only, and
+  // Loot Drop's bonus round is its mini-game, which pays through
+  // grantCoins() like the Vault does.
   if (result?.override) {
-    raw.xp    = Math.max(0, Math.round(Number(result.override.xp)    || 0));
-    raw.coins = Math.max(0, Math.round(Number(result.override.coins) || 0));
+    raw.xp = Math.max(0, Math.round(Number(result.override.xp) || 0));
   }
   const clamped = clampFunAward(raw, character.dailyFun, day);
   const xp    = clamped.xp;
-  const coins = clamped.coins;
+  // The run's own coins are whatever its bespoke bonus round paid
+  // (Math Baseball's derby) — nothing else. Clamped against the ONE
+  // daily coin cap, computed against fresh state at write time below.
+  const wantCoins = Math.max(0, Math.round(Number(raw.coins) || 0));
 
   // Bricks and sparks ride alongside, from the same run, on their own
   // daily budget. Deliberately computed from `raw` (the real correct
@@ -489,6 +698,46 @@ export async function awardRun(childId, gameId, result) {
   const oldLevel = levelFromXp(character.xp || 0).level;
   const newLevel = levelFromXp(newXp).level;
   const streak   = rollStreak(character, day);
+
+  /* ---- critters (E2) ----
+     'roll' games: a qualifying run earns rolls, taken here against the
+     daily cap. 'encounter' games: the run's pending captures confirm
+     only if the game's own success condition holds. Both are computed
+     against the FRESH character (inside the transaction for a signed-in
+     kid) so the cap, the pity counter and isNew are all true at write
+     time. Loot Drop's in-round chests ride `result.sprites` above and
+     are exempt. */
+  const rolls = dropRolls(gameId, raw);
+  // Practice Power only ever rises on a qualifying LEARN run — not for
+  // fun games, not for logging in, and never for minutes played.
+  const earnsPower = game.kind === 'learn' && runQualifies(gameId, raw);
+  const powerFor = (fresh) => earnsPower
+    ? practicePowerAfterRun(fresh, day)
+    : { power: practicePowerNow(fresh, day), powerDay: fresh.powerDay, gained: 0, alreadyToday: false };
+  const pendingCaptures = game.critterMode === 'encounter' ? (result?.captures || []) : [];
+  const captureOk = game.critterMode === 'encounter' && !!game.captureCondition?.test?.(result);
+  function critterDrops(fresh, power) {
+    const me = { ...fresh, level: levelFromXp((fresh.xp || 0) + xp).level };
+    // Today's practice counts toward today's odds: the meter is read
+    // AFTER this run's gain, so practising pays immediately.
+    const luck = luckScore({ accuracy: raw.accuracy, practicePower: power });
+    if (game.critterMode === 'roll') {
+      return { ...rollDrops({ rolls, character: me, luck, dayStr: day }), escaped: [] };
+    }
+    if (game.critterMode === 'encounter') {
+      if (!captureOk) return { drops: [], dropsState: freshDrops(fresh.drops, day), capped: false, escaped: pendingCaptures };
+      const c = confirmCaptures({ captures: pendingCaptures, character: me, dayStr: day });
+      return { drops: c.drops, dropsState: c.dropsState, capped: false, escaped: c.overflow };
+    }
+    return { drops: [], dropsState: freshDrops(fresh.drops, day), capped: false, escaped: [] };
+  }
+  const dropCountsOf = (drops) => {
+    const m = {};
+    drops.forEach((d) => { m[d.spriteId] = (m[d.spriteId] || 0) + 1; });
+    return m;
+  };
+  // Critter Reader's bedtime star rides the same write (E3).
+  const starSprite = result?.critterStar || null;
 
   // Sprites won this run, as { s12: 2 } — accepts ids or raw indices so a
   // game can pass whichever it already has.
@@ -506,7 +755,7 @@ export async function awardRun(childId, gameId, result) {
     accuracy: Math.round(raw.accuracy * 100) / 100,
     seconds: raw.seconds,
     score: Number(result?.score) || 0,
-    xpEarned: xp, coinsEarned: coins,
+    xpEarned: xp, coinsEarned: 0,   // rewritten below with the granted amount
     bricksEarned, sparksEarned,
   };
 
@@ -518,24 +767,50 @@ export async function awardRun(childId, gameId, result) {
     'character.lifetime.seconds':   increment(raw.seconds),
     [`character.lifetime.byGame.${gameId}.runs`]:  increment(1),
     [`character.lifetime.byGame.${gameId}.xp`]:    increment(xp),
-    [`character.lifetime.byGame.${gameId}.coins`]: increment(coins),
+    [`character.lifetime.byGame.${gameId}.coins`]: increment(0),   // rewritten below with the granted amount
   };
 
   const levelUp = { leveledUp: newLevel > oldLevel, newLevel, oldLevel };
+  let byGameCoins = 0;
   const outcome = {
-    xp, coins, bricksEarned, sparksEarned, ...levelUp,
+    xp, coins: 0, coinsCapped: false, bonusVault: { eligible: false, room: 0 },
+    bricksEarned, sparksEarned, ...levelUp,
     cappedByDailyFun: clamped.cappedXp || clamped.cappedCoins,
     sprites: wonCounts,
     dayStreak: streak,
+    // filled in below once the critter roll has run against fresh counts
+    drops: [], dropsCapped: false, dropsEarned: rolls, escapedCaptures: [], counts: {},
+    star: null, practicePower: { value: 0, gained: 0, max: PRACTICE_POWER.max },
   };
 
   /* ---- guests: same logic, localStorage instead of Firestore ---- */
   if (isGuestKid(childId)) {
     const next = healCharacter(character);
+    // Practice Power first: today's practice counts toward today's odds,
+    // so the meter has to be settled before the critter roll reads it.
+    const pw = powerFor(character);
+    next.practicePower = pw.power;
+    next.powerDay = pw.powerDay;
+    outcome.practicePower = { value: pw.power, gained: pw.gained, max: PRACTICE_POWER.max };
+    const coinRes = clampDailyCoins(wantCoins, character.dailyCoins, day);
+    const coins = coinRes.granted;
+    next.dailyCoins = coinRes.dailyCoins;
+    outcome.coins = coins;
+    outcome.coinsCapped = coinRes.capped;
+    outcome.bonusVault = vaultOpens(gameId, raw)
+      ? { eligible: true, floor: VAULT.floorCoins, ceiling: VAULT.ceilingCoins,
+          zone: vaultZone(game.kind, raw.accuracy), room: Math.max(0, coinRes.room - coins) }
+      : { eligible: false, room: Math.max(0, coinRes.room - coins) };
+    const found = critterDrops(character, pw.power);
+    Object.assign(outcome, { drops: found.drops, dropsCapped: found.capped, escapedCaptures: found.escaped });
+    next.drops = found.dropsState;
     next.xp = newXp;
     next.level = newLevel;
     next.coins = (next.coins || 0) + coins;
+    byGameCoins = coins;
     Object.entries(wonCounts).forEach(([id, n]) => { next.counts[id] = (next.counts[id] || 0) + n; });
+    Object.entries(dropCountsOf(found.drops)).forEach(([id, n]) => { next.counts[id] = (next.counts[id] || 0) + n; });
+    outcome.counts = { ...next.counts };
     (result?.grantSkins || []).forEach((id) => { if (!next.ownedSkins.includes(id)) next.ownedSkins.push(id); });
     (result?.grantPets  || []).forEach((id) => { if (!next.ownedPets.includes(id))  next.ownedPets.push(id); });
     (result?.claimStreakGifts || []).forEach((d) => { if (!next.claimedStreakGifts.includes(d)) next.claimedStreakGifts.push(d); });
@@ -550,8 +825,22 @@ export async function awardRun(childId, gameId, result) {
     next.lifetime.attempted = (next.lifetime.attempted || 0) + raw.asked;
     next.lifetime.seconds   = (next.lifetime.seconds || 0) + raw.seconds;
     next.lifetime.byGame[gameId] = {
-      runs: byGame.runs + 1, xp: byGame.xp + xp, coins: byGame.coins + coins,
+      runs: byGame.runs + 1, xp: byGame.xp + xp, coins: byGame.coins + byGameCoins,
     };
+    session.coinsEarned = byGameCoins;
+    const star = critterStarGrant(character, starSprite, day);
+    if (starSprite) {
+      outcome.star = star;
+      if (star.earned) {
+        next.starDay = day;
+        next.critterStars[star.spriteId] = star.complete ? 0 : star.stars;
+        if (star.granted) next.counts[star.spriteId] = (next.counts[star.spriteId] || 0) + 1;
+      }
+    }
+    const guestGrants = completionGrants(next.counts, character);
+    applyGrantsLocal(next, guestGrants);
+    outcome.newlyCompleted = guestGrants.newlyCompleted;
+    outcome.grandPrize = guestGrants.grandPrize;
     next.updatedAt = Date.now();
     localStorage.setItem(charKey(childId), JSON.stringify(next));
 
@@ -561,15 +850,18 @@ export async function awardRun(childId, gameId, result) {
     return outcome;
   }
 
-  /* ---- signed in: the character update and the session doc go together ---- */
+  /* ---- signed in: the character update and the session doc go together ----
+     A transaction rather than a batch (since R2B): the completion check
+     needs the counts as they really are at write time, not as they were
+     when the run started, so a sprite that arrived by trade mid-run
+     still completes the set on this write. */
   const uid = auth.currentUser?.uid;
   if (!uid) throw new Error('Not signed in');
   const ref = childRef(childId);
-  const batch = writeBatch(db);
+  const sessionRef = doc(collection(ref, 'sessions'));
 
   const update = {
     'character.xp': increment(xp),
-    'character.coins': increment(coins),
     'character.level': newLevel,
     'character.dayStreak': streak,
     'character.lastPlayed': day,
@@ -585,34 +877,106 @@ export async function awardRun(childId, gameId, result) {
   if (result?.grantPets?.length)  update['character.ownedPets']  = arrayUnion(...result.grantPets);
   if (result?.claimStreakGifts?.length) update['character.claimedStreakGifts'] = arrayUnion(...result.claimStreakGifts);
 
-  batch.update(ref, update);
-  batch.set(doc(collection(ref, 'sessions')), { ...session, playedAt: serverTimestamp() });
-  await batch.commit();
+  const grants = await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const fresh = healCharacter(snap.exists() ? snap.data()?.character : null);
+    const pw = powerFor(fresh);
+    const found = critterDrops(fresh, pw.power);
+    const dropCounts = dropCountsOf(found.drops);
+    const star = critterStarGrant(fresh, starSprite, day);
+    const coinRes = clampDailyCoins(wantCoins, fresh.dailyCoins, day);
+    const nextCounts = { ...fresh.counts };
+    Object.entries(wonCounts).forEach(([id, n])  => { nextCounts[id] = (nextCounts[id] || 0) + n; });
+    Object.entries(dropCounts).forEach(([id, n]) => { nextCounts[id] = (nextCounts[id] || 0) + n; });
+    if (star.granted) nextCounts[star.spriteId] = (nextCounts[star.spriteId] || 0) + 1;
+    const g = completionGrants(nextCounts, fresh);
+    const txUpdate = {
+      ...update, ...g.update, ...star.update,
+      'character.drops': found.dropsState,
+      // Only written on a day the child actually practised; decay needs
+      // no write, since practicePowerNow() derives it from powerDay.
+      ...(pw.gained > 0 ? { 'character.practicePower': pw.power, 'character.powerDay': pw.powerDay } : {}),
+      'character.coins': increment(coinRes.granted),
+      'character.dailyCoins': coinRes.dailyCoins,
+      [`character.lifetime.byGame.${gameId}.coins`]: increment(coinRes.granted),
+    };
+    Object.entries(dropCounts).forEach(([id, n]) => {
+      txUpdate[`character.counts.${id}`] = increment(n + (wonCounts[id] || 0));
+    });
+    // A quest grant and a drop of the same sprite in one run would write
+    // the same field twice — fold them into one increment.
+    if (star.granted) {
+      const already = dropCounts[star.spriteId] ? (dropCounts[star.spriteId] + (wonCounts[star.spriteId] || 0)) : 0;
+      txUpdate[`character.counts.${star.spriteId}`] = increment(already + 1);
+    }
+    tx.update(ref, txUpdate);
+    tx.set(sessionRef, { ...session, coinsEarned: coinRes.granted, playedAt: serverTimestamp(), dropsWon: found.drops.length });
+    return { ...g, found, nextCounts, star, coinRes, pw };
+  });
+  outcome.newlyCompleted = grants.newlyCompleted;
+  outcome.grandPrize = grants.grandPrize;
+  outcome.drops = grants.found.drops;
+  outcome.dropsCapped = grants.found.capped;
+  outcome.escapedCaptures = grants.found.escaped;
+  outcome.counts = grants.nextCounts;
+  if (starSprite) outcome.star = grants.star;
+  outcome.practicePower = { value: grants.pw.power, gained: grants.pw.gained, max: PRACTICE_POWER.max };
+  outcome.coins = grants.coinRes.granted;
+  outcome.coinsCapped = grants.coinRes.capped;
+  outcome.bonusVault = vaultOpens(gameId, raw)
+    ? { eligible: true, floor: VAULT.floorCoins, ceiling: VAULT.ceilingCoins,
+        zone: vaultZone(game.kind, raw.accuracy), room: Math.max(0, grants.coinRes.room - grants.coinRes.granted) }
+    : { eligible: false, room: Math.max(0, grants.coinRes.room - grants.coinRes.granted) };
   return outcome;
 }
 
 /**
- * A small coin top-up outside a run — Loot Drop's bonus mini-game pays a
- * handful of coins without being a "run", so it shouldn't fake a session
- * doc. increment() only; never negative (spending happens in buyItem's
- * transaction, nowhere else).
+ * THE COIN FAUCET — every coin a kid earns outside a run's own award
+ * arrives here: the shared Bonus Vault, Loot Drop's between-round
+ * mini-games, and (once the Box exists) compliments.
+ *
+ * Nothing about it is a "run", so it writes no session doc. It is
+ * clamped by the SAME daily cap as everything else, which is what stops
+ * any one surface becoming the faucet — a kid who reads six bedtime
+ * stories gets six Vaults but not six times the coins. Being capped is
+ * never an error: it returns ok with a smaller `granted` and
+ * `capped: true`, and the UI says it in tomorrow's language.
+ *
+ * increment() only; never negative — spending happens in buyItem's
+ * transaction, nowhere else.
  */
 export async function grantCoins(childId, amount) {
   assertActiveChild(childId);
-  const n = Math.max(0, Math.round(Number(amount) || 0));
-  if (!n) return { ok: true, granted: 0 };
+  const want = Math.max(0, Math.round(Number(amount) || 0));
+  if (!want) return { ok: true, granted: 0, capped: false };
+  const day = todayKey();
+
   if (isGuestKid(childId)) {
     const character = healCharacter(readLocal(charKey(childId), null));
-    character.coins = (character.coins || 0) + n;
+    const res = clampDailyCoins(want, character.dailyCoins, day);
+    character.coins = (character.coins || 0) + res.granted;
+    character.dailyCoins = res.dailyCoins;
     character.updatedAt = Date.now();
     localStorage.setItem(charKey(childId), JSON.stringify(character));
-    return { ok: true, granted: n };
+    return { ok: true, granted: res.granted, capped: res.capped };
   }
-  await updateDoc(childRef(childId), {
-    'character.coins': increment(n),
-    'character.updatedAt': serverTimestamp(),
-  });
-  return { ok: true, granted: n };
+
+  const ref = childRef(childId);
+  try {
+    return await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      const character = healCharacter(snap.exists() ? snap.data()?.character : null);
+      const res = clampDailyCoins(want, character.dailyCoins, day);
+      tx.update(ref, {
+        'character.coins': increment(res.granted),
+        'character.dailyCoins': res.dailyCoins,
+        'character.updatedAt': serverTimestamp(),
+      });
+      return { ok: true, granted: res.granted, capped: res.capped };
+    });
+  } catch (e) {
+    return { ok: false, granted: 0, capped: false, why: 'failed' };
+  }
 }
 
 /* =======================================================================
@@ -641,7 +1005,9 @@ function purchaseProblem(character, kind, item) {
 export async function buyItem(childId, kind, itemId) {
   assertActiveChild(childId);
   const item = findItem(kind, itemId);
-  if (!item) return { ok: false, why: 'missing' };
+  // Structural, not by omission: anything buyable:false (statues, the
+  // Grand Prize) cannot be bought even if a shop somehow lists it.
+  if (!item || !isBuyable(item)) return { ok: false, why: 'missing' };
 
   if (isGuestKid(childId)) {
     // localStorage is synchronous and single-threaded, so this read →
@@ -718,12 +1084,14 @@ export async function listFamilyCharacters() {
       pet: character.pet,
       dayStreak: character.dayStreak,
       collectionScore: collectionScoreFromCounts(character.counts),
-      uniqueSprites: Object.values(character.counts).filter((n) => n > 0).length,
+      uniqueSprites: uniqueLiveCount(character.counts),
+      badges: character.badges,
     };
   }));
 }
 
-/** A sibling's kit, read-only — for the "what has he got equipped?" peek. */
+/** A sibling's kit, read-only — for the "what has he got equipped?" peek.
+    Shaped so spriteState(id, loadout) works on it directly. */
 export async function getSiblingLoadout(childId) {
   const character = await readCharacter(childId);
   return {
@@ -732,6 +1100,8 @@ export async function getSiblingLoadout(childId) {
     ownedSkins: character.ownedSkins, ownedPets: character.ownedPets,
     counts: character.counts,
     level: character.level,
+    xp: character.xp,
+    badges: character.badges,
     collectionScore: collectionScoreFromCounts(character.counts),
   };
 }
@@ -753,23 +1123,51 @@ function tradesRef() {
   return collection(db, 'families', uid, 'trades');
 }
 
-export async function proposeTrade(fromChildId, toChildId, offerSprite, wantSprite) {
+/**
+ * A trade doc, whichever shape it was written in. Trades from before
+ * multi-item offers existed carry a single offerSprite/wantSprite; they
+ * are read as one-element arrays so a pending offer made yesterday
+ * still works today. Nothing rewrites them — the old shape is simply
+ * understood.
+ */
+function readTrade(id, t) {
+  const offer = Array.isArray(t.offer) ? t.offer : (t.offerSprite ? [t.offerSprite] : []);
+  const want  = Array.isArray(t.want)  ? t.want  : (t.wantSprite  ? [t.wantSprite]  : []);
+  return { ...t, id, offer, want, legacy: !Array.isArray(t.offer) };
+}
+
+/**
+ * Offer any 1–6 sprites for any 1–6 of theirs. The receiver simply
+ * accepts or declines — there is no counter-offer, and no haggling
+ * surface, because every extra step is another thing to explain to a
+ * six-year-old.
+ *
+ * Validated here so a bad offer is never written, and validated AGAIN
+ * inside respondToTrade's transaction, because the collection can move
+ * between making an offer and answering it.
+ */
+export async function proposeTrade(fromChildId, toChildId, offer, want) {
   assertActiveChild(fromChildId);
   if (isGuestKid(fromChildId) || isGuestKid(toChildId)) {
     return { ok: false, why: 'guest' };   // guests have no sibling to trade with
   }
   if (fromChildId === toChildId) return { ok: false, why: 'self' };
-  if (spriteIndex(offerSprite) < 0 || spriteIndex(wantSprite) < 0) return { ok: false, why: 'missing' };
+  const offerIds = Array.isArray(offer) ? offer : [offer];
+  const wantIds  = Array.isArray(want)  ? want  : [want];
 
-  // Only offer a spare. A kid must never be able to give away their last
-  // copy of something, even by accident.
   const mine = await readCharacter(fromChildId);
-  if ((mine.counts[offerSprite] || 0) < 2) return { ok: false, why: 'not a duplicate' };
+  const problem = tradeSideProblem(mine.counts, offerIds);
+  if (problem) return { ok: false, why: problem };
+  // The want side is only size-checked here: whether THEY can spare it is
+  // their business, re-checked when they answer.
+  if (!wantIds.length || wantIds.length > ECONOMY.maxTradeItems) return { ok: false, why: 'want size' };
+  if (wantIds.some((id) => !inCollection(id))) return { ok: false, why: 'missing' };
 
   const me = (await listChildren()).find((c) => c.id === fromChildId);
   const ref = await addDoc(tradesRef(), {
     fromChildId, fromNickname: me?.nickname || 'Someone', toChildId,
-    offerSprite, wantSprite, status: 'pending', createdAt: serverTimestamp(),
+    offer: offerIds, want: wantIds,
+    status: 'pending', createdAt: serverTimestamp(),
   });
   return { ok: true, tradeId: ref.id };
 }
@@ -781,29 +1179,65 @@ export async function listTrades(childId) {
   const uid = auth.currentUser?.uid;
   if (!uid) return { incoming: [], outgoing: [] };
   const snap = await getDocs(query(tradesRef(), where('status', '==', 'pending')));
-  const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const all = snap.docs.map((d) => readTrade(d.id, d.data()));
   const mine = await readCharacter(childId).catch(() => blankCharacter());
   const newest = (a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0);
   return {
     incoming: all.filter((t) => t.toChildId === childId).sort(newest).map((t) => ({
       ...t,
-      // Flag it so the UI can warn before a kid parts with their only one.
-      lastCopy: (mine.counts[t.wantSprite] || 0) <= 1,
+      // Can this kid actually afford their side right now? The card uses
+      // it to explain rather than to fail silently on Accept.
+      problem: tradeSideProblem(mine.counts, t.want),
     })),
     outgoing: all.filter((t) => t.fromChildId === childId).sort(newest),
   };
 }
 
 /**
- * Accept or decline. On accept, both characters change inside one
- * transaction: the offering side gives offerSprite and gets wantSprite,
- * the accepting side does the reverse.
+ * Every trade ever, newest first, for the grown-up portal. This is the
+ * real safety valve on open-ended trading: rather than a rule that stops
+ * a big brother talking a little brother into five-for-one, there is a
+ * log a parent can look at, notice a pattern in, and have a conversation
+ * about. That is a parenting moment, not a code rule.
+ */
+export async function listTradeLog(max = 100) {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return [];
+  const snap = await getDocs(query(tradesRef(), limit(max)));
+  const kids = await listChildren().catch(() => []);
+  const nameOf = (id) => kids.find((k) => k.id === id)?.nickname || 'someone';
+  return snap.docs
+    .map((d) => readTrade(d.id, d.data()))
+    .map((t) => ({
+      id: t.id, status: t.status,
+      from: t.fromNickname || nameOf(t.fromChildId), to: nameOf(t.toChildId),
+      offer: t.offer, want: t.want,
+      createdAt: t.createdAt?.toMillis?.() ?? null,
+      resolvedAt: t.resolvedAt?.toMillis?.() ?? null,
+    }))
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+}
+
+/**
+ * Accept or decline. On accept, EVERY sprite on both sides moves inside
+ * one transaction: the proposer hands over `offer` and receives `want`,
+ * the accepter does the reverse. A partial write here would mean a kid
+ * loses a critter and gets nothing back, which is the one bug that would
+ * end this feature's credibility with them.
  *
- * Re-checked here, never trusting anything read earlier: the trade is
- * still pending, both sides still hold the sprite they're giving, and the
- * offering side still has a spare (count >= 2). The accepting side needs
- * only one — they're choosing to part with it by tapping Accept, and they
- * get one back in return; listTrades() flags that case so the UI can warn.
+ * Nothing read before the transaction is trusted. Re-checked at the
+ * moment the sprites move:
+ *   · the trade is still pending, and this really is the kid it was sent to
+ *   · 1–6 items on each side
+ *   · NEVER YOUR LAST COPY, on BOTH sides — each kid must hold at least
+ *     one more of every sprite than they are giving away
+ *
+ * Then the collection-completion check runs for both kids, because a
+ * trade that finishes someone's set is the entire point of trading.
+ *
+ * Note what is deliberately NOT checked: the receiver's level. Trading
+ * legitimately bypasses the level gate — a legendary handed over by a
+ * generous brother lands in full colour at Level 1.
  */
 export async function respondToTrade(tradeId, accept) {
   const active = getCurrentKid();
@@ -816,13 +1250,13 @@ export async function respondToTrade(tradeId, accept) {
     return await runTransaction(db, async (tx) => {
       const tradeSnap = await tx.get(tradeRef);
       if (!tradeSnap.exists()) return { ok: false, why: 'missing' };
-      const trade = tradeSnap.data();
+      const trade = readTrade(tradeId, tradeSnap.data());
       if (trade.status !== 'pending') return { ok: false, why: 'already answered' };
       // Only the child the offer was made to can answer it.
       if (trade.toChildId !== active.id) return { ok: false, why: 'not yours' };
 
       if (!accept) {
-        tx.update(tradeRef, { status: 'declined' });
+        tx.update(tradeRef, { status: 'declined', resolvedAt: serverTimestamp() });
         return { ok: true, status: 'declined' };
       }
 
@@ -832,21 +1266,52 @@ export async function respondToTrade(tradeId, accept) {
       const fromChar = healCharacter(fromSnap.exists() ? fromSnap.data()?.character : null);
       const toChar   = healCharacter(toSnap.exists()   ? toSnap.data()?.character   : null);
 
-      if ((fromChar.counts[trade.offerSprite] || 0) < 2) return { ok: false, why: 'offer gone' };
-      if ((toChar.counts[trade.wantSprite]   || 0) < 1) return { ok: false, why: 'want gone' };
+      // The guardrail, both ways. Whoever is giving something up must
+      // keep at least one of it — the proposer for `offer`, the
+      // accepter for `want`.
+      const fromProblem = tradeSideProblem(fromChar.counts, trade.offer);
+      if (fromProblem) return { ok: false, why: 'offer gone', side: 'from', problem: fromProblem };
+      const toProblem = tradeSideProblem(toChar.counts, trade.want);
+      if (toProblem) return { ok: false, why: 'want gone', side: 'to', problem: toProblem };
 
-      tx.update(fromRef, {
-        [`character.counts.${trade.offerSprite}`]: increment(-1),
-        [`character.counts.${trade.wantSprite}`]:  increment(1),
-        'character.updatedAt': serverTimestamp(),
-      });
-      tx.update(toRef, {
-        [`character.counts.${trade.wantSprite}`]:  increment(-1),
-        [`character.counts.${trade.offerSprite}`]: increment(1),
-        'character.updatedAt': serverTimestamp(),
-      });
-      tx.update(tradeRef, { status: 'accepted' });
-      return { ok: true, status: 'accepted', got: trade.offerSprite, gave: trade.wantSprite };
+      // Move every sprite on both sides. Repeats in an array mean
+      // quantity, so the tally is what actually gets incremented.
+      const giving   = tradeTally(trade.offer);   // proposer → accepter
+      const wanting  = tradeTally(trade.want);    // accepter → proposer
+      const fromNext = { ...fromChar.counts };
+      const toNext   = { ...toChar.counts };
+      const fromUpdate = { 'character.updatedAt': serverTimestamp() };
+      const toUpdate   = { 'character.updatedAt': serverTimestamp() };
+      // Netted per sprite rather than written per side, so a sprite that
+      // appears on BOTH sides of a trade nets out correctly instead of
+      // one dotted-path write clobbering the other.
+      const netFrom = {}, netTo = {};
+      for (const [id, n] of Object.entries(giving)) { netFrom[id] = (netFrom[id] || 0) - n; netTo[id] = (netTo[id] || 0) + n; }
+      for (const [id, n] of Object.entries(wanting)) { netTo[id] = (netTo[id] || 0) - n; netFrom[id] = (netFrom[id] || 0) + n; }
+      for (const [id, n] of Object.entries(netFrom)) {
+        fromNext[id] = (fromNext[id] || 0) + n;
+        if (n !== 0) fromUpdate[`character.counts.${id}`] = increment(n);
+      }
+      for (const [id, n] of Object.entries(netTo)) {
+        toNext[id] = (toNext[id] || 0) + n;
+        if (n !== 0) toUpdate[`character.counts.${id}`] = increment(n);
+      }
+
+      // The completion check runs for BOTH kids on the counts as they
+      // will be after the swap — a trade that finishes a set is the whole
+      // point of trading, and the receiver gets the full celebration.
+      const fromGrants = completionGrants(fromNext, fromChar);
+      const toGrants   = completionGrants(toNext, toChar);
+
+      tx.update(fromRef, { ...fromUpdate, ...fromGrants.update });
+      tx.update(toRef,   { ...toUpdate,   ...toGrants.update });
+      tx.update(tradeRef, { status: 'accepted', resolvedAt: serverTimestamp() });
+      return {
+        ok: true, status: 'accepted',
+        got: trade.offer, gave: trade.want,
+        newlyCompleted: { [trade.fromChildId]: fromGrants.newlyCompleted, [trade.toChildId]: toGrants.newlyCompleted },
+        grandPrize:     { [trade.fromChildId]: fromGrants.grandPrize,     [trade.toChildId]: toGrants.grandPrize },
+      };
     });
   } catch (e) {
     return { ok: false, why: 'failed' };

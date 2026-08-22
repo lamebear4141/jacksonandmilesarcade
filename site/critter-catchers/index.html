@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/arcade.css">
-<title>Critter Catchers — Bedtime Stories</title>
+<title>Critter Reader — Bedtime Stories</title>
 <style>
   :root{
     /* the room at bedtime: indigo night outside, lamplight inside */
@@ -98,7 +98,38 @@
   .btn.mini{ font-size:13px; padding:9px 18px; }
 
   /* ---------- den (critter select) ---------- */
-  .denGrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:14px; }
+  /* Eighty critters, grouped by collection and folded shut. The grid
+     class moved inside a section; .denGrid is now the sections column. */
+  .denGrid{ display:flex; flex-direction:column; gap:12px; }
+  .denGridInner{ display:none; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:14px; padding:12px 2px 4px; }
+  .denSec.open .denGridInner{ display:grid; }
+  .denSecHead{
+    width:100%; display:flex; align-items:center; gap:11px; cursor:pointer;
+    background:rgba(255,244,214,0.10); border:none; border-radius:14px;
+    padding:11px 14px; color:#fdf3dc; font-family:inherit; font-weight:800; font-size:16px;
+    box-shadow:inset 0 0 0 1px rgba(255,232,180,0.22);
+  }
+  .denSecHead .ic{ font-size:24px; line-height:1; }
+  .denSecHead .nm{ flex:1; text-align:left; }
+  .denSecHead .ct{ font-size:13px; color:var(--accent); }
+  .denSecHead .chev{ font-size:12px; opacity:0.75; transition:transform 0.2s; }
+  .denSec.open .denSecHead .chev{ transform:rotate(90deg); }
+
+  /* three states, the same everywhere in the arcade:
+     owned = full colour · silhouette = shape blacked out but NAME shown,
+     because this is the screen where a kid chooses · hidden = a locked
+     slot that says which level opens it. */
+  .critterCard.silhouette .face{ filter:brightness(0); opacity:0.55; }
+  .critterCard.silhouette .nm{ color:var(--ink-soft); }
+  .critterCard.locked{
+    cursor:default; background:linear-gradient(168deg,#efe6cf 0%, #e2d6b8 100%);
+    box-shadow:0 4px 0 #d3c4a2, 0 8px 16px rgba(0,0,0,0.28); opacity:0.85;
+  }
+  .critterCard.locked .lockedVig{ display:grid; place-items:center; background:rgba(0,0,0,0.06); }
+  .critterCard.locked .lockFace{ font-size:34px; opacity:0.5; }
+  .critterCard.locked .nm{ color:var(--ink-soft); font-style:italic; }
+  .critterCard.locked .pl{ color:#8a6a1f; font-weight:800; }
+
   .critterCard{
     position:relative; overflow:hidden;
     background:linear-gradient(168deg,#fffaea 0%, var(--cream) 62%, #f6e9c9 100%);
@@ -422,16 +453,16 @@
 
   <!-- ================= DEN — pick a critter ================= -->
   <section class="screen" id="denScreen">
-    <h1 class="title">🌙 Bedtime Stories</h1>
-    <p class="sub">Pick a sleepy friend and read them a story. If you read it well, they'll drift off to dreamland — and join your collection!</p>
+    <h1 class="title">🌙 Critter Reader</h1>
+    <p class="sub">Pick any critter and read them a bedtime story. Read well and they drift off — and after enough cozy nights, they join your collection for keeps.</p>
     <div class="topStats">
-      <span class="st">🌟 Collected: <b id="dexCount">0</b>/<span id="dexTotal">12</span></span>
+      <span class="st">🌟 Collected: <b id="dexCount">0</b>/<span id="dexTotal">80</span></span>
       <span class="st">📖 Stories read: <b id="storyCount">0</b></span>
     </div>
     <div class="starBanner hidden" id="starBanner"></div>
     <div class="denGrid" id="denGrid"></div>
     <div class="denFoot">
-      <button class="btn soft mini" id="dexBtn">🏅 My collection</button>
+      <button class="btn soft mini" id="dexBtn">🏅 My quests</button>
       <button class="btn soft mini" id="saveBtn">💾 Save progress file</button>
     </div>
   </section>
@@ -533,7 +564,7 @@
       <div class="awardLine" id="awardLine"></div>
       <div style="margin-top:16px">
         <button class="btn" id="sleepAgain">📚 Read another story</button>
-        <button class="btn soft" id="sleepDex">🏅 My collection</button>
+        <button class="btn soft" id="sleepDex">🏅 My quests</button>
       </div>
     </div>
   </section>
@@ -555,8 +586,8 @@
 
   <!-- ================= COLLECTION ================= -->
   <section class="screen hidden" id="dexScreen">
-    <h1 class="title">🏅 My Sleepy Collection</h1>
-    <p class="sub" id="dexSub">Every friend you've tucked in, snoozing happily.</p>
+    <h1 class="title">🏅 My Quests</h1>
+    <p class="sub" id="dexSub">Every critter you've read to — and how many nights are left.</p>
     <div class="dexGrid" id="dexGrid"></div>
     <div style="text-align:center; margin-top:18px">
       <button class="btn soft mini" id="dexBack">← Back to the den</button>
@@ -569,13 +600,26 @@
 import { onParentChange, getCurrentKid, isGuestKid, getChild, ageFromBirthday, tierForAge } from '../firebase-config.js';
 import { requireKid, mountBar, finishRun, celebrateLevelUp, describeAward, sfx } from '../assets/arcade-shell.js';
 import { STORIES, storiesFor } from './stories.js';
-import { RARITY } from '../assets/catalog.js';
+import {
+  RARITY, COLLECTIONS, LIVE_SPRITE_IDS, RARITY_UNLOCK, CRITTER_STARS, BEDTIME_SPRITE_IDS,
+  spriteById, spriteIndex, spriteState, displayRarity, starsNeededFor, uniqueLiveCount,
+} from '../assets/catalog.js';
+import { loadCharacter, migrateCritterDex } from '../firebase-config.js';
+import { revealDrops } from '../assets/arcade-shell.js';
 
 /* =====================================================================
-   CRITTER CATCHERS — BEDTIME STORIES
-   Read a story to a critter. Read it well and the critter falls asleep
-   and joins your collection. Stumble, and it stays up doing something
-   deeply silly instead. Either way, you read — so you always earn.
+   CRITTER READER — BEDTIME STORIES
+
+   Read a story to a critter. Read it well and the critter falls asleep;
+   read to the same one enough nights and it joins your collection for
+   good. Stumble, and it stays up doing something deeply silly instead.
+   Either way, you read — so you always earn.
+
+   Since R2B/E3 this is the ONE place in the arcade where a kid picks
+   which critter they are chasing: the whole collection is on the shelf,
+   and reading is the slow, guaranteed road next to play's fast, random
+   one. The folder, the game id and every saved stat stay
+   'critter-catchers'; only what a kid reads changed.
    ===================================================================== */
 const CONFIG = {
   wigglyAllowed: 1,      // pages that can go wrong and still earn the tuck-in
@@ -583,12 +627,22 @@ const CONFIG = {
   micGreatRatio: 0.85,   // hearing this much auto-finishes the page
   micTries: 2,           // low mic scores before we offer a question instead
   starsPerDay: 1,                   // bedtime stars earnable per calendar day
-  starsByRarity: { common:1, rare:3, epic:8, legendary:12, mythic:15 },
+  /* Nights per critter now live in catalog.js as CRITTER_STARS
+     (common 1 · rare 3 · epic 6 · legendary 10) so the Locker, the
+     Collections tab and this game can never disagree about the cost. */
   progressFileAuto: false,          // AJ 2026-08-21: never auto-download during play — the den has a manual save button
 };
 
-/* ---------------- the critters ---------------- */
-const CRITTERS = [
+/* ---------------- the critters ----------------
+   The shelf is the WHOLE live collection now (E3) — this is the one
+   place in the arcade where a kid aims at a specific critter.
+
+   The twelve below keep the name, favourite genre, bedtime antic and
+   one-liner they were written with. Every other critter derives the
+   same fields from the catalog: its lore tagline becomes the one-liner,
+   and its favourite genre and antic come from its sprite index, so a
+   critter behaves identically every single night.                      */
+const LEGACY_CRITTERS = [
   /* common — one star each */
   { id:'pip',     name:'Pip the Fox', short:'Pip',          emoji:'🦊', rarity:'common',    fav:'silly',  antic:'socks',  line:'Loves a giggle before bed.' },
   { id:'mo',      name:'Mo the Mouse', short:'Mo',         emoji:'🐭', rarity:'common',    fav:'royal',  antic:'bounce', line:'Small ears. Best listener.' },
@@ -607,6 +661,36 @@ const CRITTERS = [
   /* mythic — fifteen nights */
   { id:'twinkle', name:'Twinkle the Star Sprite', short:'Twinkle', emoji:'🌟', rarity:'mythic', fav:'night', antic:'snack',  line:'Fell out of the sky. Wants to earn the way home.' },
 ];
+
+const LEGACY_BY_ID     = Object.fromEntries(LEGACY_CRITTERS.map(c => [c.id, c]));
+const SPRITE_TO_LEGACY = Object.fromEntries(Object.entries(BEDTIME_SPRITE_IDS).map(([k, v]) => [v, k]));
+const FAVS   = ['silly', 'royal', 'night', 'dragon'];
+const ANTICS = ['bounce', 'socks', 'disco', 'snack'];
+
+/** One critter, keyed by sprite id — the shape the whole game reads. */
+function critterFor(spriteId){
+  const sp = spriteById(spriteId);
+  if (!sp) return null;
+  const legacyId = SPRITE_TO_LEGACY[spriteId] || null;
+  const L = legacyId ? LEGACY_BY_ID[legacyId] : null;
+  const i = spriteIndex(spriteId);
+  return {
+    id: spriteId, legacyId,
+    name:   L ? L.name  : sp.n,
+    // Derived critters use their WHOLE name: 'Nest Egg fell asleep!'
+    // reads right where 'Nest fell asleep!' does not. The twelve keep the
+    // short forms they were written with (Sir Biscuit, Twinkle).
+    short:  L ? L.short : sp.n,
+    emoji:  sp.g,
+    rarity: displayRarity(sp.r),          // mythic reads as legendary
+    fav:    L ? L.fav   : FAVS[i % FAVS.length],
+    antic:  L ? L.antic : ANTICS[i % ANTICS.length],
+    line:   L ? L.line  : (sp.lore?.tag || 'Ready for a story.'),
+  };
+}
+
+/** Every critter a kid can read to, in collection order. */
+const CRITTERS = LIVE_SPRITE_IDS.map(critterFor).filter(Boolean);
 const ANTIC_LINES = {
   bounce: name => `${name} is bouncing on the bed instead of sleeping in it!`,
   socks:  name => `${name} is juggling socks instead of going to bed!`,
@@ -621,7 +705,7 @@ const ANTIC_LINES = {
 
 /* Exposed for the Playwright test harness (and curious kids who open
    the console — hi, future Jackson). Nothing secret lives here. */
-window.__CC = { STORIES, CRITTERS, CONFIG, storiesFor };
+window.__CC = { STORIES, CRITTERS, LEGACY_CRITTERS, CONFIG, storiesFor, critterFor };
 /* the test harness counts award submissions to prove one story pays exactly once */
 window.__CC.finishRunCalls = 0;
 
@@ -630,13 +714,22 @@ window.__CC.finishRunCalls = 0;
    friendly picker when no profile is active, so none of the game's DOM
    wiring below may run in that case: it all lives inside main().
    ===================================================================== */
-const kid = await requireKid({ gameName: 'Critter Catchers' });
+const kid = await requireKid({ gameName: 'Critter Reader' });
 if (kid) {
-  await mountBar({ title: 'Critter Catchers' });
-  main();
+  await mountBar({ title: 'Critter Reader' });
+  await main();
 }
 
-function main(){
+async function main(){
+
+/* The shared character: bedtime stars, the star day and what's already
+   in the Locker all live there now, so a ten-night quest survives
+   switching iPads. Re-read after every award. */
+let CHAR = { counts:{}, critterStars:{}, starDay:null, level:1, xp:0, ccMigrated:false };
+const refreshCharacter = async () => {
+  try { CHAR = await loadCharacter(kid.id); } catch(e){ /* keep the last good copy */ }
+  return CHAR;
+};
 
 /* ---------------- per-kid save ---------------- */
 const store = {
@@ -663,23 +756,47 @@ const todayStr = () => {
   const d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 };
-/* ---------------- bedtime stars (rarity ladder) ---------------- */
-const starsNeeded = c => CONFIG.starsByRarity[c.rarity] || 1;
-const starsFor = id => (SAVE.stars || {})[id] || 0;
-const isCollected = c => starsFor(c.id) >= starsNeeded(c);
-const collectedCount = () => CRITTERS.filter(isCollected).length;
-const starEarnedToday = () => SAVE.starDay === todayStr();
-const critterById = id => CRITTERS.find(c => c.id === id) || null;
+/* ---------------- bedtime stars (rarity ladder) ----------------
+   All of it derived from the character, never from localStorage:
+   "collected" means the critter is actually in the Locker.            */
+const starsNeeded   = c => starsNeededFor(c.id);
+const starsFor      = id => (CHAR.critterStars || {})[id] || 0;
+const isOwned       = c => ((CHAR.counts || {})[c.id] || 0) > 0;
+const isCollected   = isOwned;                       // same thing, old name kept
+const collectedCount = () => uniqueLiveCount(CHAR.counts);
+const starEarnedToday = () => CHAR.starDay === todayStr();
+/* accepts a sprite id or one of the twelve legacy string ids */
+const critterById = id => CRITTERS.find(c => c.id === id || c.legacyId === id) || null;
 const shortName = c => (c && (c.short || c.name.split(' ')[0])) || '';
 
-/* migration: anyone caught under the old first-sleep rule stays collected —
-   grandfather them in at full stars. Nobody loses Pip. Runs exactly once,
-   on a save from before the star system existed; under the new rules a dex
-   entry is just a tuck-in count and must NOT imply collection. */
+/* migration, step 1 (local): anyone caught under the old first-sleep rule
+   stays collected — grandfather them in at full stars in the LOCAL save.
+   Nobody loses Pip. Runs exactly once, on a save from before the star
+   system existed; under the new rules a dex entry is just a tuck-in
+   count and must NOT imply collection. */
 if (LEGACY_SAVE){
   const stars = { ...(SAVE.stars || {}) };
-  CRITTERS.forEach(c => { if ((SAVE.dex || {})[c.id]) stars[c.id] = starsNeeded(c); });
+  LEGACY_CRITTERS.forEach(c => {
+    if ((SAVE.dex || {})[c.id]) stars[c.id] = starsNeededFor(BEDTIME_SPRITE_IDS[c.id]);
+  });
   SAVE = patchSave({ stars });
+}
+
+/* migration, step 2 (to the character): the old local dex folds into the
+   real collection, ONCE, guarded by character.ccMigrated. Collected
+   critters grant counts[spriteId] = max(existing, 1); part-finished star
+   quests copy across to the sprite. Never double-grants, never removes —
+   running it a second time is a no-op, which is the thing to test. */
+async function migrateLocalDex(){
+  if (CHAR.ccMigrated) return null;
+  const dex = SAVE.dex || {}, stars = SAVE.stars || {};
+  if (!Object.keys(dex).length && !Object.keys(stars).length) return null;
+  const r = await migrateCritterDex(kid.id, { dex, stars }).catch(() => null);
+  if (r && r.ok && !r.already){
+    await refreshCharacter();
+    console.log('[Critter Reader] folded the old dex into the collection:', r);
+  }
+  return r;
 }
 
 /* NOTE: no local session log here. finishRun() already records every run
@@ -814,9 +931,11 @@ function resolveLevel(){
     })();
   });
 }
-function init(){
+async function init(){
   SAVE = patchSave({});
   levelReady = resolveLevel().then(l => { level = l; return l; });
+  await refreshCharacter();
+  await migrateLocalDex();
   renderDen();
   show('denScreen');
 }
@@ -831,13 +950,61 @@ function progressBar(c){
   const need = starsNeeded(c), got = Math.min(starsFor(c.id), need);
   const r = RARITY[c.rarity] || RARITY.common;
   const pct = Math.round(got / need * 100);
-  const label = `⭐ ${got} of ${need} ${need === 1 ? 'night' : 'nights'}`;
+  // Owned critters keep a bar too: the next full quest earns a SPARE,
+  // which is trade goods rather than a dead end.
+  const label = isOwned(c)
+    ? `⭐ ${got} of ${need} toward a spare`
+    : `⭐ ${got} of ${need} ${need === 1 ? 'night' : 'nights'}`;
   return `<span class="track"><span class="fill" style="width:${pct}%; background:${r.color}"></span></span>
           <span class="lbl">${label}</span>`;
 }
+/* One critter card, in the three states every screen in the arcade
+   shares (catalog.spriteState):
+
+     owned       full colour, name, and the stars toward a SPARE
+     silhouette  the shape blacked out, but the NAME is shown — this is
+                 the screen where a kid chooses, so it has to be
+                 choosable; the mystery kept is what it looks like
+     hidden      a locked shelf slot naming the level that opens it,
+                 because a kid choosing deserves to know why not      */
+function critterCard(c, i){
+  const r = RARITY[c.rarity] || RARITY.common;
+  const state = spriteState(c.id, CHAR);
+
+  if (state === 'hidden'){
+    const d = document.createElement('div');
+    d.className = 'critterCard locked';
+    d.style.setProperty('--rc', r.color);
+    d.innerHTML = `<span class="ribbon">${r.name}</span>
+      <span class="vignette lockedVig"><span class="lockFace">🔒</span></span>
+      <span class="nm">Still asleep somewhere…</span>
+      <span class="pl">Unlocks at Level ${RARITY_UNLOCK[c.rarity]}</span>
+      <span class="prog"><span class="lbl">🌙 Keep levelling up!</span></span>`;
+    return d;
+  }
+
+  const owned = state === 'owned';
+  const btn = document.createElement('button');
+  btn.className = 'critterCard' + (owned ? ' collected' : ' silhouette');
+  btn.style.setProperty('--rc', r.color);
+  btn.style.setProperty('--quilt', QUILTS[i % QUILTS.length]);
+  btn.innerHTML = `<span class="ribbon">${r.name}</span>
+    <span class="vignette">
+      <span class="zz">${owned ? 'z z' : ''}</span>
+      <span class="face">${c.emoji}</span>
+      <span class="quilt"></span>
+    </span>
+    <span class="nm">${c.name}</span>
+    <span class="pl">${owned ? c.line : 'Read me to meet me! 🌙'}</span>
+    <span class="prog">${progressBar(c)}</span>
+    ${owned ? '<span class="caught">💤 in your Locker</span>' : ''}`;
+  btn.onclick = () => openShelf(c);
+  return btn;
+}
+
 function renderDen(){
   $('dexCount').textContent = collectedCount();
-  $('dexTotal').textContent = CRITTERS.length;
+  $('dexTotal').textContent = LIVE_SPRITE_IDS.length;
   $('storyCount').textContent = SAVE.storiesRead || 0;
   const banner = $('starBanner');
   if (starEarnedToday()){
@@ -845,28 +1012,31 @@ function renderDen(){
     banner.textContent = `⭐ Tonight's star is tucked in with ${sc ? shortName(sc) : 'a friend'}! More stories are just for fun — a new star rises tomorrow.`;
     banner.classList.remove('hidden');
   } else banner.classList.add('hidden');
-  const grid = $('denGrid');
-  grid.innerHTML = '';
-  CRITTERS.forEach((c, i) => {
-    const r = RARITY[c.rarity] || RARITY.common;
-    const done = isCollected(c);
-    const caught = SAVE.dex && SAVE.dex[c.id];
-    const btn = document.createElement('button');
-    btn.className = 'critterCard' + (done ? ' collected' : '');
-    btn.style.setProperty('--rc', r.color);
-    btn.style.setProperty('--quilt', QUILTS[i % QUILTS.length]);
-    btn.innerHTML = `<span class="ribbon">${r.name}</span>
-      <span class="vignette">
-        <span class="zz">z z</span>
-        <span class="face">${c.emoji}</span>
-        <span class="quilt"></span>
-      </span>
-      <span class="nm">${c.name}</span>
-      <span class="pl">${c.line}</span>
-      <span class="prog">${done ? '<span class="lbl">💤 Fast asleep</span>' : progressBar(c)}</span>
-      ${done && caught ? `<span class="caught">tucked in ×${caught.n}</span>` : ''}`;
-    btn.onclick = () => openShelf(c);
-    grid.appendChild(btn);
+
+  // Eighty critters is a lot of shelf, so it is grouped by collection and
+  // folded shut — open the one you're working on. Any collection with a
+  // quest already under way opens itself.
+  const host = $('denGrid');
+  host.innerHTML = '';
+  let idx = 0;
+  COLLECTIONS.forEach((col, ci) => {
+    const mine = col.members.map(id => CRITTERS.find(c => c.id === id)).filter(Boolean);
+    const owned = mine.filter(isOwned).length;
+    const busy  = mine.some(c => starsFor(c.id) > 0);
+    const sec = document.createElement('section');
+    sec.className = 'denSec' + (busy || ci === 0 ? ' open' : '');
+    const head = document.createElement('button');
+    head.className = 'denSecHead';
+    head.innerHTML = `<span class="ic">${col.icon}</span>
+      <span class="nm">${col.name}</span>
+      <span class="ct">${owned}/${mine.length}</span>
+      <span class="chev">▶</span>`;
+    head.onclick = () => { sec.classList.toggle('open'); snd.soft(); };
+    const grid = document.createElement('div');
+    grid.className = 'denGridInner';
+    mine.forEach(c => grid.appendChild(critterCard(c, idx++)));
+    sec.append(head, grid);
+    host.appendChild(sec);
   });
 }
 /* ---------------- bookshelf ---------------- */
@@ -1214,41 +1384,47 @@ function endStory(){
   if (asleep){ day.tuckIns += 1; if (!day.done.includes(story.id)) day.done.push(story.id); }
   const days = { ...(SAVE.days||{}) }; days[todayStr()] = day;
 
-  // ---- bedtime stars: one a day, toward whichever critter fell asleep first ----
+  // ---- the local history the progress file reads ----
+  // Bedtime stars and the star day live on the CHARACTER now (E3); the
+  // only thing kept here is how many times this critter has been read to,
+  // which is Critter-Reader-flavoured history, not progression.
   const dex = { ...(SAVE.dex||{}) };
-  const stars = { ...(SAVE.stars||{}) };
-  let starEarned = false, nowCollected = false, justForFun = false;
-  if (asleep){
-    dex[critter.id] = { n: (dex[critter.id]?.n || 0) + 1, first: dex[critter.id]?.first || Date.now() };
-    if (!starEarnedToday() && CONFIG.starsPerDay > 0){
-      const wasCollected = isCollected(critter);
-      stars[critter.id] = (stars[critter.id] || 0) + 1;
-      starEarned = true;
-      nowCollected = !wasCollected && stars[critter.id] >= starsNeeded(critter);
-      SAVE = patchSave({ dex, days, stars, starDay: todayStr(), starCritter: critter.id,
-                         storiesRead: (SAVE.storiesRead||0) + 1 });
-    } else {
-      justForFun = true;   // still a full sleep ending — warm, never "limit reached"
-      SAVE = patchSave({ dex, days, storiesRead: (SAVE.storiesRead||0) + 1 });
-    }
-  } else {
-    SAVE = patchSave({ days, storiesRead: (SAVE.storiesRead||0) + 1 });
-  }
+  if (asleep) dex[critter.id] = { n: (dex[critter.id]?.n || 0) + 1, first: dex[critter.id]?.first || Date.now() };
+  SAVE = patchSave({ dex, days, storiesRead: (SAVE.storiesRead||0) + 1,
+                     ...(asleep && !starEarnedToday() ? { starCritter: critter.id } : {}) });
 
-  // ---- the shared character: XP + coins through the arcade shell ----
+  // ---- the shared character ----
+  // XP and coins as always, PLUS tonight's bedtime star: awardRun decides
+  // whether one is owed (one per calendar day), adds it to
+  // character.critterStars, and — if that finishes the quest — grants the
+  // critter down the same path Loot Drop's loot takes. One write.
   const awardEl = asleep ? $('awardLine') : $('awakeAward');
   awardEl.textContent = 'Saving…';
   window.__CC.finishRunCalls++;
   finishRun('critter-catchers', {
     asked: pages, correct: passed, seconds, score: passed,
-  }).then(outcome => {
+    // One story is one full run, whether it is four pages or five — so
+    // the older reader's longer story earns exactly the same.
+    runQuestions: pages,
+    critterStar: asleep ? critter.id : null,
+  }).then(async outcome => {
     awardEl.textContent = describeAward(outcome);
-    if (asleep) celebrateLevelUp(outcome);
+    if (!asleep) return;
+    await refreshCharacter();
+    paintStar(outcome.star);
+    // The full reveal, then the level-up / collection-complete beats.
+    const done = () => celebrateLevelUp(outcome);
+    if (outcome.star?.granted){
+      revealDrops({ drops: [{
+        spriteId: outcome.star.spriteId, rarity: critter.rarity,
+        isNew: outcome.star.isNew, source: 'quest',
+      }] }, done);
+    } else done();
   });
 
   if (CONFIG.progressFileAuto) downloadReport(true);
 
-  if (asleep) showSleep({ starEarned, nowCollected, justForFun });
+  if (asleep) showSleep();
   else showAwake();
 }
 
@@ -1265,7 +1441,30 @@ function confettiBurst(card){
     setTimeout(() => b.remove(), 4200);
   }
 }
-function showSleep({ starEarned, nowCollected, justForFun }){
+/* The star line is filled in when the award lands, so the sleep screen
+   never waits on the network to say "fell asleep". */
+function paintStar(star){
+  const sl = $('starLine'), nf = $('newFriend');
+  const first = shortName(critter);
+  if (!star){ sl.textContent = ''; nf.classList.add('hidden'); return; }
+  if (star.alreadyToday){
+    sl.textContent = "✨ A just-for-fun story — tonight's star is already tucked in. What a cozy reader!";
+  } else if (star.complete){
+    sl.textContent = star.isNew
+      ? `⭐ The last bedtime star! ${first} is yours.`
+      : `⭐ Quest complete again — that's a spare ${first} to trade!`;
+  } else {
+    const left = star.needed - star.stars;
+    sl.textContent = `⭐ Bedtime star earned! ${first} has ${star.stars} of ${star.needed} — ${left} more ${left === 1 ? 'night' : 'nights'} to go.`;
+  }
+  nf.textContent = star.isNew
+    ? `🎉 ${first} joined your collection!`
+    : `🎉 A spare ${first} — perfect for trading!`;
+  nf.classList.toggle('hidden', !star.granted);
+  if (star.granted) confettiBurst($('sleepCard'));
+}
+
+function showSleep(){
   const first = shortName(critter);
   $('sleepFace').textContent = critter.emoji;
   $('sleepTitle').textContent = `${first} fell asleep! 🌙`;
@@ -1273,17 +1472,8 @@ function showSleep({ starEarned, nowCollected, justForFun }){
     ? 'You read every single page beautifully. Sweet dreams!'
     : 'What a lovely story. Sweet dreams!';
   $('favLine').classList.toggle('hidden', story.genre !== critter.fav);
-  const sl = $('starLine');
-  if (nowCollected){
-    sl.textContent = '⭐ Bedtime star earned!';
-  } else if (starEarned){
-    sl.textContent = `⭐ Bedtime star earned! ${first} has ${Math.min(starsFor(critter.id), starsNeeded(critter))} of ${starsNeeded(critter)}.`;
-  } else if (justForFun){
-    sl.textContent = `✨ A just-for-fun story — tonight's star is already tucked in. What a cozy reader!`;
-  } else sl.textContent = '';
-  const nf = $('newFriend');
-  nf.textContent = `🎉 ${first} joined your collection!`;
-  nf.classList.toggle('hidden', !nowCollected);
+  $('starLine').textContent = '⭐ …';
+  $('newFriend').classList.add('hidden');
   const card = $('sleepCard');
   card.querySelectorAll('.floatZ').forEach(z => z.remove());
   for (let i=0;i<3;i++){
@@ -1295,7 +1485,6 @@ function showSleep({ starEarned, nowCollected, justForFun }){
     card.appendChild(z);
   }
   snd.lullaby(); setTimeout(() => snd.snore(), 2400);
-  if (nowCollected) confettiBurst(card);
   show('sleepScreen');
 }
 $('sleepAgain').onclick = () => { renderDen(); show('denScreen'); };
@@ -1323,23 +1512,29 @@ $('awakeRetry').onclick = () => openShelf(critter);
 $('awakeBack').onclick = () => { renderDen(); show('denScreen'); };
 
 /* ---------------- collection screen ---------------- */
+/* The quest log: only critters this kid has actually read to, or already
+   owns. The full 80 live on the den shelf and in the Locker — this screen
+   answers "what am I in the middle of?". */
 function openDex(){
   const grid = $('dexGrid');
   grid.innerHTML = '';
-  CRITTERS.forEach(c => {
-    const done = isCollected(c);
-    const caught = SAVE.dex && SAVE.dex[c.id];
+  const mine = CRITTERS.filter(c => isOwned(c) || starsFor(c.id) > 0);
+  mine.forEach(c => {
+    const done = isOwned(c);
+    const caught = SAVE.dex && SAVE.dex[c.legacyId || c.id];
     const r = RARITY[c.rarity] || RARITY.common;
     const d = document.createElement('div');
     d.className = 'dexCard' + (done ? '' : ' mystery');
     d.innerHTML = done
-      ? `<span class="f">${c.emoji}</span><span class="n">${shortName(c)} 💤</span><span class="c">tucked in ×${caught ? caught.n : 0}</span>`
+      ? `<span class="f">${c.emoji}</span><span class="n">${shortName(c)} 💤</span><span class="c">read to ×${caught ? caught.n : 0}</span>`
       : `<span class="f">${c.emoji}</span><span class="n">${shortName(c)}</span><span class="c" style="color:${r.color}">⭐ ${starsFor(c.id)}/${starsNeeded(c)}</span>`;
     grid.appendChild(d);
   });
-  $('dexSub').textContent = collectedCount() === CRITTERS.length
-    ? 'EVERY critter is asleep. You are a legendary storyteller! 🌟'
-    : 'Collect a critter by earning all its bedtime stars — one cozy story a night.';
+  $('dexSub').textContent = !mine.length
+    ? 'No quests yet — pick a critter in the den and read them a story tonight! 🌙'
+    : collectedCount() === LIVE_SPRITE_IDS.length
+      ? 'EVERY critter is asleep. You are a legendary storyteller! 🌟'
+      : 'Earn a critter by reading it a story a night — one bedtime star each night.';
   show('dexScreen');
 }
 $('dexBtn').onclick = openDex;
@@ -1363,7 +1558,7 @@ function buildReportPayload(){
     stories:a.stories+d.stories, qR:a.qR+d.qRight, qT:a.qT+d.qTotal,
   }), {pages:0,passed:0,seconds:0,stories:0,qR:0,qT:0});
   return {
-    game: 'Critter Catchers — Bedtime Stories',
+    game: 'Critter Reader — Bedtime Stories',
     child: kid.nickname,
     today: t ? {
       date: todayStr(), seconds: t.seconds,
@@ -1377,8 +1572,8 @@ function buildReportPayload(){
     } : null,
     dayStreak: streak,
     crittersCollected: collectedCount(),
-    crittersTotal: CRITTERS.length,
-    collecting: CRITTERS.filter(c => starsFor(c.id) > 0 && !isCollected(c))
+    crittersTotal: LIVE_SPRITE_IDS.length,
+    collecting: CRITTERS.filter(c => starsFor(c.id) > 0 && !isOwned(c))
       .map(c => ({ critter: c.name, rarity: c.rarity, stars: starsFor(c.id), needed: starsNeeded(c) })),
     lifetime: {
       daysPlayed: days.length,
@@ -1406,7 +1601,7 @@ function downloadReport(auto){
 $('saveBtn').onclick = () => downloadReport(false);
 window.__CC.buildReportPayload = buildReportPayload;   // for the test harness
 
-init();
+await init();
 } // end main()
 </script>
 </body>

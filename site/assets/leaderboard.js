@@ -3,9 +3,9 @@
    Nicknames and avatars, never real names. Tapping a sibling opens
    their read-only loadout: what they've equipped and what they own.
    ===================================================================== */
-import { SKINS, PETS, SPRITE_IDS } from './catalog.js';
+import { SKINS, PETS, LIVE_SPRITE_IDS, spriteState, uniqueLiveCount } from './catalog.js';
 import { listFamilyCharacters, getSiblingLoadout } from '../firebase-config.js';
-import { el, fmt, sectionTitle, spriteChip, signInCard } from './widgets.js';
+import { el, fmt, sectionTitle, spriteChip, signInCard, renderBadgeBanner } from './widgets.js';
 
 const MEDALS = ['\u{1F947}', '\u{1F948}', '\u{1F949}'];
 
@@ -41,7 +41,7 @@ export async function renderLeaderboard(panel, ctx) {
     ));
   });
   panel.append(list);
-  panel.append(el('p', { class: 'ac-sub', text: 'Tap anyone to peek at their loadout. Collection score: commons 1, rares 3, epics 8, legendaries 20, mythics 60.' }));
+  panel.append(el('p', { class: 'ac-sub', text: 'Tap anyone to peek at their loadout. Collection score: commons 1, rares 3, epics 8, legendaries 20.' }));
 }
 
 /* Read-only peek at a sibling's kit. Looking never writes anything. */
@@ -59,7 +59,10 @@ async function openLoadout(f) {
     const l = await getSiblingLoadout(f.childId);
     const skin = SKINS.find((s) => s.id === l.skin) || SKINS[0];
     const pet = PETS.find((p) => p.id === l.pet);
-    const ownedIds = SPRITE_IDS.filter((id) => (l.counts[id] || 0) > 0);
+    // Only what they OWN is shown on a peek — the sibling's silhouettes
+    // and hidden slots are their own business. State is computed against
+    // the sibling's character, so a traded-in legendary reads as owned.
+    const ownedIds = LIVE_SPRITE_IDS.filter((id) => spriteState(id, l) === 'owned');
     card.innerHTML = '';
     card.append(
       el('p', { class: 'ac-modal__name', text: `${f.nickname} · Level ${l.level}` }),
@@ -70,10 +73,11 @@ async function openLoadout(f) {
           pet && pet.id !== 'none' ? el('div', { text: `${pet.g} ${pet.n}` }) : el('div', { class: 'ac-modal__hint', text: 'No pet yet' }),
         ),
       ),
-      el('p', { class: 'ac-modal__hint', text: `${ownedIds.length}/${SPRITE_IDS.length} sprites · collection score ${fmt(l.collectionScore)}` }),
+      renderBadgeBanner(l.badges, { owner: f.nickname }),
+      el('p', { class: 'ac-modal__hint', text: `${uniqueLiveCount(l.counts)}/${LIVE_SPRITE_IDS.length} critters · collection score ${fmt(l.collectionScore)}` }),
       (() => {
         const g = el('div', { class: 'ac-sprites ac-sprites--mini' });
-        ownedIds.forEach((id) => g.append(spriteChip(id, { count: l.counts[id] })));
+        ownedIds.forEach((id) => g.append(spriteChip(id, { count: l.counts[id], state: 'owned' })));
         return g;
       })(),
       el('button', { class: 'ac-btn ac-btn--inline', type: 'button', text: 'Close', onClick: () => modal.remove() }),

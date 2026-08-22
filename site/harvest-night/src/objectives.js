@@ -23,8 +23,32 @@ function makeKeyMesh() {
   return group;
 }
 
+/* The critter encounter (R2B · E2): a glowing billboard of the critter's
+   emoji in a white disc ringed in its rarity colour, lit so it reads
+   through the fog. Catching it puts it in the HUD bubble as a PENDING
+   capture; it is only granted if the kid makes it out the gate. */
+function makeCritterMesh(critter) {
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const g = canvas.getContext('2d');
+  g.beginPath(); g.arc(size / 2, size / 2, 108, 0, Math.PI * 2);
+  g.fillStyle = '#ffffff'; g.fill();
+  g.lineWidth = 18; g.strokeStyle = critter.color || '#9BB1D4'; g.stroke();
+  g.font = '140px serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(critter.emoji, size / 2, size / 2 + 8);
+  const tex = new THREE.CanvasTexture(canvas);
+  if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+  sprite.scale.set(1.5, 1.5, 1);
+  const group = new THREE.Group();
+  group.add(sprite);
+  group.add(new THREE.PointLight(0x9bd0ff, 10, 6, 2));
+  return group;
+}
+
 export class Objectives {
-  constructor({ scene, keySpots, gate, colliders, hud, audio, onFirstKey }) {
+  constructor({ scene, keySpots, gate, colliders, hud, audio, onFirstKey, critter = null }) {
     this.scene = scene;
     this.gate = gate;
     this.colliders = colliders;
@@ -40,6 +64,18 @@ export class Objectives {
       return { ...def, position, mesh, collected: false };
     });
 
+    // The night's critter, if today's cap allows one: it waits in the
+    // corn, a little way from the corn key, where the light gives it away.
+    this.critter = null;
+    this.pendingCaptures = [];
+    if (critter && critter.spriteId) {
+      const position = keySpots.corn.clone().add(new THREE.Vector3(6, 0.2, -6));
+      const mesh = makeCritterMesh(critter);
+      mesh.position.copy(position);
+      scene.add(mesh);
+      this.critter = { ...critter, position, mesh, caught: false };
+    }
+
     this.collectedCount = 0;
     this.gateHoldTime = 0;
     this.won = false;
@@ -48,6 +84,22 @@ export class Objectives {
 
     this.hud.setKeyCount(0);
     this.hud.showHint('Three keys are hidden on the farm — the barn, the silo, and the cornfield. Find them, then get to the gate.');
+  }
+
+  _nearCritter(player) {
+    const c = this.critter;
+    if (!c || c.caught) return null;
+    return player.position.distanceTo(c.position) <= CONFIG.interactRange ? c : null;
+  }
+
+  _catchCritter(player) {
+    const c = this.critter;
+    c.caught = true;
+    this.scene.remove(c.mesh);
+    this.pendingCaptures.push(c.spriteId);
+    this.hud.showCritterBubble(c.emoji, c.name);
+    this.audio.playChime();
+    this.hud.showHint(`${c.emoji} ${c.name} is in your bubble — make it out the gate and it's yours!`);
   }
 
   get elapsedSeconds() {
@@ -94,7 +146,7 @@ export class Objectives {
     // Tell the page shell the run is over so it can award the character.
     // Fire-and-forget: the win screen never waits on the save.
     document.dispatchEvent(new CustomEvent('harvest:won', {
-      detail: { keys: this.collectedCount, seconds: this.elapsedSeconds },
+      detail: { keys: this.collectedCount, seconds: this.elapsedSeconds, captures: this.pendingCaptures.slice() },
     }));
   }
 
@@ -107,9 +159,14 @@ export class Objectives {
       key.mesh.position.y = key.position.y + Math.sin(this.spinPhase * CONFIG.keyVisual.bobSpeed) * CONFIG.keyVisual.bobAmount;
     }
 
+    if (this.critter && !this.critter.caught) {
+      this.critter.mesh.position.y = this.critter.position.y + 0.9 + Math.sin(this.spinPhase * 2.2) * 0.12;
+    }
+
     if (this.won) return;
 
     const nearKey = this._nearestUncollectedKey(player);
+    const nearCritter = nearKey ? null : this._nearCritter(player);
     const gateDist = this._distanceToGateXZ(player);
     const nearGate = gateDist <= CONFIG.interactRange;
 
@@ -143,6 +200,14 @@ export class Objectives {
       this.hud.showPrompt('[E] Take key');
       if (player.input.interact && !this._prevInteract) {
         this._collect(nearKey, player);
+        this.hud.hidePrompt();
+      }
+    } else if (nearCritter) {
+      this.gateHoldTime = 0;
+      this.hud.setHoldProgress(0);
+      this.hud.showPrompt(`[E] Catch ${nearCritter.name}`);
+      if (player.input.interact && !this._prevInteract) {
+        this._catchCritter(player);
         this.hud.hidePrompt();
       }
     } else {

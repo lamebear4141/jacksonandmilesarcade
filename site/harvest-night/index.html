@@ -29,8 +29,9 @@
       Harvest Night needs the mouse captured to look around; no mobile
       browser supports Pointer Lock, so on a tablet the game literally
       cannot take input. Better to say so kindly than load it anyway.  */
-import { requireKid, mountBar, canPointerLock, finishRun, celebrateLevelUp, describeAward }
+import { requireKid, mountBar, canPointerLock, finishRun, celebrateLevelUp, describeAward, loadCharacter }
   from '../assets/arcade-shell.js';
+import { encounterSpawn, RARITY } from '../assets/catalog.js';
 
 const kid = await requireKid({ gameName: 'Harvest Night' });
 if (kid) {
@@ -57,10 +58,23 @@ if (kid) {
 
     // Winning fires this event from objectives.js. 10 units per key found
     // plus 20 for escaping; the fun-game daily cap does the clamping.
+    // Tonight's critter: one encounter from the shared, level-gated roll,
+    // or none if today's cap is spent. It is a PENDING capture until the
+    // gate — escaping is this game's captureCondition.
+    try {
+      const c = await loadCharacter(kid.id);
+      const d = encounterSpawn(c);
+      window.HARVEST_CRITTER = d ? {
+        spriteId: d.spriteId, emoji: d.sprite.g, name: d.sprite.n,
+        rarity: d.rarity, color: RARITY[d.rarity].color,
+      } : null;
+    } catch { window.HARVEST_CRITTER = null; }
+
     document.addEventListener('harvest:won', async (e) => {
-      const { keys, seconds } = e.detail;
+      const { keys, seconds, captures } = e.detail;
       const outcome = await finishRun('harvest-night', {
         units: keys * 10 + 20, seconds: Math.round(seconds), score: keys,
+        captures: captures || [], escaped: true,
       });
       const win = document.getElementById('winScreen');
       if (win) {

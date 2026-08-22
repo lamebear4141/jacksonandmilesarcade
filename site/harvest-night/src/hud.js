@@ -33,6 +33,15 @@ export class HUD {
     }
     this.root.appendChild(this.keyCounter);
 
+    // The critter bubble, top-right: a pending capture rides here until
+    // the gate. Hidden until something is caught.
+    this.bubble = el('div', {
+      position: 'absolute', top: '16px', right: '18px', display: 'none', alignItems: 'center', gap: '8px',
+      padding: '8px 14px', borderRadius: '999px', background: 'rgba(255,255,255,0.92)', color: '#1E2B63',
+      fontWeight: '900', fontSize: '15px', textShadow: 'none', boxShadow: '0 4px 0 rgba(0,0,0,0.35)',
+    });
+    this.root.appendChild(this.bubble);
+
     // Objective hint, top-center, fades after 5s.
     this.hint = el('div', {
       position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)',
@@ -81,6 +90,11 @@ export class HUD {
     this.winScreen.appendChild(this.winTime);
     this.winScreen.appendChild(this.winRestart);
     document.body.appendChild(this.winScreen);
+  }
+
+  showCritterBubble(emoji, name) {
+    this.bubble.textContent = `🫧 ${emoji} ${name} · pending`;
+    this.bubble.style.display = 'flex';
   }
 
   setKeyCount(n) {

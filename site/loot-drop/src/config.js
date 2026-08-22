@@ -31,18 +31,25 @@ export const CONFIG = {
   xpExtractBonus: 100,
   xpPerMinutePlayed: 4,
   xpEliminatedConsolation: 25,   // you still learn something losing
-  coinsPerExtract: 65,
-  coinsPerLevel: 75,
+  /* Coins are no longer a per-run wage (R2B · E4): extracting, sprite
+     rarity and levelling up all pay XP, and Loot Drop's COIN income is
+     its between-round mini-game, which is its bespoke bonus round.
+     Retired: coinsPerExtract 65, coinsPerLevel 75. */
+  minigameFloorCoins: 40,   // matches VAULT.floorCoins — a bespoke round
+                            // must never pay less than the shared one
   bonusRoundMultiplier: 2,       // story rounds need read AND answer, so pay double
 
-  // --- Daily habit bonuses (these raise your loot luck) ---
-  // Spread in from the shared catalog under their original key names, so
-  // ui.js and game.js keep reading CONFIG.streakBonusLuck & friends as
-  // they always have. Change the values in catalog.js's LUCK block.
+  // --- What makes a critter rarer ---
+  // Spread in from the shared catalog. Since E7 this is just accuracy
+  // and Practice Power: the minutes-played bonus is gone, and with it
+  // the "play 3 more minutes for better loot" prompt that used to live
+  // on the drop screen.
   ...LUCK,
 
   // --- Streak milestone gifts ---
   streakGifts: { 3:'coins:100', 5:'pet', 7:'coins:250', 14:'skin', 30:'mythic' },
+  // (streak gifts still pay coins — they are a milestone bonus, not a
+  //  per-run wage, and they go through grantCoins' daily cap.)
 };
 
 export const GRADES = {

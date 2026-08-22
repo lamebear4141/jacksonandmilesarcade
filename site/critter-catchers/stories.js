@@ -857,10 +857,40 @@ export const STORIES = {
   },
 };
 
+/* ---------------------------------------------------------------------
+   THE SHARED SHELF
+   ---------------------------------------------------------------------
+   Since R2B/E3 a kid can read to ANY critter in the collection, not just
+   the twelve this library was written for. Most books here star a named
+   bedtime critter and would make no sense read to a zebra — but a
+   handful are plain fairy tales with nobody from the den in them, and
+   those are the shelf every other critter gets.
+
+   Listed by id rather than moved, so the critters who own them keep them
+   too — a book can sit on two shelves. Deliberately excluded: 'sneeze'
+   (names Bram) and anything else naming one of the twelve.
+
+   Adding a book here is a pure content edit: write it with no named
+   critter and add its id.                                              */
+export const SHARED_STORY_IDS = {
+  1: ['knight', 'moonsock', 'frog', 'roar'],
+  2: ['backwards', 'shepherd', 'ember'],
+};
+
+/** Every book in a level, flattened — the lookup behind the shared shelf. */
+function allAtLevel(level){
+  return Object.values(STORIES[level] || {}).flat();
+}
+
 /* The shelf for one critter: their own books, favourite genre first so the
-   ⭐ marker is easy to spot. Books belonging to other critters never appear. */
+   ⭐ marker is easy to spot. Books belonging to ANOTHER named critter never
+   appear; a critter with no books of its own reads the shared shelf. */
 export function storiesFor(critter, level){
-  const mine = (STORIES[level] || {})[critter.id] || [];
+  const lvl = STORIES[level] ? level : 1;
+  const own = (STORIES[lvl] || {})[critter.legacyId || critter.id];
+  const mine = own && own.length
+    ? own
+    : allAtLevel(lvl).filter(s => (SHARED_STORY_IDS[lvl] || []).includes(s.id));
   return [ ...mine.filter(s => s.genre === critter.fav),
            ...mine.filter(s => s.genre !== critter.fav) ];
 }

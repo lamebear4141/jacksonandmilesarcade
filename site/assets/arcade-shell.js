@@ -15,7 +15,16 @@ import {
   onParentChange, getCurrentKid, clearCurrentKid, isGuestKid,
   loadCharacter, awardRun,
 } from '../firebase-config.js';
-import { GAMES, SKINS, PETS, SAFETY, levelFromXp } from './catalog.js';
+import {
+  GAMES, SKINS, PETS, SAFETY, levelFromXp, COLLECTIONS, GRAND_PRIZE,
+  RARITY, LIVE_SPRITE_IDS, spriteById, displayRarity, newlyUnlockedRarities,
+  VAULT, vaultPayout, vaultAccuracy, PRACTICE_POWER,
+} from './catalog.js';
+import { grantCoins } from '../firebase-config.js';
+
+/** The drop reveal's Trade button leaves the spare here; the trade
+    builder reads it on mount and pre-loads the "You give" side. */
+export const TRADE_OFFER_KEY = 'arcade.tradeOffer';
 
 /* The hub, resolved from this file's own location rather than from the
    page's — so it's the same link whether a game at /loot-drop/index.html
@@ -327,7 +336,7 @@ export async function finishRun(gameId, result) {
   const kid = getCurrentKid();
   if (!kid) {
     // Nothing to save to. Never blow up a game's end screen over it.
-    return { xp: 0, coins: 0, bricksEarned: 0, sparksEarned: 0, leveledUp: false, newLevel: 1, saved: false, reason: 'no profile' };
+    return { xp: 0, coins: 0, bricksEarned: 0, sparksEarned: 0, leveledUp: false, newLevel: 1, drops: [], saved: false, reason: 'no profile' };
   }
 
   inFlight = (async () => {
@@ -335,7 +344,7 @@ export async function finishRun(gameId, result) {
       const out = await awardRun(kid.id, gameId, result);
       return { ...out, saved: true };
     } catch (e) {
-      return { xp: 0, coins: 0, bricksEarned: 0, sparksEarned: 0, leveledUp: false, newLevel: 1, saved: false, reason: e.message };
+      return { xp: 0, coins: 0, bricksEarned: 0, sparksEarned: 0, leveledUp: false, newLevel: 1, drops: [], saved: false, reason: e.message };
     }
   })();
 
@@ -363,20 +372,230 @@ export function _resetRunGuard() {
    ===================================================================== */
 
 /**
- * The full-screen level-up moment. Call it with finishRun's outcome; it
- * does nothing unless the run actually levelled the character up. Shows
- * the new level and anything the shop just unlocked — celebration only,
- * a kid can never see this screen for doing badly.
+ * The end-of-run moments, in order, each waiting for the last to close:
+ *   1. revealDrops       any critters this run found (chest → critter)
+ *   2. the level-up card — with the NEW CRITTERS beat when a rarity
+ *                          band opened
+ *   3. celebrateCompletion  a collection finished by this run
+ * Call it with finishRun's outcome from any game; it does nothing when
+ * there is nothing to celebrate. A kid can never see any of these for
+ * doing badly.
  */
 export function celebrateLevelUp(outcome) {
-  if (!outcome?.leveledUp) return;
+  if (!outcome) return;
+  revealDrops(outcome, () => {
+    runBonusVault(outcome, () => {
+      if (!outcome.leveledUp) { celebrateCompletion(outcome); return; }
+      showLevelUpCard(outcome, () => celebrateCompletion(outcome));
+    });
+  });
+}
+
+/* =====================================================================
+   THE BONUS VAULT — where coins come from.
+
+   Three vaults shimmer; a marker sweeps a timing bar; one tap cracks one
+   open. How close the tap lands to the middle sets the payout between
+   the floor and the ceiling.
+
+   The rules that matter more than the mechanic:
+     · THE FLOOR ALWAYS PAYS. There is no losing this, no zero, and no
+       "you missed" — a bad tap is still a win, just a smaller one.
+     · One tap skips it and still collects the floor, so it can never
+       stand between a kid and playing again.
+     · The daily coin cap is spoken in tomorrow's language, never as a
+       limit reached.
+
+   Runs after any qualifying run in a game with no bespoke bonus round of
+   its own (GAMES[id].bonusRound === 'vault'); awardRun decides that and
+   reports it as outcome.bonusVault.
+   ===================================================================== */
+export function runBonusVault(outcome, onDone) {
+  const v = outcome?.bonusVault;
+  const done = () => { onDone && onDone(); };
+  if (!v?.eligible || !outcome?.saved) return done();
+
+  // No room left today? Say so warmly and move on — never open a vault
+  // that cannot pay.
+  if (v.room <= 0) {
+    const card = vaultCard();
+    card.append(
+      bigLine('\u{1F319}', 'ac-vault__emoji'),
+      h2El('All of today’s coins are collected!'),
+      subEl('Tomorrow’s vaults are already filling up. Your critters and XP still count — go play! \u{2728}'),
+    );
+    return overlayCard(card, 'Okay!', done);
+  }
+
+  const kid = getCurrentKid();
+  const card = vaultCard();
+  const kicker = document.createElement('p');
+  kicker.className = 'ac-reveal__kicker';
+  kicker.textContent = 'GREAT RUN — BONUS VAULT!';
+
+  const doors = document.createElement('div');
+  doors.className = 'ac-vault__doors';
+  const doorEls = ['\u{1F5DD}\u{FE0F}', '\u{1F510}', '\u{1F5DD}\u{FE0F}'].map((glyph, i) => {
+    const d = document.createElement('div');
+    d.className = 'ac-vault__door';
+    d.style.animationDelay = `${i * 0.25}s`;
+    d.textContent = '\u{1F3E6}';
+    doors.appendChild(d);
+    return d;
+  });
+
+  // A learning run widens the green: the better the maths, the bigger
+  // the target, so the coins are won with the subject and not the thumbs.
+  const zoneWidth = Math.max(0.08, Math.min(0.9, Number(v.zone) || VAULT.zoneBase));
+  const track = document.createElement('div');
+  track.className = 'ac-vault__track';
+  const zone = document.createElement('div');
+  zone.className = 'ac-vault__zone';
+  zone.style.left  = `${((1 - zoneWidth) / 2 * 100).toFixed(1)}%`;
+  zone.style.width = `${(zoneWidth * 100).toFixed(1)}%`;
+  const marker = document.createElement('div');
+  marker.className = 'ac-vault__marker';
+  track.append(zone, marker);
+
+  const hint = document.createElement('p');
+  hint.className = 'ac-levelup__sub';
+  hint.textContent = zoneWidth > VAULT.zoneBase + 0.01
+    ? 'Great answers made the target BIGGER — tap in the green!'
+    : 'Tap when the light is in the green!';
+
+  const tapBtn = document.createElement('button');
+  tapBtn.className = 'ac-btn ac-btn--inline ac-vault__tap';
+  tapBtn.type = 'button';
+  tapBtn.textContent = '\u{1F449} CRACK IT OPEN';
+
+  const skipBtn = document.createElement('button');
+  skipBtn.className = 'ac-btn--ghost ac-vault__skip';
+  skipBtn.type = 'button';
+  skipBtn.textContent = `\u{26A1} Just collect ${VAULT.floorCoins} \u{1FA99}`;
+
+  card.append(kicker, doors, track, hint, tapBtn, skipBtn);
+  const overlay = document.createElement('div');
+  overlay.className = 'ac-levelup ac-vault';
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+  sfx.play('pop');
+
+  /* The sweep. rAF rather than CSS so the tap reads the true position.
+     `pos` starts dead centre on purpose: under prefers-reduced-motion the
+     marker parks there, and in any situation where frames never arrive
+     (a backgrounded tab, a browser that throttles rAF) the tap pays the
+     CEILING rather than the floor. A kid who cannot see the bar move must
+     never be paid less for it — the error always falls their way. */
+  const still = prefersReducedMotion();
+  let raf = null, start = null, settled = false;
+  const positionAt = (t) => {
+    if (still) return 0.5;
+    const phase = ((t - start) % VAULT.sweepMs) / VAULT.sweepMs;   // 0..1
+    return phase < 0.5 ? phase * 2 : (1 - phase) * 2;              // ping-pong 0..1
+  };
+  let pos = 0.5;
+  const loop = (t) => {
+    if (settled) return;
+    if (start == null) start = t;
+    pos = positionAt(t);
+    marker.style.left = `${pos * 100}%`;
+    raf = requestAnimationFrame(loop);
+  };
+  if (still) marker.style.left = '50%'; else raf = requestAnimationFrame(loop);
+
+  const settle = (accuracy) => {
+    if (settled) return;
+    settled = true;
+    if (raf) cancelAnimationFrame(raf);
+    tapBtn.disabled = true;
+    skipBtn.remove();
+    const amount = vaultPayout(accuracy);
+    const chosen = doorEls[Math.min(2, Math.floor(accuracy * 3))];
+    doorEls.forEach((d) => d.classList.add('is-shut'));
+    chosen.classList.remove('is-shut');
+    chosen.classList.add('is-open');
+    chosen.textContent = '\u{1F4B0}';
+    track.remove();
+
+    hint.textContent = accuracy >= 0.85 ? 'PERFECT CRACK! \u{1F929}'
+                     : accuracy >= 0.5  ? 'Nice one! \u{1F44F}'
+                     : 'Cracked it! \u{1F642}';
+    sfx.play(accuracy >= 0.85 ? 'win' : 'coin');
+    confetti(window.innerWidth / 2, window.innerHeight * 0.42, accuracy >= 0.85 ? 110 : 50);
+
+    const prize = document.createElement('p');
+    prize.className = 'ac-vault__prize';
+    prize.textContent = `+${amount} \u{1FA99}`;
+    card.insertBefore(prize, tapBtn);
+    tapBtn.remove();
+
+    const finish = (granted, capped) => {
+      if (granted < amount) {
+        prize.textContent = `+${granted} \u{1FA99}`;
+        const note = document.createElement('p');
+        note.className = 'ac-reveal__note';
+        note.textContent = '\u{1F319} That fills up today — tomorrow’s vaults are already waiting!';
+        card.insertBefore(note, prize.nextSibling);
+      }
+      const ok = document.createElement('button');
+      ok.className = 'ac-btn ac-btn--yellow ac-btn--inline';
+      ok.type = 'button';
+      ok.textContent = 'Collect!';
+      ok.addEventListener('click', () => { overlay.remove(); done(); });
+      card.appendChild(ok);
+    };
+
+    if (!kid) return finish(amount, false);
+    grantCoins(kid.id, amount)
+      .then((r) => finish(r?.ok ? r.granted : amount, !!r?.capped))
+      .catch(() => finish(amount, false));
+  };
+
+  tapBtn.addEventListener('click', () => {
+    settle(still ? 1 : vaultAccuracy(pos, zoneWidth));
+  });
+  // Skipping is a real choice, not a punishment: it collects the floor.
+  skipBtn.addEventListener('click', () => settle(0));
+
+  function overlayCard(c, label, cb) {
+    const o = document.createElement('div');
+    o.className = 'ac-levelup ac-vault';
+    const b = document.createElement('button');
+    b.className = 'ac-btn ac-btn--yellow ac-btn--inline';
+    b.type = 'button';
+    b.textContent = label;
+    b.addEventListener('click', () => { o.remove(); cb(); });
+    c.appendChild(b);
+    o.appendChild(c);
+    document.body.appendChild(o);
+  }
+}
+
+function vaultCard() {
+  const c = document.createElement('div');
+  c.className = 'ac-levelup__card ac-vault__card';
+  return c;
+}
+function bigLine(text, cls) {
+  const d = document.createElement('div');
+  d.className = cls;
+  d.textContent = text;
+  return d;
+}
+function h2El(text) { const h = document.createElement('h2'); h.textContent = text; return h; }
+function subEl(text) { const p = document.createElement('p'); p.className = 'ac-levelup__sub'; p.textContent = text; return p; }
+
+function showLevelUpCard(outcome, onClose) {
   const unlocked = [...SKINS, ...PETS].filter(
     (i) => i.level > outcome.oldLevel && i.level <= outcome.newLevel);
+  // Crossing a RARITY_UNLOCK threshold is now the biggest reason to level
+  // up — it gets the second beat and the full confetti.
+  const bands = newlyUnlockedRarities(outcome.oldLevel, outcome.newLevel);
 
   // Levelling up is one of the two screen-shake moments (the other is
   // the front door's PLAY press). All fire-and-forget.
   sfx.play('win');
-  confettiRain(140);
+  confettiRain(bands.length ? 260 : 140);
   document.body.classList.add('shake');
   setTimeout(() => document.body.classList.remove('shake'), 400);
 
@@ -389,6 +608,32 @@ export function celebrateLevelUp(outcome) {
   const h2 = document.createElement('h2');
   h2.textContent = `\u{1F389} LEVEL ${outcome.newLevel}!`;
   card.appendChild(h2);
+
+  if (bands.length) {
+    const beat = document.createElement('p');
+    beat.className = 'ac-levelup__beat';
+    beat.textContent = '\u{1F389} NEW CRITTERS ARE OUT THERE!';
+    const counts = outcome.counts || {};
+    const findable = LIVE_SPRITE_IDS.filter((id) =>
+      bands.includes(displayRarity(spriteById(id).r)) && !(counts[id] > 0));
+    const row = document.createElement('div');
+    row.className = 'ac-levelup__silhouettes';
+    findable.slice(0, 6).forEach((id) => {
+      const s = spriteById(id);
+      const chip = document.createElement('span');
+      chip.className = 'ac-silhouette ac-silhouette--' + displayRarity(s.r);
+      chip.textContent = s.g;
+      chip.title = '??? · ' + RARITY[displayRarity(s.r)].name;
+      row.appendChild(chip);
+    });
+    if (findable.length > 6) {
+      const more = document.createElement('span');
+      more.className = 'ac-levelup__more';
+      more.textContent = `+${findable.length - 6} more`;
+      row.appendChild(more);
+    }
+    card.append(beat, row);
+  }
 
   if (unlocked.length) {
     const sub = document.createElement('p');
@@ -409,9 +654,249 @@ export function celebrateLevelUp(outcome) {
   btn.className = 'ac-btn ac-btn--inline';
   btn.type = 'button';
   btn.textContent = 'Keep going!';
-  btn.addEventListener('click', () => overlay.remove());
+  btn.addEventListener('click', () => { overlay.remove(); onClose && onClose(); });
   card.appendChild(btn);
   document.body.appendChild(overlay);
+}
+
+/* =====================================================================
+   THE DROP REVEAL — a chest pops, the critter scales in with its ring.
+
+   One card per critter, in turn: "NEW CRITTER!" for a first catch,
+   "+1 SPARE" for a duplicate (always framed as luck — spares are trade
+   goods — with a one-tap Trade button that pre-loads the builder).
+   Encounters say CAUGHT! instead of A CHEST!. A qualifying run that hit
+   the daily cap gets tomorrow-flavored copy; a failed run that lost a
+   pending capture gets "still out there". A run with none of those
+   shows nothing at all — there is no sad copy for a 60% run.
+   ===================================================================== */
+export function revealDrops(outcome, onDone) {
+  const drops = (outcome?.drops || []).filter((d) => spriteById(d.spriteId));
+  const escaped = outcome?.escapedCaptures || [];
+  const done = () => { onDone && onDone(); };
+  if (!drops.length && !outcome?.dropsCapped && !escaped.length) return done();
+
+  const queue = drops.slice();
+  const next = () => {
+    const d = queue.shift();
+    if (d) return showDrop(d, queue.length === 0 && outcome.dropsCapped, next);
+    if (!drops.length && outcome.dropsCapped) return noteCard('\u{1F319}', 'Tomorrow’s critters are already waking up', 'You earned a roll — it’s waiting for you tomorrow!', next);
+    if (!drops.length && escaped.length) return noteCard('\u{1F33F}', 'It scampered off — it’s still out there!', 'Finish the run next time and it’s yours.', next);
+    done();
+  };
+  next();
+
+  function overlayWith(card, onClose) {
+    const overlay = document.createElement('div');
+    overlay.className = 'ac-levelup ac-reveal';
+    const btn = document.createElement('button');
+    btn.className = 'ac-btn ac-btn--yellow ac-btn--inline';
+    btn.type = 'button';
+    btn.textContent = 'Awesome!';
+    btn.addEventListener('click', () => { overlay.remove(); onClose(); });
+    card.appendChild(btn);
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+    return { overlay, btn };
+  }
+
+  function noteCard(emoji, title, sub, onClose) {
+    const card = document.createElement('div');
+    card.className = 'ac-levelup__card ac-reveal__card';
+    const big = document.createElement('div'); big.className = 'ac-reveal__chest'; big.textContent = emoji;
+    const h2 = document.createElement('h2'); h2.textContent = title;
+    const p = document.createElement('p'); p.className = 'ac-levelup__sub'; p.textContent = sub;
+    card.append(big, h2, p);
+    overlayWith(card, onClose);
+  }
+
+  function showDrop(d, cappedAfter, onClose) {
+    const s = spriteById(d.spriteId);
+    const rar = displayRarity(s.r);
+    const card = document.createElement('div');
+    card.className = 'ac-levelup__card ac-reveal__card';
+
+    const KICKER = { encounter: 'CAUGHT!', quest: 'FAST ASLEEP!', roll: 'A CHEST!' };
+    const OPENER = { encounter: '\u{1FAE7}', quest: '\u{1F319}', roll: '\u{1F381}' };
+    const kicker = document.createElement('p');
+    kicker.className = 'ac-reveal__kicker';
+    kicker.textContent = KICKER[d.source] || KICKER.roll;
+    const stage = document.createElement('div');
+    stage.className = 'ac-reveal__stage';
+    const chest = document.createElement('div');
+    chest.className = 'ac-reveal__chest ac-reveal__chest--pop';
+    chest.textContent = OPENER[d.source] || OPENER.roll;
+    stage.appendChild(chest);
+    card.append(kicker, stage);
+    sfx.play('pop');
+
+    const { btn } = overlayWith(card, onClose);
+    btn.disabled = true;
+
+    // the chest pops, then the critter scales in with its ring
+    setTimeout(() => {
+      chest.remove();
+      const ring = document.createElement('div');
+      ring.className = 'ac-reveal__ring ac-reveal__ring--' + rar;
+      const glyph = document.createElement('span');
+      glyph.className = 'ac-reveal__critter';
+      glyph.textContent = s.g;
+      ring.appendChild(glyph);
+      stage.appendChild(ring);
+
+      const label = document.createElement('h2');
+      label.className = 'ac-reveal__label';
+      label.textContent = d.isNew ? 'NEW CRITTER!' : '+1 SPARE';
+      const name = document.createElement('p');
+      name.className = 'ac-reveal__name';
+      name.textContent = s.n;
+      const pill = document.createElement('span');
+      pill.className = 'ac-badge ac-reveal__rarity ac-reveal__rarity--' + rar;
+      pill.textContent = RARITY[rar].name;
+      const tag = document.createElement('p');
+      tag.className = 'ac-levelup__sub';
+      tag.textContent = d.isNew
+        ? (s.lore?.tag ? `“${s.lore.tag}”` : 'Into the Locker it goes!')
+        : 'Lucky — spares are what trades are made of!';
+      stage.after(label, name, pill, tag);
+
+      if (!d.isNew) {
+        const trade = document.createElement('button');
+        trade.className = 'ac-btn ac-btn--outline ac-btn--inline';
+        trade.type = 'button';
+        trade.textContent = '\u{1F501} Trade it';
+        trade.addEventListener('click', () => {
+          try { sessionStorage.setItem(TRADE_OFFER_KEY, JSON.stringify({ spriteId: d.spriteId })); } catch {}
+          window.location.href = HUB + '#trade';
+        });
+        btn.before(trade);
+      }
+      if (cappedAfter) {
+        const note = document.createElement('p');
+        note.className = 'ac-reveal__note';
+        note.textContent = '\u{1F319} Tomorrow’s critters are already waking up';
+        btn.before(note);
+      }
+      sfx.play(rar === 'legendary' || rar === 'epic' ? 'win' : 'coin');
+      confetti(window.innerWidth / 2, window.innerHeight * 0.4, rar === 'legendary' ? 120 : 50);
+      btn.disabled = false;
+    }, 700);
+  }
+}
+
+/** A kid leaving a run with a pending capture still in the bubble. Warm,
+    never punishing: the critter is simply still out there. Games call
+    this from their quit path; `onLeave` proceeds with leaving. */
+export function showScamperCard({ onLeave, onStay } = {}) {
+  const overlay = document.createElement('div');
+  overlay.className = 'ac-levelup ac-reveal';
+  const card = document.createElement('div');
+  card.className = 'ac-levelup__card ac-reveal__card';
+  const big = document.createElement('div'); big.className = 'ac-reveal__chest'; big.textContent = '\u{1F33F}';
+  const h2 = document.createElement('h2'); h2.textContent = 'It scampered off — it’s still out there!';
+  const p = document.createElement('p'); p.className = 'ac-levelup__sub';
+  p.textContent = 'Finish the run and it’s yours. Leave now and it hides again — no harm done.';
+  const stay = document.createElement('button');
+  stay.className = 'ac-btn ac-btn--inline'; stay.type = 'button'; stay.textContent = 'Keep playing';
+  stay.addEventListener('click', () => { overlay.remove(); onStay && onStay(); });
+  const leave = document.createElement('button');
+  leave.className = 'ac-btn ac-btn--outline ac-btn--inline'; leave.type = 'button'; leave.textContent = 'Leave anyway';
+  leave.addEventListener('click', () => { overlay.remove(); onLeave && onLeave(); });
+  const row = document.createElement('div'); row.className = 'ac-reveal__btns';
+  row.append(stay, leave);
+  card.append(big, h2, p, row);
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+}
+
+/* =====================================================================
+   COLLECTION COMPLETE — the thing with no price.
+
+   Fires wherever the grant happened: after finishRun in a game (through
+   celebrateLevelUp, so no game needs to know), and on Accept in the
+   trade tab. Shows the badge, the statue ("Saved for your Box!" until
+   the Box exists) and the new look; all eight adds the Grand Prize.
+   One card per newly completed collection, shown in turn.
+   ===================================================================== */
+export function celebrateCompletion(outcome) {
+  const ids = (outcome?.newlyCompleted || []).filter((id) => COLLECTIONS.some((c) => c.id === id));
+  const queue = ids.map((id) => COLLECTIONS.find((c) => c.id === id));
+  if (!queue.length && !outcome?.grandPrize) return;
+
+  const showNext = () => {
+    const col = queue.shift();
+    if (col) return showCard(completionCard(col), showNext);
+    if (outcome?.grandPrize) { outcome.grandPrize = false; return showCard(grandPrizeCard(), showNext); }
+  };
+  showNext();
+
+  function showCard(card, onClose) {
+    sfx.play('win');
+    confettiRain(160);
+    const overlay = document.createElement('div');
+    overlay.className = 'ac-levelup ac-complete';
+    const btn = document.createElement('button');
+    btn.className = 'ac-btn ac-btn--yellow ac-btn--inline';
+    btn.type = 'button';
+    btn.textContent = 'Awesome!';
+    btn.addEventListener('click', () => { overlay.remove(); onClose(); });
+    card.appendChild(btn);
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+  }
+}
+
+function rewardTile(emoji, kind, name) {
+  const t = document.createElement('div');
+  t.className = 'ac-reward';
+  t.innerHTML = `<div class="ac-reward__e"></div><div class="ac-reward__k"></div><div class="ac-reward__n"></div>`;
+  t.children[0].textContent = emoji;
+  t.children[1].textContent = kind;
+  t.children[2].textContent = name;
+  return t;
+}
+
+function completionCard(col) {
+  const card = document.createElement('div');
+  card.className = 'ac-levelup__card ac-complete__card';
+  const kicker = document.createElement('p');
+  kicker.className = 'ac-complete__kicker';
+  kicker.textContent = 'COLLECTION COMPLETE!';
+  const icon = document.createElement('div');
+  icon.className = 'ac-complete__icon';
+  icon.textContent = col.icon;
+  const h2 = document.createElement('h2');
+  h2.textContent = col.name;
+  const sub = document.createElement('p');
+  sub.className = 'ac-levelup__sub';
+  sub.textContent = `All ${col.members.length} found. You're officially a ${col.badge.name}!`;
+  const rewards = document.createElement('div');
+  rewards.className = 'ac-rewards';
+  rewards.append(
+    rewardTile(col.badge.emoji, 'Badge', col.badge.name),
+    rewardTile(col.statue.emoji, 'Saved for your Box! 🏆', col.statue.name),
+    rewardTile(col.avatar.emoji, 'New look', col.avatar.name),
+  );
+  card.append(kicker, icon, h2, sub, rewards);
+  return card;
+}
+
+function grandPrizeCard() {
+  const card = document.createElement('div');
+  card.className = 'ac-levelup__card ac-complete__card ac-complete__card--grand';
+  const kicker = document.createElement('p');
+  kicker.className = 'ac-complete__kicker';
+  kicker.textContent = 'ALL EIGHT COLLECTIONS!';
+  const icon = document.createElement('div');
+  icon.className = 'ac-complete__icon';
+  icon.textContent = GRAND_PRIZE.emoji;
+  const h2 = document.createElement('h2');
+  h2.textContent = GRAND_PRIZE.name;
+  const sub = document.createElement('p');
+  sub.className = 'ac-levelup__sub';
+  sub.textContent = 'The only one in existence — and it’s yours. Saved for your Box! 🏆';
+  card.append(kicker, icon, h2, sub);
+  return card;
 }
 
 /** "+316 XP · +125 🪙 · +34 🧱", or a gentle note when nothing could be
@@ -425,6 +910,9 @@ export function describeAward(outcome) {
   if (outcome.coins) bits.push(`+${outcome.coins} \u{1FA99}`);
   if (outcome.bricksEarned) bits.push(`+${outcome.bricksEarned} \u{1F9F1}`);
   if (outcome.sparksEarned) bits.push(`+${outcome.sparksEarned} \u26A1`);
+  // Practising today made the odds better — say so where the child can
+  // see the cause and the effect together.
+  if (outcome.practicePower?.gained) bits.push(`+${outcome.practicePower.gained} \u{1F4AA}`);
   if (!bits.length) return "That's today's fun-game limit — practice games still pay full!";
   return bits.join(' · ');
 }

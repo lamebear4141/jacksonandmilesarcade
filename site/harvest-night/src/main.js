@@ -38,6 +38,9 @@ const scarecrow = new Scarecrow({ scene, postPosition: scarecrowPost, occluders,
 const objectives = new Objectives({
   scene, keySpots, gate, colliders, hud, audio,
   onFirstKey: (p) => scarecrow.awaken(p),
+  // Tonight's critter encounter, rolled by the page shell from the shared
+  // character (null when today's cap is spent — then nothing spawns).
+  critter: window.HARVEST_CRITTER || null,
 });
 
 // ---- Click-to-play overlay (pointer lock requires a user gesture) ----
