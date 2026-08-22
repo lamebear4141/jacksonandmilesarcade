@@ -15,7 +15,7 @@ import {
   onParentChange, getCurrentKid, clearCurrentKid, isGuestKid,
   loadCharacter, awardRun,
 } from '../firebase-config.js';
-import { GAMES, SKINS, PETS, levelFromXp } from './catalog.js';
+import { GAMES, SKINS, PETS, SAFETY, levelFromXp } from './catalog.js';
 
 /* The hub, resolved from this file's own location rather than from the
    page's — so it's the same link whether a game at /loot-drop/index.html
@@ -153,7 +153,7 @@ export async function requireKid({ mount = null, gameName = '' } = {}) {
   const user = await firstAuthState();
   const kid = getCurrentKid();
   const guest = kid && isGuestKid(kid.id);
-  if (kid && (guest || user)) return kid;
+  if (kid && (guest || user)) { beginRun(); return kid; }
 
   const host = mount || document.body;
   host.innerHTML = '';
@@ -171,10 +171,131 @@ export async function requireKid({ mount = null, gameName = '' } = {}) {
 }
 
 /* =====================================================================
+   THE SAFETY NET — SAFETY.maxRunMinutes
+
+   The Phase-2 audit found that no question-driven game here has an idle
+   timeout: a kid who walks away mid-question leaves the run open for
+   ever, and nothing is saved until it ends. This closes that, for every
+   game, without any game having to know about it — the game id is read
+   off the URL, since every game lives at /<gameId>/index.html and its
+   GAMES href is that same folder.
+
+   The clock starts when requireKid() hands a game its profile, and
+   restarts after every completed run, so it measures "how long has this
+   one run been going", not "how long has this kid been here". Lots of
+   short innings never trip it.
+
+   A game that wants FULL credit at the cutoff registers a snapshot:
+
+       beginRun('math-baseball', () => ({ asked, correct, units }));
+
+   Without one the run still ends and still pays — for the time played —
+   but it cannot know what the kid had already earned. Wiring the
+   snapshot into each game is a one-line change per game and is NOT part
+   of this phase.
+   ===================================================================== */
+let safetyTimer = null;
+let safetyGameId = null;
+let safetySnapshot = null;
+let safetyStart = 0;
+
+/** Which game is this page? Null on the hub or anywhere else. */
+export function currentGameId() {
+  const parts = location.pathname.split('/').filter(Boolean);
+  for (let i = parts.length - 1; i >= 0; i--) if (GAMES[parts[i]]) return parts[i];
+  return null;
+}
+
+/** (Re)start the safety clock. `getResult` is optional; when a game
+    supplies it, the cutoff awards exactly what the game says it earned. */
+export function beginRun(gameId, getResult) {
+  const id = gameId || currentGameId();
+  if (!id || !GAMES[id]) return;
+  safetyGameId = id;
+  if (typeof getResult === 'function') safetySnapshot = getResult;
+  safetyStart = Date.now();
+  clearTimeout(safetyTimer);
+  // Clamp the MILLISECONDS, not the minutes: flooring at 1 minute would
+  // silently ignore a smaller value set for testing. 1s is only here so a
+  // zero can never turn this into a tight loop.
+  const ms = Math.max(1000, (Number(SAFETY.maxRunMinutes) || 0) * 60000);
+  safetyTimer = setTimeout(() => { endRunForBreak().catch(() => {}); }, ms);
+}
+
+/** Stop the clock without ending anything — for a game that knows it is
+    parked on a menu rather than mid-run. */
+export function pauseRunClock() {
+  clearTimeout(safetyTimer);
+  safetyTimer = null;
+}
+
+/** The cutoff. Ends the run through the ordinary award path so the kid
+    keeps everything, then says so kindly. */
+export async function endRunForBreak() {
+  safetyTimer = null;
+  const gameId = safetyGameId;
+  if (!gameId) return null;
+  const seconds = Math.round((Date.now() - safetyStart) / 1000);
+
+  let result = { asked: 0, correct: 0, units: 0, seconds };
+  try {
+    const snap = safetySnapshot && safetySnapshot();
+    if (snap) result = { asked: 0, correct: 0, units: 0, ...snap, seconds };
+  } catch { /* a broken snapshot must never cost the kid the run */ }
+
+  const outcome = await finishRun(gameId, result);
+  // Don't re-arm behind the break card — finishRun just restarted the
+  // clock on its way out, and one cutoff per run is the whole idea.
+  pauseRunClock();
+  safetyGameId = null;
+  showBreakCard(outcome);
+  return outcome;
+}
+
+/** Warm, celebratory, and never a word about screen time. */
+function showBreakCard(outcome) {
+  if (document.querySelector('.ac-breakcard')) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'ac-levelup ac-breakcard';
+  const card = document.createElement('div');
+  card.className = 'ac-levelup__card';
+
+  const h2 = document.createElement('h2');
+  h2.textContent = '🏆';   // the sentence below carries the 🎉
+  const line = document.createElement('p');
+  line.className = 'ac-levelup__sub';
+  line.textContent = 'What a session! Time for a break — your stuff is saved. 🎉';
+  card.append(h2, line);
+
+  const earned = describeAward(outcome);
+  if (earned) {
+    const award = document.createElement('p');
+    award.className = 'ac-levelup__sub';
+    award.textContent = earned;
+    card.appendChild(award);
+  }
+
+  const back = document.createElement('a');
+  back.className = 'ac-btn ac-btn--inline';
+  back.href = HUB;
+  back.textContent = '← Back to the Clubhouse';
+  card.appendChild(back);
+
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+  sfx.play('win');
+}
+
+/* =====================================================================
    FINISH A RUN — the single path from a game to the character.
 
    result: { asked, correct, seconds, score, units?, sprites? }
-   returns { xp, coins, leveledUp, newLevel, saved }
+   returns { xp, coins, bricksEarned, sparksEarned, leveledUp, newLevel, saved }
+
+   bricksEarned / sparksEarned are the pillar wallet — 🧱 from a 'learn'
+   game, ⚡ from a 'fun' one — paid alongside xp and coins, never instead
+   of them. Both keys are always present, so a game can read either one
+   without first checking which kind it is.
 
    ---------------------------------------------------------------------
    THE DOUBLE-SUBMIT GUARD
@@ -206,7 +327,7 @@ export async function finishRun(gameId, result) {
   const kid = getCurrentKid();
   if (!kid) {
     // Nothing to save to. Never blow up a game's end screen over it.
-    return { xp: 0, coins: 0, leveledUp: false, newLevel: 1, saved: false, reason: 'no profile' };
+    return { xp: 0, coins: 0, bricksEarned: 0, sparksEarned: 0, leveledUp: false, newLevel: 1, saved: false, reason: 'no profile' };
   }
 
   inFlight = (async () => {
@@ -214,7 +335,7 @@ export async function finishRun(gameId, result) {
       const out = await awardRun(kid.id, gameId, result);
       return { ...out, saved: true };
     } catch (e) {
-      return { xp: 0, coins: 0, leveledUp: false, newLevel: 1, saved: false, reason: e.message };
+      return { xp: 0, coins: 0, bricksEarned: 0, sparksEarned: 0, leveledUp: false, newLevel: 1, saved: false, reason: e.message };
     }
   })();
 
@@ -222,6 +343,9 @@ export async function finishRun(gameId, result) {
     const outcome = await inFlight;
     lastOutcome = outcome;
     settledAt = Date.now();
+    // The next run gets a fresh 45 minutes. This is what makes the clock
+    // measure one run rather than the whole sitting.
+    if (safetyGameId) beginRun(safetyGameId);
     return outcome;
   } finally {
     inFlight = null;
@@ -290,12 +414,17 @@ export function celebrateLevelUp(outcome) {
   document.body.appendChild(overlay);
 }
 
-/** "+316 XP · +125 coins", or a gentle note when nothing could be saved. */
+/** "+316 XP · +125 🪙 · +34 🧱", or a gentle note when nothing could be
+    saved. Bricks and sparks sit right beside the coins in the same style;
+    each game only ever shows the one its kind pays, because the other is
+    zero and zeroes are left out. */
 export function describeAward(outcome) {
   if (!outcome?.saved) return 'Played as a guest — nothing saved this time.';
   const bits = [];
   if (outcome.xp) bits.push(`+${outcome.xp} XP`);
   if (outcome.coins) bits.push(`+${outcome.coins} \u{1FA99}`);
+  if (outcome.bricksEarned) bits.push(`+${outcome.bricksEarned} \u{1F9F1}`);
+  if (outcome.sparksEarned) bits.push(`+${outcome.sparksEarned} \u26A1`);
   if (!bits.length) return "That's today's fun-game limit — practice games still pay full!";
   return bits.join(' · ');
 }

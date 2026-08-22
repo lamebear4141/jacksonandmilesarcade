@@ -178,6 +178,11 @@ const CONFIG = {
   climbSteps:    15,    // how many right answers to reach the flag
   blitzSeconds:  60,    // how long Coin Rush lasts
   wrongPause:    900,   // ms the right answer stays highlighted after a miss
+  // Race mode had no way to end except reaching the flag, so a kid who
+  // kept guessing wrong climbed for ever. Five misses in a row now pauses
+  // the climb and shows exactly which ones to practise — a checkpoint to
+  // learn at, never a game over. Coin Rush already ends on its timer.
+  wrongStreakStop: 5,
 
   // --- How hard does it push on the stuff he keeps missing? ---
   // The game remembers what he gets wrong and brings it back more often. focusChance
@@ -440,12 +445,14 @@ const HERO_X = 130;
 
 let state='menu', topic='addsub', mode='sprint';
 let coins, wrong, streak, bestStreak, elapsed, climb, locked, comebacks;
+let wrongStreak, missed;   // misses in a row, and what they actually were
 let runStart = 0;   // wall clock for the character award
 let q=null, choices=[], sparkles=[], flyCoins=[], heroY=0, heroTargetY=0, heroSquash=0;
 let lastT=0, camOffset=0, camTarget=0;
 
 function resetGame(){
   coins=0; wrong=0; streak=0; bestStreak=0; elapsed=0; climb=0; locked=false; comebacks=0;
+  wrongStreak=0; missed=[];
   sparkles=[]; flyCoins=[]; ADAPT.recent=[]; ADAPT.weakStreak=0;
   heroY=0; heroTargetY=0; heroSquash=0; camOffset=0; camTarget=0;
   nextQuestion();
@@ -479,6 +486,7 @@ function answer(value, btn){
     if (wasWeak){ comebacks++; document.getElementById('qHint').textContent = '💪 You got that one back!'; }
     btn.classList.add('right');
     coins++; streak++; climb++;
+    wrongStreak = 0;                    // one right answer clears the slate
     if (streak>bestStreak) bestStreak=streak;
     sfx.coin(); sfx.jump();
     heroTargetY += STEP_H; heroSquash = 1;
@@ -500,7 +508,14 @@ function answer(value, btn){
       if (parseInt(b.dataset.value,10) === q.answer) b.classList.add('right');
     });
     document.getElementById('qHint').textContent = `The answer is ${q.answer}`;
+    wrongStreak++;
+    missed.push({ text: q.text, answer: q.answer });
     updateHUD();
+    // Race mode's only other exit is the flag, so without this a kid who
+    // keeps missing never reaches an end screen at all.
+    if (mode==='sprint' && wrongStreak >= CONFIG.wrongStreakStop){
+      return setTimeout(()=>endGame('stuck'), CONFIG.wrongPause);
+    }
     setTimeout(nextQuestion, CONFIG.wrongPause);
   }
 }
@@ -653,28 +668,58 @@ function startGame(){
   refreshBestLabel(); resetGame(); updateHUD();
   beep(523,0.1); setTimeout(()=>beep(784,0.14),110);
 }
-function endGame(){
+/** `reason` is 'stuck' when Race mode paused on CONFIG.wrongStreakStop
+    misses in a row; anything else is a normal finish. A stuck run is a
+    practice checkpoint, not a loss: it still pays, it never records a
+    time (the flag wasn't reached), and it shows the actual questions to
+    work on rather than a score. */
+function endGame(reason){
   state='over';
+  const stuck = reason === 'stuck';
   let score, isRecord;
   if (mode==='sprint'){
     score = Math.round(elapsed*10)/10;
-    isRecord = saveBest(topic,'sprint',score);
-    document.getElementById('endTitle').textContent = '🚩 YOU REACHED THE FLAG!';
+    isRecord = !stuck && saveBest(topic,'sprint',score);
+    document.getElementById('endTitle').textContent =
+      stuck ? '🧗 Let’s practise these!' : '🚩 YOU REACHED THE FLAG!';
   } else {
     score = coins;
     isRecord = saveBest(topic,'blitz',score);
     document.getElementById('endTitle').textContent = "⏰ TIME'S UP!";
   }
-  sfx.win();
+  // A fanfare would be the wrong note for a checkpoint — two warm rising
+  // beeps say "go again", not "well done" and not "you lost".
+  if (stuck){ beep(440,0.12); setTimeout(()=>beep(587,0.16),120); }
+  else sfx.win();
   const acc = (coins+wrong) ? Math.round(coins/(coins+wrong)*100) : 0;
   logSession({ t:Date.now(), who:'Miles', game:'Coin Climb',
                topic:TOPIC_NAME[topic], mode, correct:coins, wrong, acc,
-               score, bestStreak, comebacks, finished:true });
+               score, bestStreak, comebacks, finished:!stuck });
 
   const stats = [];
-  if (mode==='sprint') stats.push(`<div class="scoreRow">Your time: <b>${fmtTime(elapsed)}</b></div>`);
-  stats.push(`<div class="scoreRow">Coins: <b>${coins}</b> 🪙</div>`);
-  stats.push(`<div class="scoreRow">Best streak: <b>${bestStreak}</b> · ${acc}% right</div>`);
+  if (stuck){
+    // The whole point of stopping: show the child what to learn, with the
+    // answers, before offering the climb again.
+    stats.push('<div class="scoreRow">Five tricky ones in a row — so these are the ones worth practising:</div>');
+    const seen = new Set();
+    missed.slice(-CONFIG.wrongStreakStop).forEach(m => {
+      // "7 + 5 = ?" and "2, 4, 6, ?" read best with the answer dropped in;
+      // "What comes after 9?" reads best with it appended.
+      const line = /[=,] \?$/.test(m.text)
+        ? m.text.replace(/\?$/, m.answer)
+        : `${m.text} ${m.answer}`;
+      if (seen.has(line)) return;
+      seen.add(line);
+      stats.push(`<div class="scoreRow" style="color:#fff2a8">${line}</div>`);
+    });
+    stats.push('<div class="scoreRow">Say them out loud, then press PLAY AGAIN and take another run at the flag! 🚩</div>');
+  }
+  if (mode==='sprint' && !stuck) stats.push(`<div class="scoreRow">Your time: <b>${fmtTime(elapsed)}</b></div>`);
+  // On a stuck run the practice list IS the message: a percentage there
+  // reads as a verdict on the child, which is the one thing these end
+  // screens must never do. Coins still show if any were earned.
+  if (!stuck || coins > 0) stats.push(`<div class="scoreRow">Coins: <b>${coins}</b> 🪙</div>`);
+  if (!stuck) stats.push(`<div class="scoreRow">Best streak: <b>${bestStreak}</b> · ${acc}% right</div>`);
   if (comebacks > 0)
     stats.push(`<div class="scoreRow" style="color:#fff2a8">💪 ${comebacks} comeback${comebacks===1?'':'s'} — ones you'd missed before!</div>`);
   document.getElementById('endStats').innerHTML = stats.join('');
@@ -713,6 +758,17 @@ document.querySelectorAll('#modeChooser .chip').forEach(c=>{
   c.onclick=()=>{ document.querySelectorAll('#modeChooser .chip').forEach(x=>x.classList.remove('on'));
     c.classList.add('on'); mode=c.dataset.mode; refreshBestLabel(); };
 });
+/* Exposed for tuning and for the console, same as Critter Catchers'
+   window.__CC — CONFIG is inside main()'s closure otherwise. */
+window.__CLIMB = {
+  CONFIG,
+  get state(){ return state; },
+  get mode(){ return mode; },
+  get wrongStreak(){ return wrongStreak; },
+  get missed(){ return missed; },
+  get answer(){ return q?.answer; },
+};
+
 document.getElementById('startBtn').onclick = startGame;
 document.getElementById('againBtn').onclick = startGame;
 document.getElementById('menuBtn').onclick = ()=>{

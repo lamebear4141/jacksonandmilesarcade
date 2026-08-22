@@ -187,6 +187,48 @@ export const ECONOMY = {
   funDailyXpCap:  250,
 };
 
+/* =====================================================================
+   THE PILLAR ECONOMY — bricks & sparks (foundation only)
+
+   The three-pillar reward model: 🧠 Learn pays 🧱 bricks, 🎮 Play pays
+   ⚡ sparks, 🎨 Create pays 🪙 coins.
+
+   This block adds the first two ALONGSIDE the ECONOMY above. Nothing
+   about how xp or coins are earned changes here. Coins moving to the
+   Create pillar (friends visiting a kid's My World) is a real later
+   step, but it can't happen until My World exists — doing it now would
+   leave the Shop with no way to earn anything to spend.
+
+   There is nowhere to spend bricks or sparks yet either; My World's
+   Build Mode is the spend surface. They pile up on purpose until then.
+   ===================================================================== */
+export const PILLAR_ECONOMY = {
+  bricksPerCorrect: 2,   // Learn games: bricks = correct answers × this
+  sparksPerUnit:    1,   // Play games: sparks = whatever `units` that game
+                         // already passes to finishRun × this
+  dailySparkCap:   60,   // per kid per day, across all fun games combined —
+                         // same spirit as the existing daily fun cap
+};
+
+/* =====================================================================
+   THE SAFETY NET
+
+   No run may last forever. Every game is supposed to end on its own —
+   three outs, sixty seconds, the last page — but a kid who walks away
+   mid-question leaves a run open indefinitely in every question-driven
+   game here, because none of them has an idle timeout.
+
+   This is the backstop, not the design. A run that crosses this line is
+   ended warmly through the normal award path with full credit for
+   everything earned. Never a freeze, never a lost run, and never a word
+   about screen time.
+   ===================================================================== */
+export const SAFETY = {
+  maxRunMinutes: 45,    // measured from the start of the run, or from the
+                        // last completed one — a kid playing lots of short
+                        // innings keeps resetting it
+};
+
 /* Accuracy needed to count a learning run as "cleared". */
 export const CLEAR_ACCURACY = 0.80;
 
@@ -280,7 +322,11 @@ export function computeAward(gameId, result){
     xp += Math.round(minutes * ECONOMY.xpPerMinute);
     if (cleared) coins += ECONOMY.clearBonusCoins;
   }
-  return { xp, coins, kind: game.kind, units, accuracy, minutes, cleared, asked, correct, seconds };
+  // A bonus round a kid earned OUTSIDE the questions (Math Baseball's
+  // Home Run Derby) can pay ⚡ sparks on top, even from a learn game.
+  // It rides through untouched here and is spent in computePillarAward.
+  const bonusSparks = Math.max(0, Math.round(Number(r.bonusSparks) || 0));
+  return { xp, coins, kind: game.kind, units, accuracy, minutes, cleared, asked, correct, seconds, bonusSparks };
 }
 
 /** Clamp a fun-game award to what's left of today's fun budget.
@@ -302,6 +348,43 @@ export function clampFunAward(award, daily, dayStr){
     daily: { date, xp: (fresh.xp || 0) + xp, coins: (fresh.coins || 0) + coins },
     cappedXp:    xp    < award.xp,
     cappedCoins: coins < award.coins,
+  };
+}
+
+/** Bricks and sparks for one finished run, paid alongside xp/coins.
+
+    Learn games pay bricks per correct answer; fun games pay sparks on the
+    same `units` they already report, clamped to what's left of today's
+    spark budget. `award` is computeAward()'s result, `daily` is the
+    character's wallet.dailySparks ({ date, total }), and the returned
+    `dailySparks` is what to store back.
+
+    A learn run never moves the spark total, but still returns the
+    date-rolled tally so a new day starts from zero whatever was played. */
+export function computePillarAward(award, daily, dayStr){
+  const date  = dayStr || todayKey();
+  const fresh = (daily && daily.date === date) ? daily : { date, total: 0 };
+
+  const bricksEarned = award.kind === 'learn'
+    ? Math.round(Math.max(0, Number(award.correct) || 0) * PILLAR_ECONOMY.bricksPerCorrect)
+    : 0;
+
+  // Sparks come from a fun game's own units, plus any bonus a game earned
+  // outside its questions — Math Baseball's Home Run Derby is a no-math
+  // bonus round, so it pays the play currency even though the game is a
+  // learn game. Both draw on the one daily spark budget.
+  const fromUnits = award.kind === 'fun'
+    ? Math.round(Math.max(0, Number(award.units) || 0) * PILLAR_ECONOMY.sparksPerUnit)
+    : 0;
+  const want = fromUnits + Math.max(0, Math.round(Number(award.bonusSparks) || 0));
+  const room = Math.max(0, PILLAR_ECONOMY.dailySparkCap - (fresh.total || 0));
+  const sparksEarned = Math.min(want, room);
+
+  return {
+    bricksEarned,
+    sparksEarned,
+    dailySparks: { date, total: (fresh.total || 0) + sparksEarned },
+    cappedSparks: sparksEarned < want,
   };
 }
 

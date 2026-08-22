@@ -20,7 +20,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import {
   ECONOMY, GAMES, SKINS, PETS, levelFromXp, spriteId, spriteIndex,
-  computeAward, clampFunAward, collectionScoreFromCounts, todayKey,
+  computeAward, clampFunAward, computePillarAward, collectionScoreFromCounts, todayKey,
 } from './assets/catalog.js';
 
 const firebaseConfig = {
@@ -357,6 +357,9 @@ export function blankCharacter() {
     counts: {},                       // sprite id -> how many, e.g. { s12: 3 }
     dayStreak: 0, lastPlayed: null,
     dailyFun: { date: todayKey(), xp: 0, coins: 0 },
+    // The pillar wallet: 🧱 from Learn games, ⚡ from Play games. Kept
+    // beside xp/coins rather than replacing them — see PILLAR_ECONOMY.
+    wallet: { bricks: 0, sparks: 0, dailySparks: { date: todayKey(), total: 0 } },
     lifetime: { runs: 0, correct: 0, attempted: 0, seconds: 0, byGame: {} },
     claimedStreakGifts: [],
   };
@@ -374,6 +377,8 @@ function healCharacter(c) {
   out.lifetime   = { ...blank.lifetime, ...(c?.lifetime || {}) };
   out.lifetime.byGame = { ...(c?.lifetime?.byGame || {}) };
   out.dailyFun   = { ...blank.dailyFun, ...(c?.dailyFun || {}) };
+  out.wallet     = { ...blank.wallet, ...(c?.wallet || {}) };
+  out.wallet.dailySparks = { ...blank.wallet.dailySparks, ...(c?.wallet?.dailySparks || {}) };
   out.level      = levelFromXp(out.xp || 0).level;
   return out;
 }
@@ -471,6 +476,15 @@ export async function awardRun(childId, gameId, result) {
   const xp    = clamped.xp;
   const coins = clamped.coins;
 
+  // Bricks and sparks ride alongside, from the same run, on their own
+  // daily budget. Deliberately computed from `raw` (the real correct
+  // count / unit count), never from the clamped xp/coins — a kid who has
+  // used up today's fun XP is still building up their wallet. Loot Drop's
+  // `override` rewrites xp/coins only, so bricks still track real answers.
+  const pillars = computePillarAward(raw, character.wallet?.dailySparks, day);
+  const bricksEarned = pillars.bricksEarned;
+  const sparksEarned = pillars.sparksEarned;
+
   const newXp    = (character.xp || 0) + xp;
   const oldLevel = levelFromXp(character.xp || 0).level;
   const newLevel = levelFromXp(newXp).level;
@@ -493,6 +507,7 @@ export async function awardRun(childId, gameId, result) {
     seconds: raw.seconds,
     score: Number(result?.score) || 0,
     xpEarned: xp, coinsEarned: coins,
+    bricksEarned, sparksEarned,
   };
 
   const byGame = character.lifetime.byGame?.[gameId] || { runs: 0, xp: 0, coins: 0 };
@@ -508,7 +523,7 @@ export async function awardRun(childId, gameId, result) {
 
   const levelUp = { leveledUp: newLevel > oldLevel, newLevel, oldLevel };
   const outcome = {
-    xp, coins, ...levelUp,
+    xp, coins, bricksEarned, sparksEarned, ...levelUp,
     cappedByDailyFun: clamped.cappedXp || clamped.cappedCoins,
     sprites: wonCounts,
     dayStreak: streak,
@@ -527,6 +542,9 @@ export async function awardRun(childId, gameId, result) {
     next.dayStreak  = streak;
     next.lastPlayed = day;
     next.dailyFun   = clamped.daily;
+    next.wallet.bricks = (next.wallet.bricks || 0) + bricksEarned;
+    next.wallet.sparks = (next.wallet.sparks || 0) + sparksEarned;
+    next.wallet.dailySparks = pillars.dailySparks;
     next.lifetime.runs      = (next.lifetime.runs || 0) + 1;
     next.lifetime.correct   = (next.lifetime.correct || 0) + raw.correct;
     next.lifetime.attempted = (next.lifetime.attempted || 0) + raw.asked;
@@ -556,6 +574,9 @@ export async function awardRun(childId, gameId, result) {
     'character.dayStreak': streak,
     'character.lastPlayed': day,
     'character.dailyFun': clamped.daily,
+    'character.wallet.bricks': increment(bricksEarned),
+    'character.wallet.sparks': increment(sparksEarned),
+    'character.wallet.dailySparks': pillars.dailySparks,
     'character.updatedAt': serverTimestamp(),
     ...lifetimeUpdate,
   };

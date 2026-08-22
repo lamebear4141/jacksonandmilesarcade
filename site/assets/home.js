@@ -1,7 +1,8 @@
 /* =====================================================================
    CHARACTER HOME — what a kid lands on after their PIN.
 
-   The header card is their character: avatar, level bar, coin purse,
+   The header card is their character: avatar, level bar, the purse
+   (coins, plus 🧱 bricks and ⚡ sparks from the pillar economy),
    streak, pet. Below it, five tabs:
 
      PLAY     the game grid, grouped, with the economy taught in labels
@@ -99,6 +100,8 @@ export async function mountHome(container, kid) {
       ),
       el('div', { class: 'ac-home-stats' },
         el('span', { class: 'coins', text: `\u{1FA99} ${fmt(c.coins)}` }),
+        el('span', { class: 'bricks', title: 'Bricks — earned by practising', text: `\u{1F9F1} ${fmt(c.wallet?.bricks)}` }),
+        el('span', { class: 'sparks', title: 'Sparks — earned by playing',    text: `\u26A1 ${fmt(c.wallet?.sparks)}` }),
         el('span', { text: c.dayStreak > 0 ? `\u{1F525} ${c.dayStreak}-day streak` : '\u{1F525} Play today to start a streak!' }),
       ),
     );

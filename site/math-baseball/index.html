@@ -152,7 +152,8 @@
 
   .scoreRow{ font-size:18px; margin:4px 0; color:var(--ac-text); font-weight:800; }
   .scoreRow b{ color:var(--ac-red-deep); font-size:26px; }
-  #newRecord{ color:var(--ac-yellow-deep); font-size:24px; font-weight:800; margin:10px 0; }
+  #newRecord, #newDerbyRecord{ color:var(--ac-yellow-deep); font-size:24px; font-weight:800; margin:10px 0; }
+  #derbyHow{ font-size:14px; }
   .recordBoard{
     background:var(--ac-panel); border:4px solid var(--ac-edge); border-radius:18px;
     padding:14px 22px; margin:12px 0;
@@ -177,8 +178,10 @@
 <div id="wrap">
   <div id="topbar">
     <div class="cell"><span class="label">RUNS</span><span id="runsValue">0</span></div>
-    <div class="cell"><span class="label">OUTS</span><span id="outsValue">⚪⚪⚪</span></div>
-    <div class="cell"><span class="label">STRIKES</span><span id="strikesValue">⚪⚪⚪</span></div>
+    <div class="cell" id="outsCell"><span class="label">OUTS</span><span id="outsValue">⚪⚪⚪</span></div>
+    <div class="cell" id="strikesCell"><span class="label">STRIKES</span><span id="strikesValue">⚪⚪⚪</span></div>
+    <!-- swaps in for OUTS/STRIKES during the derby, where neither exists -->
+    <div class="cell hidden" id="derbyCell"><span class="label">HOMERS</span><span id="derbyValue">🔥 0</span></div>
     <div class="cell"><span class="label">BASES</span>
       <div id="hudDiamond">
         <span class="bag bag--2"></span>
@@ -215,10 +218,21 @@
     <button class="btn" id="startBtn">PLAY BALL!</button>
   </div>
 
+  <!-- ============ THE DERBY INVITATION (at CONFIG.runCap) ============ -->
+  <div class="overlay hidden" id="derbyScreen">
+    <h1 id="derbyTitle">10 RUNS!</h1>
+    <p>The other team is calling it — but the crowd wants a
+       <b>HOME RUN DERBY!</b> 🎉</p>
+    <p id="derbyHow">No math, no outs — just swing. Every home run brings
+       another pitch, and they get faster every time. How many can you hit?</p>
+    <button class="btn" id="derbyBtn">START THE DERBY</button>
+  </div>
+
   <!-- ================= END SCREEN ================= -->
   <div class="overlay hidden" id="endScreen">
     <h2 id="endTitle">Inning over!</h2>
     <div id="newRecord" class="hidden">⭐ NEW RECORD! ⭐</div>
+    <div id="newDerbyRecord" class="hidden">⭐ NEW DERBY RECORD! ⭐</div>
     <div id="endStats"></div>
     <div id="awardLine" class="scoreRow" style="color:var(--ac-yellow-deep);min-height:1.2em"></div>
     <div class="recordBoard" id="endBoard"></div>
@@ -253,6 +267,8 @@ function main(kid){
 const CONFIG = {
   // ---- the inning ----
   outsPerInning: 3,     // the whole game is one inning: this many outs ends it
+  runCap: 10,           // reaching this many runs ends the inning EARLY and opens
+                        // the Home Run Derby — a reward, never a cut-off
   strikesPerOut: 3,     // strikes on one batter before they're out (fouls can never ring up the last one)
   // what a wrong answer costs, per tier: 'out' (default) or 'strike' (softer, for later)
   wrongAnswerCosts: { easy:'out', medium:'out', hard:'out' },
@@ -282,6 +298,19 @@ const CONFIG = {
     easy:   { flightMs:1600, windows:{ homer:70, triple:130, double:200, single:280, foul:380 } },
     medium: { flightMs:1250, windows:{ homer:50, triple:100, double:160, single:230, foul:320 } },
     hard:   { flightMs:1000, windows:{ homer:40, triple:85,  double:140, single:200, foul:280 } },
+  },
+
+  // ---- the Home Run Derby (the bonus round at runCap) ----
+  // No math at all: pitches come on a timer and the kid just swings. A
+  // homer keeps it alive, anything else ends it. Every homer shrinks
+  // both the flight time and the contact window toward their floors, so
+  // the round is DESIGNED to end — see the modelled curve in the report.
+  derby: {
+    startFlightMs: 1100, minFlightMs: 380, flightDecay: 0.96,
+    startWindowMs:  140, minWindowMs:   55, windowDecay: 0.97,
+    mulligans: 1,       // the first non-homer is forgiven, once
+    maxHomers: 100,     // a provable ceiling; reaching it is a PERFECT DERBY
+    sparksPerHomer: 1,  // ⚡ paid per homer, on top of the run's normal award
   },
 
   // ---- adaptive practice (the ADAPT engine below reads these) ----
@@ -455,8 +484,10 @@ function makeChoices(q){
    delta = how far (ms) the swing was from the perfect contact moment.
    Inside the tightest window is a home run; each wider ring is a lesser
    hit; the outermost ring is a foul; beyond that is a whiff.           */
-function judgeSwing(deltaMs, tier){
-  const w = CONFIG.tiers[tier].windows;
+function judgeSwing(deltaMs, tierOrWindows){
+  // The derby hands in its own shrinking window set; normal play hands in
+  // a tier name. Both land on the same ladder of rings.
+  const w = typeof tierOrWindows === 'string' ? CONFIG.tiers[tierOrWindows].windows : tierOrWindows;
   const d = Math.abs(deltaMs);
   if (d <= w.homer)  return 'homer';
   if (d <= w.triple) return 'triple';
@@ -464,6 +495,32 @@ function judgeSwing(deltaMs, tier){
   if (d <= w.single) return 'single';
   if (d <= w.foul)   return 'foul';
   return 'miss';
+}
+
+/* How fast this pitch is and how tight its rings are. In normal play
+   both come straight from the tier. In the derby the homer window is the
+   shrinking one and the outer rings keep the tier's proportions, so a
+   near-miss still reads as a triple or a foul rather than always a
+   whiff — the kid can see HOW they missed, not just that they did.
+   Pitch n (1-indexed) decays from the start value n-1 times.          */
+function derbyFlightMs(homers){
+  const d = CONFIG.derby;
+  return Math.max(d.minFlightMs, d.startFlightMs * Math.pow(d.flightDecay, homers));
+}
+function derbyWindowMs(homers){
+  const d = CONFIG.derby;
+  return Math.max(d.minWindowMs, d.startWindowMs * Math.pow(d.windowDecay, homers));
+}
+function derbyWindows(homers, tierWindows){
+  const homer = derbyWindowMs(homers);
+  const scale = homer / tierWindows.homer;
+  return {
+    homer,
+    triple: tierWindows.triple * scale,
+    double: tierWindows.double * scale,
+    single: tierWindows.single * scale,
+    foul:   tierWindows.foul   * scale,
+  };
 }
 
 /* The real baseball rule: a foul counts as a strike, but can never be
@@ -532,6 +589,17 @@ function saveRecordIfBest(t, runsScored){
   return true;   // the cloud write happens once, in endInning, records + facts together
 }
 
+/** Most homers in one derby, stored beside the per-tier run records
+    (guest: mathbaseball.v1.records.bestDerby). The derby is the same
+    round whatever the maths tier, so this record is not per tier. */
+function saveDerbyRecordIfBest(homers){
+  if (homers <= 0) return false;
+  if (records.bestDerby != null && homers <= records.bestDerby) return false;
+  records.bestDerby = homers;
+  if (isGuestKid(kid.id)) store.set(RECORDS_KEY, JSON.stringify(records));
+  return true;   // the cloud write rides along with endInning's
+}
+
 /* =====================================================================
    DIFFICULTY — from the profile's birthday, never a menu. The game
    deals the right math for the kid's age and steps up as they grow.
@@ -543,17 +611,20 @@ async function detectTier(){
   const forced = new URLSearchParams(location.search).get('tier');
   if (CONFIG.tiers[forced]){
     tier = forced;
-    note.textContent = `Difficulty pinned to ${TIER_NAME[tier]} by ?tier= — tuning only`;
+    // The ONLY place a tier word still appears, and it takes a hand-typed
+    // ?tier= in the URL to summon it. It describes the URL, not the child.
+    note.textContent = `Tuning: math pinned by ?tier=${forced}`;
     note.classList.remove('hidden');
     return;
   }
+  // No note on the normal path. The tier is a fact about which questions
+  // to deal, not a verdict on the kid, and a 1st grader reading "EASY"
+  // learns nothing except where the game has filed him.
   if (isGuestKid(kid.id)) return;               // no birthday on file → medium
   const child = await getChild(kid.id).catch(() => null);
   const age = ageFromBirthday(child?.birthday);
   if (age == null) return;
   tier = tierForAge(age);
-  note.textContent = `Difficulty set to ${TIER_NAME[tier]} for ${kid.nickname} (age ${age})`;
-  note.classList.remove('hidden');
 }
 
 /* =====================================================================
@@ -647,7 +718,11 @@ const cv = $('game'), ctx = cv.getContext('2d');
 const W = cv.width, H = cv.height;
 
 let tier = 'medium';
-let state = 'menu';          // menu | question | beat | windup | pitch | result | over
+let state = 'menu';          // menu | question | beat | windup | pitch | result | derbyoffer | over
+// null outside the Home Run Derby; see startDerby(). Its presence is what
+// switches the pitch machinery from "answer a question first" to "here
+// comes another one", and what routes resolvePitch() away from outs/runs.
+let derby = null;
 let outs, strikes, runs, bases, asked, correctCount, wrongCount, comebacks;
 let hitLog, strikeouts, fieldedOuts, runStart;
 let q = null;
@@ -660,18 +735,31 @@ let batAnim = 0;             // >0 while the bat is mid-swing
 let lastT = 0;
 let timers = [];
 
+/* The pitch clock. Everything that draws or judges a pitch reads these
+   two, so the derby's shrinking numbers can never disagree with the
+   rings a kid is actually looking at. */
+function liveFlightMs(){ return derby ? derby.flightMs : CONFIG.tiers[tier].flightMs; }
+function liveWindows(){  return derby ? derby.windows  : CONFIG.tiers[tier].windows; }
+
 // setTimeout that dies with the run — so PLAY AGAIN can't inherit ghosts
 function later(fn, ms){ timers.push(setTimeout(fn, ms)); }
 function clearTimers(){ timers.forEach(clearTimeout); timers = []; }
 
 function resetGame(){
   clearTimers();
+  // Back to a state askQuestion() will actually act on. Without this the
+  // 'over' from the last inning survives the reset, askQuestion()'s
+  // `if (state === 'over') return` fires, and PLAY AGAIN silently does
+  // nothing — one inning per page load. Pre-existing; found while testing
+  // the derby, which needs several innings in a row to exercise.
+  state = 'menu';
   outs = 0; strikes = 0; runs = 0; bases = [false,false,false];
   asked = 0; correctCount = 0; wrongCount = 0; comebacks = 0;
   ADAPT.recent = []; ADAPT.weakStreak = 0;
   hitLog = { homer:0, triple:0, double:0, single:0 };
   strikeouts = 0; fieldedOuts = 0;
   particles = []; scorePops = []; ball = null; batAnim = 0;
+  derby = null; derbyDone = null;
   stamp = null; trail = []; catcherPop = 0; pitchAnim = 0; waggleBoost = 0;
   batterPose = { name:'idle', t:0 };
   runStart = Date.now();
@@ -798,9 +886,9 @@ function swing(){
   if (state !== 'pitch' || swung) return;
   swung = true;
   batAnim = 1;
-  const flight = CONFIG.tiers[tier].flightMs;
+  const flight = liveFlightMs();
   const delta = performance.now() - (pitchStart + flight);
-  const result = judgeSwing(delta, tier);
+  const result = judgeSwing(delta, liveWindows());
   resolvePitch(result, delta);
 }
 function noSwing(){
@@ -811,6 +899,9 @@ function noSwing(){
 
 function resolvePitch(result, delta){
   state = 'result';
+  // In the derby there are no outs, no strikes, no runners and no
+  // questions — a completely separate resolution.
+  if (derby) return resolveDerbyPitch(result, delta);
   if (result === 'miss' || result === 'nomiss'){
     ball = null;
     strikes = strikesAfterContact(strikes, 'strike');
@@ -851,6 +942,10 @@ function recordHit(kind){
   sfx.crack();
   batAnim = 1;
   const adv = advanceRunners(bases, HIT_BASES[kind]);
+  // `runs` only rises in the delayed callback below, so read the total
+  // we're about to have. Reaching the cap ends the inning right here — no
+  // waiting for a third out — and hands the kid the derby instead.
+  const capReached = runs + adv.runs >= CONFIG.runCap;
   const stamps = { single:['SINGLE!','#63E08A'], double:['DOUBLE!','#4C9BFF'],
                    triple:['TRIPLE!','#FF5A5A'], homer:['HOME RUN!','#FFC93C'] };
   showStamp(stamps[kind][0], stamps[kind][1]);
@@ -883,7 +978,7 @@ function recordHit(kind){
   }, hudDelay);
   strikes = 0;   // a hit means a fresh batter steps in
   updateHUD();
-  later(askQuestion, kind === 'homer' ? 2200 : 1600);
+  later(capReached ? offerDerby : askQuestion, kind === 'homer' ? 2200 : 1600);
 }
 
 function recordOut(how){
@@ -898,9 +993,161 @@ function recordOut(how){
 }
 
 /* =====================================================================
+   THE HOME RUN DERBY
+
+   The bonus round for reaching CONFIG.runCap. No math, no outs, no
+   runners: pitches arrive on a timer and the only input is the swing.
+   A home run buys another pitch; anything else ends it, once the one
+   mulligan is spent. Both the flight time and the contact window decay
+   per homer toward a floor, so this round provably terminates — and
+   maxHomers is a hard ceiling on top of that.
+
+   Nothing in here touches asked / correctCount / accuracy. Swinging a
+   bat is not doing maths, so it can never earn the learning currency;
+   the derby pays ⚡ sparks and nothing else.
+   ===================================================================== */
+let derbyDone = null;    // { homers, longestFt, perfect } — survives into endInning
+
+/** The invitation. Never framed as "that's enough" — the crowd asked. */
+function offerDerby(){
+  if (state === 'over' || state === 'derbyoffer' || derby) return;
+  clearTimers();
+  state = 'derbyoffer';
+  ball = null; swung = false; trail = [];
+  $('swingWrap').classList.add('hidden');
+  setFeedback('', '');
+  sfx.roar(); sfx.fanfare();
+  $('derbyTitle').textContent = runs + ' RUNS!';
+  $('derbyScreen').classList.remove('hidden');
+}
+
+function startDerby(){
+  // The same shape of guard as finishRun's double-submit protection: the
+  // first pitch is 900ms away, so without this a kid mashing START THE
+  // DERBY (or leaning on Enter) queues a fresh derby per press and ends
+  // up with several overlapping pitch sequences.
+  if (derby) return;
+  $('derbyScreen').classList.add('hidden');
+  state = 'result';        // neutral and non-interactive until the windup
+  derby = {
+    homers: 0,
+    mulligansLeft: CONFIG.derby.mulligans,
+    longestFt: 0,
+    flightMs: derbyFlightMs(0),
+    windows: derbyWindows(0, CONFIG.tiers[tier].windows),
+  };
+  updateHUD();
+  setFeedback('Here it comes — swing away! 🔥', 'good');
+  derbyPitch(900);
+}
+
+/** Wind up and throw, with no question in between. */
+function derbyPitch(delayMs){
+  later(() => {
+    if (state === 'over' || !derby) return;
+    swung = false; ball = null; trail = [];
+    setPose('idle');
+    hideInputsShowSwing();
+    state = 'windup';
+    windupStart = performance.now();
+    later(() => {
+      if (state !== 'windup' || !derby) return;
+      state = 'pitch';
+      pitchStart = performance.now();
+      pitchAnim = 1; trail = [];
+      ball = { t:0 };
+    }, CONFIG.windupMs);
+  }, delayMs);
+}
+
+const DERBY_STAMPS = {
+  triple: ['TRIPLE!',    '#FF5A5A'], double: ['DOUBLE!', '#4C9BFF'],
+  single: ['SINGLE!',    '#63E08A'], foul:   ['FOUL BALL', '#FFC93C'],
+  miss:   ['STEE-RIKE!', '#A971F5'], nomiss: ['STEE-RIKE!', '#A971F5'],
+};
+
+function resolveDerbyPitch(result, delta){
+  state = 'result';
+
+  if (result === 'homer'){
+    derby.homers++;
+    // A tighter swing carries further. Pure flavour, but it gives a kid
+    // something to chase besides the count.
+    const tightness = 1 - Math.min(1, Math.abs(delta) / derby.windows.homer);
+    const feet = 380 + Math.round(tightness * 120);
+    if (feet > derby.longestFt) derby.longestFt = feet;
+
+    launchBall('homer');
+    batAnim = 1;
+    sfx.crack(); sfx.roar();
+    showStamp('HOME RUN!', '#FFC93C');
+    setPose('cheer');
+    later(() => setPose('run'), CONFIG.look.cheerMs);
+    document.body.classList.remove('shakeHard'); void document.body.offsetWidth;
+    document.body.classList.add('shakeHard');
+    setFeedback(`🚀 GONE — ${feet} feet! That's ${derby.homers} in a row! 🔥`, 'good');
+    updateHUD();
+
+    if (derby.homers >= CONFIG.derby.maxHomers){ later(() => endDerby(true), 1900); return; }
+
+    // faster and tighter for the next one
+    derby.flightMs = derbyFlightMs(derby.homers);
+    derby.windows  = derbyWindows(derby.homers, CONFIG.tiers[tier].windows);
+    derbyPitch(1900);
+    return;
+  }
+
+  // ---- anything else: show WHAT it was, then the mulligan or the end ----
+  const [text, color] = DERBY_STAMPS[result] || DERBY_STAMPS.miss;
+  if (result === 'miss'){ sfx.whiff(); ball = null; }
+  else if (result === 'nomiss'){ sfx.mitt(); catcherPop = 1; ball = null; }
+  else { launchBall(result === 'foul' ? 'foul' : result); sfx.crack(); batAnim = 1; }
+  showStamp(text, color);
+
+  if (derby.mulligansLeft > 0){
+    derby.mulligansLeft--;
+    sfx.cheer();
+    // The pitch does NOT get harder on a mulligan — same speed, one more go.
+    setFeedback('OOOH! The crowd wants ONE more! 🙌', 'info');
+    derbyPitch(2100);
+    return;
+  }
+  setPose('scratch');
+  later(() => endDerby(false), 1600);
+}
+
+/** Ends the derby and hands off to the normal end screen, which carries
+    the single award for the whole run. Never any variant of "you failed". */
+function endDerby(perfect){
+  if (state === 'over' || !derby) return;
+  clearTimers();
+  state = 'over';
+  ball = null;
+  derbyDone = { homers: derby.homers, longestFt: derby.longestFt, perfect };
+  derby = null;
+  if (perfect){
+    showStamp('PERFECT DERBY!', '#FFC93C');
+    sfx.fanfare(); sfx.roar();
+    fenceFireworks(300); fenceFireworks(180); fenceFireworks(420);
+    document.body.classList.remove('shakeHard'); void document.body.offsetWidth;
+    document.body.classList.add('shakeHard');
+  }
+  updateHUD();
+  later(endInning, perfect ? 2400 : 1200);
+}
+
+/* =====================================================================
    HUD
    ===================================================================== */
 function updateHUD(){
+  // Outs and strikes don't exist in the derby, so the cells that would
+  // lie about them step aside for the homer count.
+  const inDerby = !!derby;
+  $('outsCell').classList.toggle('hidden', inDerby);
+  $('strikesCell').classList.toggle('hidden', inDerby);
+  $('derbyCell').classList.toggle('hidden', !inDerby);
+  if (inDerby) $('derbyValue').textContent = '🔥 ' + derby.homers;
+
   $('runsValue').textContent = runs;
   $('outsValue').textContent = '⚫'.repeat(Math.min(outs,3)) + '⚪'.repeat(Math.max(0,3-outs));
   $('strikesValue').textContent = '🟡'.repeat(strikes) + '⚪'.repeat(Math.max(0,CONFIG.strikesPerOut-strikes));
@@ -1176,7 +1423,7 @@ function drawRings(){
   ringAt(CONTACT.x, CONTACT.y, L.ringTarget);
   ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(30,43,99,0.45)';
   ringAt(CONTACT.x, CONTACT.y, L.ringTarget+2.5);
-  const u = Math.min(1, (performance.now()-pitchStart)/CONFIG.tiers[tier].flightMs);
+  const u = Math.min(1, (performance.now()-pitchStart)/liveFlightMs());
   const r = L.ringStart - (L.ringStart - L.ringTarget)*u;
   ctx.lineWidth = 4; ctx.strokeStyle = '#FFC93C';
   ringAt(CONTACT.x, CONTACT.y, r);
@@ -1185,7 +1432,7 @@ function drawRings(){
 }
 
 function drawPitchBall(){
-  const flight = CONFIG.tiers[tier].flightMs;
+  const flight = liveFlightMs();
   const t = Math.min(1.12, (performance.now() - pitchStart) / flight);   // runs a touch past the plate
   const u = Math.min(1, t);
   const x = RELEASE.x + (CONTACT.x - RELEASE.x) * t;
@@ -1263,8 +1510,8 @@ function loop(t){
 
   // a pitch nobody swung at eventually lands in the mitt: called strike
   if (state === 'pitch' && !swung){
-    const flight = CONFIG.tiers[tier].flightMs;
-    const w = CONFIG.tiers[tier].windows;
+    const flight = liveFlightMs();
+    const w = liveWindows();
     if (performance.now() > pitchStart + flight + w.foul + CONFIG.noSwingGraceMs) noSwing();
   }
 
@@ -1340,11 +1587,18 @@ function draw(){
 /* =====================================================================
    START / END
    ===================================================================== */
-const TIER_NAME = { easy:'Easy', medium:'Medium', hard:'Hard' };
+/* Records are still stored per tier — a kid who grows into harder maths
+   keeps the record they set on the easier questions, and it isn't
+   compared against the new ones. Only the CURRENT tier's is ever shown,
+   and it's shown without naming the tier. */
 function renderRecordBoard(el){
   const r = records;
-  const rows = ['easy','medium','hard'].map(t =>
-    `<div><span>${TIER_NAME[t]} — most runs</span><span>${r[t] == null ? '—' : r[t] + ' runs'}</span></div>`);
+  const mine = r[tier];
+  const rows = [
+    `<div><span>Most runs</span><span>${mine == null ? '—' : mine + ' runs'}</span></div>`,
+  ];
+  rows.push(`<div><span>🔥 Home Run Derby</span><span>${
+    r.bestDerby == null ? '—' : r.bestDerby + (r.bestDerby === 1 ? ' homer' : ' homers')}</span></div>`);
   el.innerHTML = `<div style="opacity:.6;font-size:11px;letter-spacing:1.5px;justify-content:center">YOUR RECORDS</div>` + rows.join('');
 }
 
@@ -1352,6 +1606,8 @@ function startGame(){
   resetGame();
   $('startScreen').classList.add('hidden');
   $('endScreen').classList.add('hidden');
+  $('derbyScreen').classList.add('hidden');
+  $('newDerbyRecord').classList.add('hidden');
   setFeedback('', '');
   tone(523,0.1); tone(784,0.14,{delay:0.11});
   askQuestion();
@@ -1365,9 +1621,15 @@ function endInning(){
   $('keypad').classList.add('hidden');
 
   const isRecord = runs > 0 && saveRecordIfBest(tier, runs);
+  const isDerbyRecord = !!derbyDone && saveDerbyRecordIfBest(derbyDone.homers);
   sfx.cheer();
 
-  $('endTitle').textContent = runs === 0 ? '⚾ Inning over!' :
+  // After a derby the headline is the derby. Never a variant of "you
+  // failed" — reaching this screen at all means the kid capped the inning.
+  $('endTitle').textContent =
+    derbyDone?.perfect ? '💯 PERFECT DERBY!' :
+    derbyDone ? `🔥 DERBY OVER — ${derbyDone.homers} home run${derbyDone.homers === 1 ? '' : 's'}!` :
+    runs === 0 ? '⚾ Inning over!' :
     runs === 1 ? '⚾ 1 RUN SCORED!' : `⚾ ${runs} RUNS SCORED!`;
 
   // the at-bat log, e.g. "2 home runs · 1 double · 3 singles"
@@ -1380,6 +1642,11 @@ function endInning(){
 
   const acc = asked ? Math.round(correctCount/asked*100) : 0;
   const stats = [];
+  if (derbyDone){
+    stats.push(`<div class="scoreRow">Derby home runs: <b>${derbyDone.homers}</b></div>`);
+    if (derbyDone.longestFt > 0)
+      stats.push(`<div class="scoreRow">Longest blast: ${derbyDone.longestFt} feet 🚀</div>`);
+  }
   stats.push(`<div class="scoreRow">Runs scored: <b>${runs}</b></div>`);
   stats.push(`<div class="scoreRow">${hitLine}</div>`);
   stats.push(`<div class="scoreRow">Math: ${correctCount} of ${asked} right · ${acc}%</div>`);
@@ -1387,7 +1654,8 @@ function endInning(){
     stats.push(`<div class="scoreRow" style="color:#1c7a45">💪 ${comebacks} comeback${comebacks===1?'':'s'} — facts you'd missed before!</div>`);
   $('endStats').innerHTML = stats.join('');
   $('newRecord').classList.toggle('hidden', !isRecord);
-  if (isRecord) sfx.fanfare();
+  $('newDerbyRecord').classList.toggle('hidden', !isDerbyRecord);
+  if (isRecord || isDerbyRecord) sfx.fanfare();
 
   // one cloud write per inning for a signed-in kid: records + practice facts
   if (!isGuestKid(kid.id)){
@@ -1400,12 +1668,20 @@ function endInning(){
   // 80% still pays consolation XP — there is no zero-reward outcome.
   const awardEl = $('awardLine');
   awardEl.textContent = 'Saving…';
+  // Derby homers are deliberately absent from asked / correct / units:
+  // they are not maths, so they can never move accuracy, the ≥80% clear
+  // bonus, or 🧱 bricks. They pay ⚡ sparks through bonusSparks, which
+  // the shared economy clamps against the same daily spark budget as
+  // every fun game.
+  const derbyHomers = derbyDone?.homers || 0;
   finishRun('math-baseball', {
     asked,
     correct: correctCount,
     seconds: Math.round((Date.now() - runStart) / 1000),
     score: runs,
     units: correctCount + CONFIG.unitsPerRun * runs,
+    derbyHomers,
+    bonusSparks: CONFIG.derby.sparksPerHomer * derbyHomers,
   }).then((outcome) => {
     awardEl.textContent = describeAward(outcome);
     celebrateLevelUp(outcome);
@@ -1468,6 +1744,7 @@ document.addEventListener('keydown', e=>{
     e.preventDefault();
     if (e.repeat) return;
     if (state === 'question' && q?.input === 'typed') submitTyped();
+    else if (state === 'derbyoffer') startDerby();
     else if (state === 'menu' || state === 'over') startGame();
     return;
   }
@@ -1484,6 +1761,25 @@ document.addEventListener('keydown', e=>{
 
 $('startBtn').onclick = startGame;
 $('againBtn').onclick = startGame;
+$('derbyBtn').onclick = startDerby;
+
+/* Exposed for tuning and for the console — the same idea as Critter
+   Catchers' window.__CC. CONFIG lives inside main()'s closure, so
+   without this there is no way to try a 2-run cap or a 3-homer derby
+   without editing the file. Nothing secret lives here. */
+window.__MB = {
+  CONFIG,
+  get tier(){ return tier; },
+  get records(){ return records; },
+  get derby(){ return derby; },
+  get state(){ return state; },
+  get answer(){ return q?.answer; },
+  // the live pitch clock, so a test can swing at the exact contact moment
+  get pitchStart(){ return pitchStart; },
+  get flightMs(){ return liveFlightMs(); },
+  get windows(){ return liveWindows(); },
+  derbyFlightMs, derbyWindowMs, derbyWindows,
+};
 
 resetGame();
 renderRecordBoard($('recordBoard'));

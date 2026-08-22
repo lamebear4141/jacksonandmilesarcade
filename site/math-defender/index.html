@@ -205,6 +205,11 @@ const CONFIG = {
   hearts:          3,       // how many hits your wall can take
   wrongPenalty:    3,       // seconds added to Sprint time for a wrong answer
   extraEvery:      5,       // every Nth question sends a bonus creeper
+  // Creepers only ever spawned from nextQuestion(), so a kid who stopped
+  // answering mid-question watched one creeper reach the wall and then
+  // nothing at all happened, for ever. The wave now keeps coming on its
+  // own, which is also what makes Sprint mode provably end.
+  idleSpawnSeconds: 30,     // no answer for this long sends another creeper
   creeperSpeed:    20,      // pixels per second at the start
   speedRamp:       1.3,     // extra speed added per creeper sent
   creeperMax:      62,      // speed cap
@@ -470,13 +475,14 @@ let creepers = [], particles = [];
 let hearts, correct, wrong, streak, bestStreak, elapsed, penalty, spawned, asked, comebacks;
 let runStart = 0;   // wall clock for the character award
 let q = null, lastT = 0, shakeT = 0, flashT = 0, flashColor = '#ff5555';
+let idle = 0;       // seconds since the last answer, right or wrong
 
 function resetGame(){
   creepers = []; particles = [];
   hearts = CONFIG.hearts;
   correct = 0; wrong = 0; streak = 0; bestStreak = 0;
   elapsed = 0; penalty = 0; spawned = 0; asked = 0; comebacks = 0;
-  shakeT = 0; flashT = 0;
+  shakeT = 0; flashT = 0; idle = 0;
   ADAPT.recent = []; ADAPT.weakStreak = 0;
   nextQuestion();
 }
@@ -488,6 +494,7 @@ function nextQuestion(){
   if (state === 'playing') inp.focus();
   // every question sends one creeper; every 5th sends a friend along
   asked++;
+  idle = 0;
   spawnCreeper();
   if (asked % CONFIG.extraEvery === 0) spawnCreeper();
 }
@@ -573,6 +580,11 @@ function loop(t){
 }
 function update(dt){
   elapsed += dt;
+
+  // Nobody's answering — send another one, so the wall is always the
+  // thing that decides, and walking away can't stall the run for ever.
+  idle += dt;
+  if (idle >= CONFIG.idleSpawnSeconds){ idle = 0; spawnCreeper(); }
 
   for (let i=creepers.length-1;i>=0;i--){
     const c = creepers[i];
@@ -812,6 +824,23 @@ document.querySelectorAll('#modeChooser .chip').forEach(c=>{
     c.classList.add('on'); mode = c.dataset.mode; refreshBestLabel();
   };
 });
+/* Exposed for tuning and for the console, same as Critter Catchers'
+   window.__CC. CONFIG lives inside main()'s closure, so without this
+   there's no way to try a shorter idle timer without editing the file. */
+window.__MD = {
+  CONFIG,
+  get state(){ return state; },
+  get hearts(){ return hearts; },
+  get creepers(){ return creepers.length; },
+  get idleSeconds(){ return idle; },
+  get answer(){ return q?.answer; },
+  // Test seam: the main loop is requestAnimationFrame-driven, which is
+  // frozen in a hidden tab, so there is otherwise no way to exercise the
+  // idle timer without watching a real clock. Same underscore convention
+  // as arcade-shell's _resetRunGuard.
+  _tick(dt){ if (state === 'playing') update(dt); },
+};
+
 document.getElementById('startBtn').onclick = startGame;
 document.getElementById('againBtn').onclick = startGame;
 document.getElementById('menuBtn').onclick = ()=>{

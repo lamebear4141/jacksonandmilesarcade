@@ -8,7 +8,7 @@
    ECONOMY or GAMES and that stops being true, this fails loudly.
    ===================================================================== */
 import {
-  computeAward, clampFunAward, ECONOMY, GAMES,
+  computeAward, clampFunAward, computePillarAward, ECONOMY, PILLAR_ECONOMY, GAMES,
   spriteId, spriteIndex, spriteById, SPRITES,
   collectionScoreFromCounts, todayKey,
 } from './catalog.js';
@@ -69,6 +69,47 @@ const tomorrow = clampFunAward(funBig, first.daily, '2026-08-21');
 check('the fun budget resets the next day', [tomorrow.xp, tomorrow.coins], [ECONOMY.funDailyXpCap, ECONOMY.funDailyCoinCap]);
 const learnUncapped = clampFunAward(mathRun, { date:'2026-08-20', xp:9999, coins:9999 }, '2026-08-20');
 check('learning games are never capped', [learnUncapped.xp, learnUncapped.coins], [mathRun.xp, mathRun.coins]);
+
+/* ---------------- the pillar wallet ----------------
+   Bricks and sparks are paid ALONGSIDE xp/coins, never instead of them:
+   a learn game must pay bricks and zero sparks, a fun game the reverse.
+   If that ever flips, the wrong pillar is being fed. */
+console.log('\nPillar wallet');
+const learnPillars = computePillarAward(mathRun, null, '2026-08-20');
+check('a learn game pays bricks per correct answer',
+  learnPillars.bricksEarned, 17 * PILLAR_ECONOMY.bricksPerCorrect);
+check('a learn game pays no sparks', learnPillars.sparksEarned, 0);
+
+const funPillars = computePillarAward(blockRun, null, '2026-08-20');
+check('a fun game pays sparks per unit',
+  funPillars.sparksEarned, 20 * PILLAR_ECONOMY.sparksPerUnit);
+check('a fun game pays no bricks', funPillars.bricksEarned, 0);
+
+const sparkBig   = computePillarAward(funBig, null, '2026-08-20');
+check('sparks clamp to the daily cap', sparkBig.sparksEarned, PILLAR_ECONOMY.dailySparkCap);
+const sparkAgain = computePillarAward(funBig, sparkBig.dailySparks, '2026-08-20');
+check('a second fun run the same day earns no more sparks', sparkAgain.sparksEarned, 0);
+const sparkTomorrow = computePillarAward(funBig, sparkBig.dailySparks, '2026-08-21');
+check('the spark budget resets the next day',
+  sparkTomorrow.sparksEarned, PILLAR_ECONOMY.dailySparkCap);
+check('bricks are never capped by the spark budget',
+  computePillarAward(mathRun, sparkBig.dailySparks, '2026-08-20').bricksEarned,
+  17 * PILLAR_ECONOMY.bricksPerCorrect);
+
+/* a learn game's bonus round (the Home Run Derby) still pays sparks */
+const derbyRun = computeAward('math-baseball', { asked:20, correct:17, seconds:240, units:20, bonusSparks:7 });
+const derbyPillars = computePillarAward(derbyRun, null, '2026-08-20');
+check('a derby bonus pays sparks from a learn game', derbyPillars.sparksEarned, 7);
+check('the derby bonus does not touch bricks',
+  derbyPillars.bricksEarned, 17 * PILLAR_ECONOMY.bricksPerCorrect);
+check('the derby bonus is clamped by the same daily cap',
+  computePillarAward(derbyRun, { date:'2026-08-20', total:PILLAR_ECONOMY.dailySparkCap }, '2026-08-20').sparksEarned, 0);
+check('a bonus never leaks into xp or coins',
+  [derbyRun.xp, derbyRun.coins], [mathRun.xp, mathRun.coins]);
+
+/* the whole point of W0: the old numbers must not have moved */
+check('adding pillars did not change the xp/coin award',
+  [mathRun.xp, mathRun.coins, blockRun.xp, blockRun.coins], [316, 125, 60, 15]);
 
 /* ---------------- sprite ids ---------------- */
 console.log('\nSprite ids');
